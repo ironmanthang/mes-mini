@@ -1,0 +1,369 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Bảng employees (Nhân viên)
+model Employee {
+  employeeId             Int                     @id @default(autoincrement()) @map("employee_id")
+  fullName               String                  @map("full_name")
+  username               String                  @unique
+  password               String // Added for authentication
+  roles                  EmployeeRole[]
+  createdPurchaseOrders  PurchaseOrder[]
+  createdWorkOrders      WorkOrder[]
+  createdProductionReqs  ProductionRequest[]
+  managedSalesOrders     SalesOrder[]
+  performedQualityChecks QualityCheck[]
+  inventoryTransactions  InventoryTransaction[]
+
+  @@map("employees")
+}
+
+// 2. Bảng roles (Vai trò)
+model Role {
+  roleId   Int            @id @default(autoincrement()) @map("role_id")
+  roleName String         @unique @map("role_name")
+  employees EmployeeRole[]
+
+  @@map("roles")
+}
+
+// 3. Bảng employee_roles (Phân quyền vai trò)
+model EmployeeRole {
+  employee    Employee @relation(fields: [employeeId], references: [employeeId])
+  employeeId  Int      @map("employee_id")
+  role        Role     @relation(fields: [roleId], references: [roleId])
+  roleId      Int      @map("role_id")
+
+  @@id([employeeId, roleId])
+  @@map("employee_roles")
+}
+
+// 4. Bảng agents (Đại lý)
+model Agent {
+  agentId     Int          @id @default(autoincrement()) @map("agent_id")
+  agentName   String       @map("agent_name")
+  phoneNumber String?      @unique @map("phone_number")
+  email       String?      @unique
+  address     String
+  salesOrders SalesOrder[]
+
+  @@map("agents")
+}
+
+// 5. Bảng suppliers (Nhà cung cấp)
+model Supplier {
+  supplierId    Int             @id @default(autoincrement()) @map("supplier_id")
+  supplierName  String          @map("supplier_name")
+  phoneNumber   String?         @unique @map("phone_number")
+  email         String?         @unique
+  address       String
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+// 6. Bảng customers (Khách hàng)
+model Customer {
+  customerId  Int        @id @default(autoincrement()) @map("customer_id")
+  customerName String     @map("customer_name")
+  phoneNumber String?    @unique @map("phone_number")
+  email       String?    @unique
+  warranties  Warranty[]
+
+  @@map("customers")
+}
+
+// 7. Bảng product_categories (Danh mục sản phẩm)
+model ProductCategory {
+  categoryId  Int       @id @default(autoincrement()) @map("category_id")
+  categoryName String    @map("category_name")
+  description String?
+  products    Product[]
+
+  @@map("product_categories")
+}
+
+// 8. Bảng products (Sản phẩm)
+model Product {
+  productId           Int                   @id @default(autoincrement()) @map("product_id")
+  productName         String                @map("product_name")
+  categoryId          Int?                  @map("category_id")
+  category            ProductCategory?      @relation(fields: [categoryId], references: [categoryId])
+  composition         ProductComposition[]
+  salesOrderDetails   SalesOrderDetail[]
+  productionRequests  ProductionRequest[]
+  productInstances    ProductInstance[]
+
+  @@map("products")
+}
+
+// 9. Bảng components (Linh kiện)
+model Component {
+  componentId          Int                    @id @default(autoincrement()) @map("component_id")
+  componentName        String                 @map("component_name")
+  description          String?
+  productComposition   ProductComposition[]
+  purchaseOrderDetails PurchaseOrderDetail[]
+  componentStocks      ComponentStock[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@map("components")
+}
+
+// 10. Bảng product_composition (Cấu thành sản phẩm)
+model ProductComposition {
+  product         Product @relation(fields: [productId], references: [productId])
+  productId       Int     @map("product_id")
+  component       Component @relation(fields: [componentId], references: [componentId])
+  componentId     Int     @map("component_id")
+  quantityNeeded  Int     @map("quantity_needed")
+
+  @@id([productId, componentId])
+  @@map("product_composition")
+}
+
+// 11. Bảng purchase_orders (Đơn đặt hàng nhà cung cấp)
+model PurchaseOrder {
+  purchaseOrderId Int                     @id @default(autoincrement()) @map("purchase_order_id")
+  orderDate       DateTime                @map("order_date")
+  status          String
+  employeeId      Int                     @map("employee_id")
+  supplierId      Int                     @map("supplier_id")
+  employee        Employee                @relation(fields: [employeeId], references: [employeeId])
+  supplier        Supplier                @relation(fields: [supplierId], references: [supplierId])
+  details         PurchaseOrderDetail[]
+
+  @@map("purchase_orders")
+}
+
+// 12. Bảng purchase_order_details (Chi tiết đơn đặt hàng NCC)
+model PurchaseOrderDetail {
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [purchaseOrderId])
+  purchaseOrderId Int           @map("purchase_order_id")
+  component       Component     @relation(fields: [componentId], references: [componentId])
+  componentId     Int           @map("component_id")
+  quantity        Int
+  unitPrice       Decimal       @db.Decimal(10, 2) @map("unit_price")
+
+  @@id([purchaseOrderId, componentId])
+  @@map("purchase_order_details")
+}
+
+// 13. Bảng sales_orders (Đơn hàng)
+model SalesOrder {
+  salesOrderId Int                @id @default(autoincrement()) @map("sales_order_id")
+  orderDate    DateTime           @map("order_date")
+  status       String
+  employeeId   Int                @map("employee_id")
+  agentId      Int                @map("agent_id")
+  employee     Employee           @relation(fields: [employeeId], references: [employeeId])
+  agent        Agent              @relation(fields: [agentId], references: [agentId])
+  details      SalesOrderDetail[]
+
+  @@map("sales_orders")
+}
+
+// 14. Bảng sales_order_details (Chi tiết đơn hàng)
+model SalesOrderDetail {
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [salesOrderId])
+  salesOrderId Int        @map("sales_order_id")
+  product      Product    @relation(fields: [productId], references: [productId])
+  productId    Int        @map("product_id")
+  quantity     Int
+  salePrice    Decimal    @db.Decimal(10, 2) @map("sale_price")
+
+  @@id([salesOrderId, productId])
+  @@map("sales_order_details")
+}
+
+// 15. Bảng production_requests (Yêu cầu sản xuất)
+model ProductionRequest {
+  productionRequestId Int                      @id @default(autoincrement()) @map("production_request_id")
+  requestDate         DateTime                 @map("request_date")
+  status              String
+  quantity            Int
+  employeeId          Int                      @map("employee_id")
+  productId           Int                      @map("product_id")
+  employee            Employee                 @relation(fields: [employeeId], references: [employeeId])
+  product             Product                  @relation(fields: [productId], references: [productId])
+  workOrderFulfillments WorkOrderFulfillment[]
+
+  @@map("production_requests")
+}
+
+// 16. Bảng production_lines (Dây chuyền sản xuất)
+model ProductionLine {
+  productionLineId Int                @id @default(autoincrement()) @map("production_line_id")
+  lineName         String             @map("line_name")
+  location         String?
+  productionBatches ProductionBatch[]
+
+  @@map("production_lines")
+}
+
+// 17. Bảng work_orders (Lệnh sản xuất)
+model WorkOrder {
+  workOrderId         Int                      @id @default(autoincrement()) @map("work_order_id")
+  createDate          DateTime                 @map("create_date")
+  status              String
+  employeeId          Int                      @map("employee_id")
+  employee            Employee                 @relation(fields: [employeeId], references: [employeeId])
+  workOrderFulfillments WorkOrderFulfillment[]
+  productionBatches   ProductionBatch[]
+  productionCosts     ProductionCost[]
+
+  @@map("work_orders")
+}
+
+// 18. Bảng work_order_fulfillments (Thực thi yêu cầu sản xuất)
+model WorkOrderFulfillment {
+  workOrder           WorkOrder         @relation(fields: [workOrderId], references: [workOrderId])
+  workOrderId         Int               @map("work_order_id")
+  productionRequest   ProductionRequest @relation(fields: [productionRequestId], references: [productionRequestId])
+  productionRequestId Int               @map("production_request_id")
+
+  @@id([workOrderId, productionRequestId])
+  @@map("work_order_fulfillments")
+}
+
+// 19. Bảng production_batches (Lô sản xuất)
+model ProductionBatch {
+  productionBatchId Int               @id @default(autoincrement()) @map("production_batch_id")
+  batchCode         String            @unique @map("batch_code")
+  productionDate    DateTime          @map("production_date")
+  expiryDate        DateTime?         @map("expiry_date")
+  workOrderId       Int               @map("work_order_id")
+  productionLineId  Int               @map("production_line_id")
+  workOrder         WorkOrder         @relation(fields: [workOrderId], references: [workOrderId])
+  productionLine    ProductionLine    @relation(fields: [productionLineId], references: [productionLineId])
+  productInstances  ProductInstance[]
+
+  @@map("production_batches")
+}
+
+// 20. Bảng product_instances (Sản phẩm cụ thể)
+model ProductInstance {
+  productInstanceId  Int                   @id @default(autoincrement()) @map("product_instance_id")
+  serialNumber       String                @unique @map("serial_number")
+  status             String
+  unitProductionCost Decimal?              @db.Decimal(10, 2) @map("unit_production_cost")
+  productId          Int                   @map("product_id")
+  productionBatchId  Int                   @map("production_batch_id")
+  product            Product               @relation(fields: [productId], references: [productId])
+  productionBatch    ProductionBatch       @relation(fields: [productionBatchId], references: [productionBatchId])
+  warranty           Warranty?
+  qualityChecks      QualityCheck[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@map("product_instances")
+}
+
+// 21. Bảng warranties (Bảo hành)
+model Warranty {
+  warrantyId        Int             @id @default(autoincrement()) @map("warranty_id")
+  activationDate    DateTime        @map("activation_date")
+  expiryDate        DateTime        @map("expiry_date")
+  productInstanceId Int             @unique @map("product_instance_id")
+  customerId        Int             @map("customer_id")
+  productInstance   ProductInstance @relation(fields: [productInstanceId], references: [productInstanceId])
+  customer          Customer        @relation(fields: [customerId], references: [customerId])
+
+  @@map("warranties")
+}
+
+// 22. Bảng quality_checklists (Danh mục kiểm tra chất lượng)
+model QualityChecklist {
+  checklistId   Int            @id @default(autoincrement()) @map("checklist_id")
+  checklistName String         @map("checklist_name")
+  description   String?
+  qualityChecks QualityCheck[]
+
+  @@map("quality_checklists")
+}
+
+// 23. Bảng quality_checks (Kiểm tra chất lượng)
+model QualityCheck {
+  qualityCheckId    Int              @id @default(autoincrement()) @map("quality_check_id")
+  checkDate         DateTime         @map("check_date")
+  result            String
+  notes             String?
+  employeeId        Int              @map("employee_id")
+  productInstanceId Int              @map("product_instance_id")
+  checklistId       Int              @map("checklist_id")
+  employee          Employee         @relation(fields: [employeeId], references: [employeeId])
+  productInstance   ProductInstance  @relation(fields: [productInstanceId], references: [productInstanceId])
+  checklist         QualityChecklist @relation(fields: [checklistId], references: [checklistId])
+
+  @@map("quality_checks")
+}
+
+// 24. Bảng warehouses (Kho hàng)
+model Warehouse {
+  warehouseId           Int                    @id @default(autoincrement()) @map("warehouse_id")
+  warehouseName         String                 @map("warehouse_name")
+  location              String?
+  componentStocks       ComponentStock[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@map("warehouses")
+}
+
+// 25. Bảng component_stock (Tồn kho linh kiện)
+model ComponentStock {
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [warehouseId])
+  warehouseId Int       @map("warehouse_id")
+  component   Component @relation(fields: [componentId], references: [componentId])
+  componentId Int       @map("component_id")
+  quantity    Int
+
+  @@id([warehouseId, componentId])
+  @@map("component_stock")
+}
+
+// 26. Bảng inventory_transactions (Giao dịch kho)
+model InventoryTransaction {
+  transactionId     Int              @id @default(autoincrement()) @map("transaction_id")
+  transactionDate   DateTime         @map("transaction_date")
+  transactionType   String           @map("transaction_type")
+  quantity          Int
+  note              String?
+  employeeId        Int              @map("employee_id")
+  warehouseId       Int              @map("warehouse_id")
+  componentId       Int?             @map("component_id")
+  productInstanceId Int?             @map("product_instance_id")
+  employee          Employee         @relation(fields: [employeeId], references: [employeeId])
+  warehouse         Warehouse        @relation(fields: [warehouseId], references: [warehouseId])
+  component         Component?       @relation(fields: [componentId], references: [componentId])
+  productInstance   ProductInstance? @relation(fields: [productInstanceId], references: [productInstanceId])
+
+  @@map("inventory_transactions")
+}
+
+// 27. Bảng cost_categories (Loại chi phí)
+model CostCategory {
+  costCategoryId  Int              @id @default(autoincrement()) @map("cost_category_id")
+  categoryName    String           @map("category_name")
+  description     String?
+  productionCosts ProductionCost[]
+
+  @@map("cost_categories")
+}
+
+// 28. Bảng production_costs (Chi phí sản xuất)
+model ProductionCost {
+  productionCostId Int          @id @default(autoincrement()) @map("production_cost_id")
+  amount           Decimal      @db.Decimal(12, 2)
+  description      String?
+  workOrderId      Int          @map("work_order_id")
+  costCategoryId   Int          @map("cost_category_id")
+  workOrder        WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
+  costCategory     CostCategory @relation(fields: [costCategoryId], references: [costCategoryId])
+
+  @@map("production_costs")
+}

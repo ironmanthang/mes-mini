@@ -1,0 +1,45 @@
+# Note: The 'version' tag is obsolete and has been removed.
+services:
+  backend:
+    build: .
+    env_file:
+      - .env 
+    ports:
+      - "${HOST_PORT}:${CONTAINER_PORT}"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+    depends_on:
+      db: # <-- CHANGE IS HERE
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    restart: always
+    env_file:
+      - .env # The db service will pick up the POSTGRES_* variables
+    ports:
+      # Use variable substitution from the .env file
+      - "${DB_PORT}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck: # <-- ADD THIS ENTIRE BLOCK
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    env_file:
+      - .env # The pgadmin service will pick up the PGADMIN_* variables
+    ports:
+      - "8080:80"
+    depends_on:
+      db: # It's also good practice for pgadmin to wait for db to be healthy
+        condition: service_healthy
+
+volumes:
+  pgdata:
