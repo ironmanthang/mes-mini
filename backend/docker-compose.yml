@@ -36,7 +36,7 @@ services:
     env_file:
       - .env # The pgadmin service will pick up the PGADMIN_* variables
     ports:
-      - "8080:80"
+      - "${PGADMIN_PORT}:80"
     depends_on:
       db: # It's also good practice for pgadmin to wait for db to be healthy
         condition: service_healthy

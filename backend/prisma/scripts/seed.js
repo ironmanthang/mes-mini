@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, EmployeeStatus } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  // --- 1. SEED THE ROLES (You already have this) ---
   console.log('Seeding roles...');
   const roles = [
     'System Admin',
@@ -22,26 +21,34 @@ async function main() {
   }
   console.log('Roles seeded successfully.');
 
-
-  // --- 2. SEED THE INITIAL ADMIN USER (This is the new part) ---
   console.log('Seeding initial admin user...');
   const adminUsername = 'admin';
-  const adminPassword = 'changeme'; // Use a known, temporary password
+  const adminPassword = 'changeme';
 
-  // Find the 'System Admin' role we just created
   const adminRole = await prisma.role.findUnique({
     where: { roleName: 'System Admin' },
   });
 
   if (adminRole) {
-    // Use upsert to avoid creating the admin twice if the script is run again
     const adminUser = await prisma.employee.upsert({
       where: { username: adminUsername },
-      update: {},
+      update: {
+        // Ensure data stays consistent on re-runs
+        status: EmployeeStatus.ACTIVE,
+      },
       create: {
         fullName: 'Default Admin',
         username: adminUsername,
         password: await bcrypt.hash(adminPassword, 10),
+        email: 'admin@example.com',
+        phoneNumber: '000-000-0000',
+        
+        // --- NEW FIELDS ---
+        dateOfBirth: new Date('1990-01-01'), // Default DOB for admin
+        address: 'Admin HQ Address',         // Default address
+        
+        hireDate: new Date(),
+        status: EmployeeStatus.ACTIVE,
         roles: {
           create: {
             roleId: adminRole.roleId,

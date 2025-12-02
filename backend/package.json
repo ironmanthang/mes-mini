@@ -18,6 +18,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
@@ -26,5 +27,7 @@
     "nodemon": "^3.1.10",
     "prisma": "^6.19.0"
   },
-  "prisma": { "seed": "node prisma/scripts/seed.js" }
+  "prisma": {
+    "seed": "node prisma/scripts/seed.js"
+  }
 }
