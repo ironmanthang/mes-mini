@@ -1,4 +1,4 @@
-const runValidation = (schema) => (req, res, next) => {
+const validate = (schema) => (req, res, next) => {
   const { error, value } = schema.validate(req.body, {
     abortEarly: false, // Return all errors, not just the first one
     stripUnknown: true // Remove extra fields that aren't in the schema
@@ -15,4 +15,4 @@ const runValidation = (schema) => (req, res, next) => {
   next();
 };
 
-module.exports = runValidation;
+module.exports = validate;

@@ -16,27 +16,32 @@ enum Priority {
 }
 
 enum OrderStatus {
+  DRAFT               
   PENDING
+  APPROVED            // Added
   PROCESSING
+  PARTIALLY_RECEIVED  // Added: Critical for real purchasing
   SHIPPED
   COMPLETED
   CANCELLED
 }
 
 enum ProductionStatus {
+  DRAFT               
   REQUESTED
   APPROVED
   IN_PROGRESS
-  ON_HOLD
   COMPLETED
   CLOSED
+  CANCELLED
 }
 
 enum ProductInstanceStatus {
   IN_STOCK
   SOLD
   IN_REPAIR
-  DECOMMISSIONED
+  SCRAPPED           
+  RETURNED
 }
 
 enum EmployeeStatus {
@@ -52,15 +57,21 @@ enum QualityCheckResult {
 }
 
 enum InventoryTransactionType {
-  RECEIPT // From supplier
-  SHIPMENT // To agent/customer
-  TRANSFER // Between warehouses
-  ADJUSTMENT // Manual correction
-  CONSUMPTION // Used in production
+  IMPORT_PO         // From Supplier
+  EXPORT_PRODUCTION // To Line (Material Issue)
+  IMPORT_PRODUCTION // From Line (Finished Goods)
+  EXPORT_SALES      // To Customer
+  TRANSFER
+  ADJUSTMENT
   RETURN
 }
 
-
+enum RequestStatus {     // NEW ENUM for Module C
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
 // 1. Bảng employees (Nhân viên)
 model Employee {
   employeeId             Int                     @id @default(autoincrement()) @map("employee_id")
@@ -69,21 +80,24 @@ model Employee {
   password               String
   email                  String                  @unique
   phoneNumber            String                  @unique @map("phone_number")
-  
+  address                String?                   
   dateOfBirth            DateTime?               @map("date_of_birth") 
-  address                String?                 
   
   hireDate               DateTime                @map("hire_date")
   terminationDate        DateTime?               @map("termination_date")
   status                 EmployeeStatus          @default(ACTIVE)
 
   roles                  EmployeeRole[]
-  createdPurchaseOrders  PurchaseOrder[]
   createdWorkOrders      WorkOrder[]
   createdProductionReqs  ProductionRequest[]
-  managedSalesOrders     SalesOrder[]
+  managedSalesOrders     SalesOrder[]  
+  createdMaterialReqs    MaterialExportRequest[] @relation("Requester")
+  approvedMaterialReqs   MaterialExportRequest[] @relation("Approver")
   performedQualityChecks QualityCheck[]
   inventoryTransactions  InventoryTransaction[]
+  createdPurchaseOrders  PurchaseOrder[] @relation("POCreator")  
+  approvedPurchaseOrders PurchaseOrder[] @relation("POApprover")
+
   createdAt              DateTime                @default(now()) @map("created_at")
   updatedAt              DateTime                @updatedAt @map("updated_at")
 
@@ -131,6 +145,7 @@ model Agent {
 // 5. Bảng suppliers (Nhà cung cấp)
 model Supplier {
   supplierId     Int             @id @default(autoincrement()) @map("supplier_id")
+  code           String          @unique // NEW: Required for Barcode
   supplierName   String          @map("supplier_name")
   phoneNumber    String?         @unique @map("phone_number")
   email          String?         @unique
@@ -138,6 +153,8 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  suppliedComponents SupplierComponent[] // Relation for filtering
 
   @@index([supplierName])
   @@map("suppliers")
@@ -175,8 +192,10 @@ model ProductCategory {
 // 8. Bảng products (Sản phẩm)
 model Product {
   productId          Int                   @id @default(autoincrement()) @map("product_id")
+  code               String                @unique // NEW: PRD-001
   productName        String                @map("product_name")
   categoryId         Int?                  @map("category_id")
+  unit               String                // NEW
   category           ProductCategory?      @relation(fields: [categoryId], references: [categoryId], onDelete: SetNull)
   composition        ProductComposition[]
   salesOrderDetails  SalesOrderDetail[]
@@ -196,12 +215,19 @@ model Product {
 // 9. Bảng components (Linh kiện)
 model Component {
   componentId           Int                    @id @default(autoincrement()) @map("component_id")
+  code                  String                 @unique // NEW: Required for Barcode (COM-001)
   componentName         String                 @map("component_name")
   description           String?
+  unit                  String                 // NEW: (kg, pcs)
+  minStockLevel         Int                    @default(0) @map("min_stock_level") // NEW: Alerting
+  standardCost          Decimal                @default(0) @db.Decimal(10, 2) @map("standard_cost")
+
   productComposition    ProductComposition[]
   purchaseOrderDetails  PurchaseOrderDetail[]
   componentStocks       ComponentStock[]
   inventoryTransactions InventoryTransaction[]
+  materialReqDetails    MaterialRequestDetail[] 
+  suppliedBy         SupplierComponent[] // Relation
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
@@ -215,7 +241,8 @@ model ProductComposition {
   productId      Int       @map("product_id")
   component      Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
   componentId    Int       @map("component_id")
-  quantityNeeded Int       @map("quantity_needed")
+  quantityNeeded Decimal   @map("quantity_needed") @db.Decimal(10, 4) // Changed to Decimal for precision
+
 
   @@id([productId, componentId])
   @@map("product_composition")
@@ -224,37 +251,51 @@ model ProductComposition {
 // 11. Bảng purchase_orders (Đơn đặt hàng nhà cung cấp)
 model PurchaseOrder {
   purchaseOrderId      Int                     @id @default(autoincrement()) @map("purchase_order_id")
+  code                 String                  @unique 
   orderDate            DateTime                @default(now()) @map("order_date")
   status               OrderStatus             @default(PENDING)
-  
+  totalAmount          Decimal                 @default(0) @db.Decimal(15, 2) @map("total_amount")
+  discount             Decimal                 @default(0) @db.Decimal(15, 2) // Added
+  shippingCost         Decimal                 @default(0) @db.Decimal(15, 2) @map("shipping_cost")
+  tax                  Decimal                 @default(0) @db.Decimal(15, 2) 
+
   paymentTerms         String?                 @map("payment_terms")
   deliveryTerms        String?                 @map("delivery_terms")
-  tax                  Decimal                 @default(0) @db.Decimal(10, 2)
-  shippingCost         Decimal                 @default(0) @map("shipping_cost") @db.Decimal(10, 2)
   expectedDeliveryDate DateTime?               @map("expected_delivery_date")
   priority             Priority                @default(MEDIUM)
 
   employeeId           Int                     @map("employee_id")
   supplierId           Int                     @map("supplier_id")
-  employee             Employee                @relation(fields: [employeeId], references: [employeeId])
+  employee             Employee                @relation("POCreator", fields: [employeeId], references: [employeeId])
   supplier             Supplier                @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
   details              PurchaseOrderDetail[]
   createdAt            DateTime                @default(now()) @map("created_at")
   updatedAt            DateTime                @updatedAt @map("updated_at")
+  
+  // Approver (The Manager who said "Yes")
+  approverId           Int?                    @map("approver_id") // NEW
+  approvedAt           DateTime?               @map("approved_at") // NEW
+  approver             Employee?               @relation("POApprover", fields: [approverId], references: [employeeId])
 
+  // Relation to Inventory Transactions (For history tracking)
+  inventoryTransactions InventoryTransaction[] // This already exists in your schema but needs the other side updated
+  
   @@map("purchase_orders")
 }
 
 // 12. Bảng purchase_order_details (Chi tiết đơn đặt hàng NCC)
 model PurchaseOrderDetail {
+  poDetailId      Int           @id @default(autoincrement()) @map("po_detail_id") // NEW: ID for easier tracking
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [purchaseOrderId], onDelete: Cascade)
   purchaseOrderId Int           @map("purchase_order_id")
   component       Component     @relation(fields: [componentId], references: [componentId])
   componentId     Int           @map("component_id")
-  quantity        Int
+  quantityOrdered Int           @map("quantity_ordered") // Renamed from quantity
+  quantityReceived Int          @default(0) @map("quantity_received") // NEW: Track partials
+  
   unitPrice       Decimal       @db.Decimal(10, 2) @map("unit_price")
-
-  @@id([purchaseOrderId, componentId])
+  
+  @@unique([purchaseOrderId, componentId]) 
   @@map("purchase_order_details")
 }
 
@@ -290,6 +331,7 @@ model SalesOrderDetail {
 // 15. Bảng production_requests (Yêu cầu sản xuất)
 model ProductionRequest {
   productionRequestId   Int                      @id @default(autoincrement()) @map("production_request_id")
+  code                  String                   @unique // NEW
   requestDate           DateTime                 @default(now()) @map("request_date")
   status                ProductionStatus         @default(REQUESTED)
   
@@ -322,8 +364,11 @@ model ProductionLine {
 // 17. Bảng work_orders (Lệnh sản xuất)
 model WorkOrder {
   workOrderId           Int                      @id @default(autoincrement()) @map("work_order_id")
+  code                  String                   @unique // NEW: WO-001
   createDate            DateTime                 @default(now()) @map("create_date")
-  status                ProductionStatus         @default(REQUESTED)
+  status                ProductionStatus         @default(DRAFT) // Changed default
+  quantity              Int                      // NEW: Planned Qty
+
   employeeId            Int                      @map("employee_id")
   
   productId             Int                      @map("product_id")
@@ -333,6 +378,7 @@ model WorkOrder {
   workOrderFulfillments WorkOrderFulfillment[]
   productionBatches     ProductionBatch[]
   productionCosts       ProductionCost[]
+  materialRequests      MaterialExportRequest[]
   createdAt             DateTime                 @default(now()) @map("created_at")
   updatedAt             DateTime                 @updatedAt @map("updated_at")
 
@@ -357,15 +403,17 @@ model ProductionBatch {
   productionDate    DateTime          @map("production_date")
   expiryDate        DateTime?         @map("expiry_date")
   workOrderId       Int               @map("work_order_id")
-  productionLineId  Int               @map("production_line_id")
+  productionLineId  Int?              @map("production_line_id") // Made Optional
   workOrder         WorkOrder         @relation(fields: [workOrderId], references: [workOrderId])
-  productionLine    ProductionLine    @relation(fields: [productionLineId], references: [productionLineId])
+  productionLine    ProductionLine?   @relation(fields: [productionLineId], references: [productionLineId])
   productInstances  ProductInstance[]
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
   @@map("production_batches")
 }
+
+
 
 // 20. Bảng product_instances (Sản phẩm cụ thể)
 model ProductInstance {
@@ -434,6 +482,7 @@ model QualityCheck {
 // 24. Bảng warehouses (Kho hàng)
 model Warehouse {
   warehouseId           Int                    @id @default(autoincrement()) @map("warehouse_id")
+  code                  String                 @unique // NEW: Barcode (WH-01)
   warehouseName         String                 @map("warehouse_name")
   location              String?
   componentStocks       ComponentStock[]
@@ -454,7 +503,7 @@ model ComponentStock {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@id([warehouseId, componentId])
-  @@map("component_stock")
+  @@map("component_stocks")
 }
 
 // 26. Bảng inventory_transactions (Giao dịch kho)
@@ -468,10 +517,14 @@ model InventoryTransaction {
   warehouseId       Int                      @map("warehouse_id")
   componentId       Int?                     @map("component_id")
   productInstanceId Int?                     @map("product_instance_id")
+  materialReqId     Int?                     @map("material_req_id") // NEW: Link to Request
   employee          Employee                 @relation(fields: [employeeId], references: [employeeId])
   warehouse         Warehouse                @relation(fields: [warehouseId], references: [warehouseId])
   component         Component?               @relation(fields: [componentId], references: [componentId])
   productInstance   ProductInstance?         @relation(fields: [productInstanceId], references: [productInstanceId])
+  materialReq       MaterialExportRequest?   @relation(fields: [materialReqId], references: [requestId])
+  purchaseOrderId   Int?                     @map("purchase_order_id") // NEW
+  purchaseOrder     PurchaseOrder?           @relation(fields: [purchaseOrderId], references: [purchaseOrderId])
 
   @@index([transactionType])
   @@index([transactionDate])
@@ -502,4 +555,54 @@ model ProductionCost {
   createdAt        DateTime     @default(now()) @map("created_at")
 
   @@map("production_costs")
+}
+
+// 29.  
+model SupplierComponent {
+  supplier    Supplier  @relation(fields: [supplierId], references: [supplierId], onDelete: Cascade)
+  supplierId  Int       @map("supplier_id")
+  component   Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
+  componentId Int       @map("component_id")
+
+  // REMOVED: supplierSku, price, currency (Per your request)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@id([supplierId, componentId]) // Composite Key
+  @@map("supplier_components")
+}
+
+// 30.
+model MaterialExportRequest {
+  requestId     Int           @id @default(autoincrement()) @map("material_req_id")
+  code          String        @unique // e.g. "REQ-MAT-001"
+  requestDate   DateTime      @default(now()) @map("request_date")
+  status        RequestStatus @default(PENDING)
+  note          String?
+  
+  workOrderId   Int           @map("work_order_id")
+  requesterId   Int           @map("requester_id")
+  approverId    Int?          @map("approver_id")
+  
+  workOrder     WorkOrder     @relation(fields: [workOrderId], references: [workOrderId])
+  requester     Employee      @relation("Requester", fields: [requesterId], references: [employeeId])
+  approver      Employee?     @relation("Approver", fields: [approverId], references: [employeeId])
+  
+  details       MaterialRequestDetail[]
+  transactions  InventoryTransaction[]
+
+  @@map("material_export_requests")
+}
+
+
+// 31.
+model MaterialRequestDetail {
+  detailId      Int                   @id @default(autoincrement())
+  requestId     Int                   @map("material_req_id")
+  componentId   Int                   @map("component_id")
+  quantity      Int
+  
+  request       MaterialExportRequest @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+  component     Component             @relation(fields: [componentId], references: [componentId])
+
+  @@map("material_request_details")
 }

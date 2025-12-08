@@ -1,17 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const { login, getMe, updateProfile, changePassword } = require('../controllers/authController');
+const { 
+    login,
+    getMe, 
+    updateProfile, 
+    changePassword 
+} = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
-const runValidation = require('../middleware/validate');
+const validate = require('../middleware/validate');
 const { loginSchema, profileUpdateSchema, changePasswordSchema } = require('../validators/authValidator');
 
-router.post('/login', runValidation(loginSchema), login);
-
-
-
-router.get('/me', protect, getMe);
-router.put('/profile', protect, runValidation(profileUpdateSchema), updateProfile);
-router.put('/change-password', protect, runValidation(changePasswordSchema), changePassword);
+router.post('/login', validate(loginSchema), login);
+router.use(protect);
+router.get('/me', getMe);
+router.put('/profile', validate(profileUpdateSchema), updateProfile);
+router.put('/change-password', validate(changePasswordSchema), changePassword);
 
 
 /**
@@ -31,7 +34,7 @@ router.put('/change-password', protect, runValidation(changePasswordSchema), cha
  *               - password
  *             properties:
  *               username: { type: string, example: "admin" }
- *               password: { type: string, example: "changeme" }
+ *               password: { type: string, example: "123456" }
  *     responses:
  *       200:
  *         description: Login successful

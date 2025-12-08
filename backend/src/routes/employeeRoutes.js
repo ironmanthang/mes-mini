@@ -9,18 +9,18 @@ const {
     deleteEmployee 
 } = require('../controllers/employeeController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const runValidation = require('../middleware/validate');
+const validate = require('../middleware/validate');
 const { employeeCreateSchema, employeeUpdateSchema, statusUpdateSchema } = require('../validators/employeeValidator');
 
 
 router.use(protect, authorize('System Admin'));
 
-router.post('/', runValidation(employeeCreateSchema), createUser);
+router.post('/', validate(employeeCreateSchema), createUser);
 router.get('/', getAllEmployees);
 router.get('/:id', getEmployeeById);
-router.put('/:id', runValidation(employeeUpdateSchema), updateEmployee);
+router.put('/:id', validate(employeeUpdateSchema), updateEmployee);
 router.delete('/:id', deleteEmployee);
-router.patch('/:id/status', runValidation(statusUpdateSchema), updateEmployeeStatus);
+router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
 
 
 /**

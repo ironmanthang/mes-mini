@@ -11,6 +11,14 @@ const swaggerOptions = {
       description: 'API documentation for the Mini-MES backend',
     },
     servers: [{ url: `http://localhost:${process.env.HOST_PORT}` }],
+    tags: [
+      { name: 'Auth', description: 'Authentication & Profile' },
+      { name: 'Employees', description: 'User Management' },
+      { name: 'Roles', description: 'RBAC Management' },
+      { name: 'Suppliers', description: 'Module A: Supply Chain' },
+      { name: 'Components', description: 'Master Data: Raw Materials' },
+      { name: 'Purchase Orders', description: 'Module A: Procurement' },
+    ],
     components: {
       securitySchemes: {
         bearerAuth: {

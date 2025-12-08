@@ -1,14 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { getAllRoles, createRole, updateRole, deleteRole } = require('../controllers/roleController');
+const { 
+    getAllRoles, 
+    createRole, 
+    updateRole, 
+    deleteRole 
+} = require('../controllers/roleController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const runValidation = require('../middleware/validate');
+const validate = require('../middleware/validate');
 const { roleSchema } = require('../validators/roleValidator');
 
 router.use(protect, authorize('System Admin'));
 router.get('/', getAllRoles);
-router.post('/', runValidation(roleSchema), createRole);
-router.put('/:id', runValidation(roleSchema), updateRole);
+router.post('/', validate(roleSchema), createRole);
+router.put('/:id', validate(roleSchema), updateRole);
 router.delete('/:id', deleteRole);
 
 /**
