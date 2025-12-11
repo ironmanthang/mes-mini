@@ -14,7 +14,7 @@ import type { JSX } from "react";
 
 interface SidebarProps {
   activePage: string;
-  onNavigate: (pageName: string) => void; 
+  onNavigate: (pageName: string) => void;
 }
 
 const menuItems = [

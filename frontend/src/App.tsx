@@ -11,13 +11,28 @@ import { Components } from "./screens/Components";
 
 export default function App() {
   const [activePage, setActivePage] = useState("Dashboard");
+  const [userSystemTab, setUserSystemTab] = useState<"management" | "settings">("management");
+
+  const handleSidebarNavigate = (pageName: string) => {
+    setActivePage(pageName);
+    if (pageName === "User & System") {
+      setUserSystemTab("management");
+    }
+  };
+
+  const handleHeaderNavigate = (pageName: string) => {
+    setActivePage(pageName);
+    if (pageName === "User & System") {
+      setUserSystemTab("settings");
+    }
+  };
 
   const renderContent = () => {
     switch (activePage) {
       case "Dashboard":
         return <Dashboard />;
       case "User & System":
-        return <UserAndSystem />;
+        return <UserAndSystem tabType={userSystemTab}/>
       case "Human Resources":
         return <HumanResources />;
       case "Production":
@@ -34,10 +49,10 @@ export default function App() {
   return (
     <div className="bg-white w-full min-h-screen flex [font-family:'Zen_Kaku_Gothic_Antique',Helvetica]">
       
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={handleSidebarNavigate} />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header />
+        <Header onNavigate={handleHeaderNavigate}/>
 
         <div className="flex-1 overflow-auto bg-white">
            {renderContent()}

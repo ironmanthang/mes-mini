@@ -1,6 +1,6 @@
 import { 
   Plus, Trash2, Upload, 
-  Save, Send, Calculator, Printer
+  Save, Send, Calculator, Printer, FileText
 } from "lucide-react";
 import { useState, type JSX } from "react";
 
@@ -33,7 +33,7 @@ interface OrderRow {
 export const CreateComponentOrder = (): JSX.Element => {
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [supplierInfo, setSupplierInfo] = useState<any>(null);
-  const [orderDate] = useState(new Date().toISOString().split('T')[0]); // Today
+  const [orderDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [priority, setPriority] = useState("Medium");
 
@@ -94,19 +94,33 @@ export const CreateComponentOrder = (): JSX.Element => {
   const grandTotal = subtotal + taxAmount + shippingCost;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-8">
+      
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">New Component Order</h2>
+          <p className="text-sm text-gray-500">Create a purchase order for raw materials.</p>
+        </div>
+        <div className="flex gap-3">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+             <Save className="w-4 h-4" /> Save Draft
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+             <Printer className="w-4 h-4" /> Print
+          </button>
+        </div>
+      </div>
+
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
-          Supplier & Basic Info
+        <h3 className="text-base font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
+          <FileText className="w-4 h-4 text-blue-600" /> Supplier Information
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Supplier Selection<span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700">Supplier<span className="text-red-500">*</span></label>
             <select 
-              className="w-full p-2.5 border border-gray-300 rounded-lg 
-              focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer"
+              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer bg-white"
               value={selectedSupplierId}
               onChange={handleSupplierChange}
             >
@@ -118,7 +132,7 @@ export const CreateComponentOrder = (): JSX.Element => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Phone Number</label>
+            <label className="text-sm font-medium text-gray-700">Phone</label>
             <input type="text" readOnly value={supplierInfo?.phone || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
           </div>
 
@@ -132,23 +146,20 @@ export const CreateComponentOrder = (): JSX.Element => {
             <input type="text" readOnly value={supplierInfo?.address || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
           </div>
           
-          <div className="w-full h-px bg-gray-100 md:col-span-3 my-2"></div>
+          <div className="w-full h-px bg-gray-100 md:col-span-3 my-1"></div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Order Date</label>
-            <div className="relative">
-              <input type="date" disabled value={orderDate} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
-            </div>
+            <input type="date" disabled value={orderDate} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Expected Delivery Date</label>
+            <label className="text-sm font-medium text-gray-700">Expected Delivery</label>
             <input 
               type="date" 
               value={deliveryDate} 
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg 
-              focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer" 
+              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer" 
             />
           </div>
 
@@ -157,8 +168,7 @@ export const CreateComponentOrder = (): JSX.Element => {
             <select 
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg 
-              focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer"
+              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer bg-white"
             >
               <option value="High">High</option>
               <option value="Medium">Medium</option>
@@ -168,20 +178,27 @@ export const CreateComponentOrder = (): JSX.Element => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
-          Component List
-        </h3>
+      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm min-h-[300px]">
+        <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+            <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600" /> Items Details
+            </h3>
+            <button 
+                onClick={addRow}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
+            >
+                <Plus className="w-4 h-4" /> Add Item
+            </button>
+        </div>
 
-        <div className="overflow-x-auto mb-4">
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs uppercase text-gray-500 font-semibold">
-                <th className="p-3 w-[250px]">Component Name*</th>
+                <th className="p-3 w-[300px]">Component Name*</th>
                 <th className="p-3">ID</th>
                 <th className="p-3">Description</th>
-                <th className="p-3 text-right">Current Stock</th>
+                <th className="p-3 text-right">Stock</th>
                 <th className="p-3 text-right w-[100px]">Qty*</th>
                 <th className="p-3 text-right w-[120px]">Unit Price ($)*</th>
                 <th className="p-3 text-right w-[120px]">Total ($)</th>
@@ -190,11 +207,10 @@ export const CreateComponentOrder = (): JSX.Element => {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="p-3">
                     <select 
-                      className="w-full p-2 border border-gray-300 rounded 
-                      text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
+                      className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
                       value={row.componentId}
                       onChange={(e) => handleComponentSelect(row.id, e.target.value)}
                     >
@@ -211,20 +227,25 @@ export const CreateComponentOrder = (): JSX.Element => {
                     <input 
                       type="number" 
                       min="1"
-                      className="w-full p-2 border border-gray-300 rounded 
-                      text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full p-2 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                       value={row.quantity}
                       onChange={(e) => handleRowChange(row.id, 'quantity', parseInt(e.target.value) || 0)}
                     />
                   </td>
                   <td className="p-3 text-sm text-gray-600 text-right">
-                    {row.unitPrice || '-'}
+                    <input 
+                        type="number" 
+                        min="0"
+                        className="w-full p-2 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={row.unitPrice}
+                        onChange={(e) => handleRowChange(row.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                    />
                   </td>
                   <td className="p-3 text-right text-sm font-medium text-gray-900">
                     {row.total.toLocaleString()}
                   </td>
                   <td className="p-3 text-center">
-                    <button onClick={() => removeRow(row.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer">
+                    <button onClick={() => removeRow(row.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded transition-colors cursor-pointer">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
@@ -232,126 +253,107 @@ export const CreateComponentOrder = (): JSX.Element => {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-400 italic text-sm">
-                    No components added yet. Click "Add Component" to start.
+                  <td colSpan={8} className="p-12 text-center text-gray-400 border-dashed border-2 border-gray-100 rounded-lg">
+                    <div className="flex flex-col items-center">
+                        <Plus className="w-8 h-8 mb-2 opacity-20" />
+                        <p className="text-sm">List is empty.</p>
+                        <button onClick={addRow} className="mt-2 text-blue-600 hover:underline text-sm">Add first item</button>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-
-        <button 
-          onClick={addRow}
-          className="flex items-center gap-2 px-4 py-2 
-          bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium
-          cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Add Component
-        </button>
       </div>
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
-          Summary & Approval
-        </h3>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6">
-             <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Payment Terms</label>
-                  <select 
-                    value={paymentTerm} onChange={(e) => setPaymentTerm(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none cursor-pointer"
-                  >
-                    <option value="Net 30">Net 30</option>
-                    <option value="Due upon receipt">Due upon receipt</option>
-                    <option value="50% Advance, 50% on delivery">50% Advance, 50% on delivery</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Delivery Terms</label>
-                  <select 
-                    value={deliveryTerm} onChange={(e) => setDeliveryTerm(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none cursor-pointer"
-                  >
-                    <option value="FOB - Free On Board">FOB - Free On Board</option>
-                    <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
-                    <option value="EXW - Ex Works">EXW - Ex Works</option>
-                    <option value="DDP - Delivered Duty Paid">DDP - Delivered Duty Paid</option>
-                  </select>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-6 h-full">
+             <div className="space-y-4">
+                <h4 className="text-sm font-bold text-gray-700 border-b border-gray-100 pb-2">Terms & Conditions</h4>
+                <div className="grid grid-cols-1 gap-4">
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 block mb-1">Payment Terms</label>
+                        <select 
+                            value={paymentTerm} onChange={(e) => setPaymentTerm(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none cursor-pointer"
+                        >
+                            <option value="Net 30">Net 30</option>
+                            <option value="Due upon receipt">Due upon receipt</option>
+                            <option value="50% Advance">50% Advance, 50% on delivery</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 block mb-1">Delivery Terms</label>
+                        <select 
+                            value={deliveryTerm} onChange={(e) => setDeliveryTerm(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none cursor-pointer"
+                        >
+                            <option value="FOB">FOB - Free On Board</option>
+                            <option value="CIF">CIF - Cost, Insurance and Freight</option>
+                            <option value="DDP">DDP - Delivered Duty Paid</option>
+                        </select>
+                    </div>
                 </div>
              </div>
 
              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Attachments</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer text-center">
-                   <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                   <p className="text-sm text-gray-600 font-medium">Click to upload documents</p>
-                   <p className="text-xs text-gray-400">Quotes, Spec Sheets (PDF, JPG)</p>
+                <label className="text-xs font-medium text-gray-500 block">Attachments</label>
+                <div className="border border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer text-gray-500">
+                   <Upload className="w-4 h-4" />
+                   <span className="text-sm">Upload Quotes / Specs</span>
                 </div>
              </div>
           </div>
 
-          <div className="bg-gray-50 p-6 rounded-lg space-y-4">
-             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-               <span className="text-sm text-gray-600">Subtotal</span>
-               <span className="text-base font-semibold text-gray-900">${subtotal.toLocaleString()}</span>
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+             <div className="space-y-4">
+                 <div className="flex justify-between items-center text-sm text-gray-600">
+                   <span>Subtotal</span>
+                   <span className="font-semibold text-gray-900">${subtotal.toLocaleString()}</span>
+                 </div>
+
+                 <div className="flex justify-between items-center text-sm text-gray-600">
+                   <span>Tax (%)</span>
+                   <div className="flex items-center justify-end w-32">
+                     <input 
+                       type="number" 
+                       value={taxRate} 
+                       onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                       className="w-12 p-1 border border-gray-300 rounded text-right text-sm mr-2 bg-white"
+                     />
+                     <span className="font-medium text-gray-900">${taxAmount.toLocaleString()}</span>
+                   </div>
+                 </div>
+
+                 <div className="flex justify-between items-center text-sm text-gray-600">
+                   <span>Shipping ($)</span>
+                   <input 
+                      type="number" 
+                      value={shippingCost} 
+                      onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                      className="w-24 p-1 border border-gray-300 rounded text-right text-sm font-medium text-gray-900 bg-white"
+                   />
+                 </div>
+
+                 <div className="pt-4 border-t-2 border-gray-200 flex justify-between items-center">
+                   <span className="text-lg font-bold text-gray-900">Grand Total</span>
+                   <span className="text-2xl font-bold text-blue-600">${grandTotal.toLocaleString()}</span>
+                 </div>
              </div>
 
-             <div className="flex justify-between items-center gap-4">
-               <span className="text-sm text-gray-600">Tax (%)</span>
-               <div className="flex items-center justify-end w-32">
-                 <input 
-                   type="number" 
-                   value={taxRate} 
-                   onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                   className="w-16 p-1 border border-gray-300 rounded text-right text-sm mr-2"
-                 />
-                 <span className="text-sm font-medium text-gray-900">${taxAmount.toLocaleString()}</span>
-               </div>
-             </div>
-
-             <div className="flex justify-between items-center gap-4">
-               <span className="text-sm text-gray-600">Shipping Cost ($)</span>
-               <input 
-                  type="number" 
-                  value={shippingCost} 
-                  onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                  className="w-32 p-1 border border-gray-300 rounded text-right text-sm font-medium text-gray-900"
-               />
-             </div>
-
-             <div className="pt-4 border-t-2 border-gray-200 flex justify-between items-center">
-               <span className="text-lg font-bold text-gray-900">Grand Total</span>
-               <span className="text-2xl font-bold text-blue-600">${grandTotal.toLocaleString()}</span>
+             <div className="mt-8 grid grid-cols-2 gap-3">
+                <button className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                   <Calculator className="w-4 h-4" /> Recalculate
+                </button>
+                <button className="flex items-center justify-center gap-2 px-4 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md cursor-pointer">
+                   <Send className="w-4 h-4" /> Submit Order
+                </button>
              </div>
           </div>
-        </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 ml-[200px]">
-         <div className="max-w-7xl mx-auto flex items-center justify-end gap-3">
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-white border 
-            border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-               <Save className="w-4 h-4" /> Save Draft
-            </button>
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-white border 
-            border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-               <Printer className="w-4 h-4" /> Print Preview
-            </button>
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-blue-100 text-blue-700 
-            font-medium rounded-lg hover:bg-blue-200 transition-colors cursor-pointer">
-               <Calculator className="w-4 h-4" /> Calculate Total
-            </button>
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-[#2EE59D] text-white 
-            font-medium rounded-lg hover:bg-[#25D390] transition-colors shadow-sm cursor-pointer">
-               <Send className="w-4 h-4" /> Submit for Approval
-            </button>
-         </div>
-      </div>
     </div>
   );
 };
