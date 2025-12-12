@@ -1,11 +1,49 @@
-import { EyeIcon } from "lucide-react";
+import { EyeIcon, Loader2, EyeOffIcon } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/lable";
 import type { JSX } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { authService } from "../../services/authServices";
 
 export const SignIn = (): JSX.Element => {
+  const navigate = useNavigate();
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      setError("Please enter both username and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await authService.login({ username, password });
+      navigate("/"); 
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Login failed. Please check your credentials.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleLogin();
+    }
+  };
+
   return (
     <div className="bg-white overflow-hidden w-full min-w-[1440px] h-screen flex">
       <div className="w-1/2 relative bg-gradient-to-br from-[#7b76f1] via-[#9b6fd9] to-[#c96bc6] flex flex-col items-center justify-between py-20 px-16 gap-6">
@@ -29,7 +67,6 @@ export const SignIn = (): JSX.Element => {
             </p>
           </div>
         </div>
-
         <div className="h-20" />
       </div>
 
@@ -40,7 +77,13 @@ export const SignIn = (): JSX.Element => {
             Production Operations eXtended
           </h1>
 
-          <div className="w-full max-w-[380px] flex flex-col gap-6">
+          <div className="w-full max-w-[380px] flex flex-col gap-6" onKeyDown={handleKeyDown}>
+            {error && (
+              <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm text-center border border-red-200">
+                {error}
+              </div>
+            )}
+
             <div className="flex flex-col gap-6">
               <div className="relative flex flex-col gap-2">
                 <Label
@@ -52,7 +95,9 @@ export const SignIn = (): JSX.Element => {
                 <Input
                   id="email"
                   type="text"
-                  defaultValue="phanphuclam@prodopsx.com"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="[font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-normal text-[#212121] text-base tracking-[0] leading-[28.2px] border-0 border-b border-[#e0e0e0] rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#7b76f1]"
                 />
               </div>
@@ -67,15 +112,18 @@ export const SignIn = (): JSX.Element => {
                 <div className="relative">
                   <Input
                     id="password"
-                    type="password"
-                    defaultValue="**************"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="[font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-normal text-[#424242] text-base tracking-[0] leading-[28.2px] border-0 border-b border-[#e0e0e0] rounded-none px-0 pr-8 focus-visible:ring-0 focus-visible:border-[#7b76f1]"
                   />
                   <button
                     type="button"
+                    onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-0 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#424242]"
                   >
-                    <EyeIcon className="w-4 h-4" />
+                    {showPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -92,9 +140,14 @@ export const SignIn = (): JSX.Element => {
                 </Label>
               </div>
 
-              <Button className="bg-[#7b76f1] hover:bg-[#6b66e1] text-white [font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-bold text-[12.8px] tracking-[0] 
-                leading-[22.5px] rounded-[56px] shadow-[0px_34px_40px_-8px_#7b76f13d] h-14 px-12 cursor-pointer">
-                LOG IN
+              <Button 
+                onClick={handleLogin}
+                disabled={isLoading}
+                className="bg-[#7b76f1] hover:bg-[#6b66e1] text-white [font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-bold text-[12.8px] tracking-[0] 
+                leading-[22.5px] rounded-[56px] shadow-[0px_34px_40px_-8px_#7b76f13d] h-14 px-12 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isLoading ? "LOGGING IN..." : "LOG IN"}
               </Button>
             </div>
           </div>
