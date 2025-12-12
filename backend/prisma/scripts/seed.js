@@ -19,7 +19,7 @@ const SEED_CONFIG = {
 const DEFAULT_PASSWORD = '123456'; 
 
 async function main() {
-  console.log('🌱 Starting Seeding Process...');
+  console.log('Starting Seeding Process...');
 
   if (SEED_CONFIG.ROLES) await seedRoles();
   if (SEED_CONFIG.EMPLOYEES) await seedEmployees();
@@ -27,7 +27,7 @@ async function main() {
   if (SEED_CONFIG.COMPONENTS) await seedComponents();
   if (SEED_CONFIG.RELATIONS) await seedSupplierComponents();
 
-  console.log('✅ Seeding Completed.');
+  console.log('Seeding Completed.');
 }
 
 // ============================================================================
@@ -84,7 +84,7 @@ async function seedEmployees() {
     // 1. Get Role ID
     const role = await prisma.role.findUnique({ where: { roleName: u.role } });
     if (!role) {
-      console.warn(`⚠️ Role ${u.role} not found. Skipping user ${u.username}.`);
+      console.warn(`Role ${u.role} not found. Skipping user ${u.username}.`);
       continue;
     }
 
