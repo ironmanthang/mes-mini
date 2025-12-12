@@ -6,7 +6,7 @@ const createPOSchema = Joi.object({
   }),
   supplierId: Joi.number().integer().required(),
   orderDate: Joi.date().iso().default(() => new Date()),
-  status: Joi.string().valid('DRAFT', 'PENDING').default('PENDING'), 
+  status: Joi.string().valid('DRAFT', 'PENDING').default('DRAFT'), 
   expectedDeliveryDate: Joi.date().iso().min('now').optional().allow(null),
   
   // Financials
