@@ -1,27 +1,16 @@
 import { 
   Plus, Trash2, Upload, 
-  Save, Send, Calculator, Printer, FileText
+  Save, Send, Calculator, Printer, FileText, Loader2
 } from "lucide-react";
-import { useState, type JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
 
-// --- Mock Data ---
-const suppliers = [
-  { id: "SUP001", name: "Bosch Vietnam", phone: "028 1234 5678", email: "contact@bosch.vn", address: "Long Thanh, Dong Nai" },
-  { id: "SUP002", name: "Samsung Electro-Mechanics", phone: "024 9876 5432", email: "sales@samsung.com", address: "Thai Nguyen" },
-  { id: "SUP003", name: "Intel Products", phone: "028 5555 9999", email: "supply@intel.com", address: "Thu Duc, HCMC" },
-];
+import { supplierService, type Supplier } from "../../../services/supplierServices";
+import { componentService, type Component } from "../../../services/componentServices";
+import { purchaseOrderService } from "../../../services/purchaseOrderServices";
 
-const componentDatabase = [
-  { id: "COMP001", name: "CPU Chipset A1", description: "Main processing unit", currentStock: 150, unitPrice: 250 },
-  { id: "COMP002", name: "Memory Module 8GB", description: "DDR4 RAM", currentStock: 500, unitPrice: 45 },
-  { id: "COMP003", name: "SSD 512GB", description: "NVMe Storage", currentStock: 200, unitPrice: 60 },
-  { id: "COMP004", name: "Wifi Card", description: "Wifi 6E Module", currentStock: 50, unitPrice: 15 },
-];
-
-// --- Interfaces ---
 interface OrderRow {
   id: number;
-  componentId: string;
+  componentId: number;
   componentName: string;
   description: string;
   currentStock: number;
@@ -31,8 +20,14 @@ interface OrderRow {
 }
 
 export const CreateComponentOrder = (): JSX.Element => {
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
-  const [supplierInfo, setSupplierInfo] = useState<any>(null);
+  const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
+  const [componentsList, setComponentsList] = useState<Component[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | "">("");
+  const [supplierInfo, setSupplierInfo] = useState<Supplier | null>(null);
+  
   const [orderDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [priority, setPriority] = useState("Medium");
@@ -44,17 +39,45 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [paymentTerm, setPaymentTerm] = useState("Net 30");
   const [deliveryTerm, setDeliveryTerm] = useState("FOB - Free On Board");
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [suppliers, components] = await Promise.all([
+          supplierService.getAllSuppliers(),
+          componentService.getAllComponents()
+        ]);
+        setSuppliersList(suppliers);
+        setComponentsList(components);
+      } catch (error) {
+        console.error("Failed to load initial data", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+
   const handleSupplierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
+    const id = Number(e.target.value);
     setSelectedSupplierId(id);
-    const supplier = suppliers.find(s => s.id === id);
+    const supplier = suppliersList.find(s => s.supplierId === id);
     setSupplierInfo(supplier || null);
   };
 
   const addRow = () => {
     setRows([
       ...rows,
-      { id: Date.now(), componentId: "", componentName: "", description: "", currentStock: 0, quantity: 1, unitPrice: 0, total: 0 }
+      { 
+        id: Date.now(), 
+        componentId: 0, 
+        componentName: "", 
+        description: "", 
+        currentStock: 0, 
+        quantity: 1, 
+        unitPrice: 0, 
+        total: 0 
+      }
     ]);
   };
 
@@ -62,17 +85,19 @@ export const CreateComponentOrder = (): JSX.Element => {
     setRows(rows.filter(r => r.id !== id));
   };
 
-  const handleComponentSelect = (rowId: number, compId: string) => {
-    const comp = componentDatabase.find(c => c.id === compId);
+  const handleComponentSelect = (rowId: number, compIdStr: string) => {
+    const compId = Number(compIdStr);
+    const comp = componentsList.find(c => c.componentId === compId);
+    
     if (comp) {
       setRows(rows.map(r => r.id === rowId ? {
         ...r,
-        componentId: comp.id,
-        componentName: comp.name,
-        description: comp.description,
-        currentStock: comp.currentStock,
-        unitPrice: comp.unitPrice,
-        total: r.quantity * comp.unitPrice
+        componentId: comp.componentId,
+        componentName: comp.componentName,
+        description: comp.description || "",
+        currentStock: comp.currentStock || 0,
+        unitPrice: comp.standardCost || 0,
+        total: r.quantity * (comp.standardCost || 0)
       } : r));
     }
   };
@@ -88,10 +113,52 @@ export const CreateComponentOrder = (): JSX.Element => {
     }));
   };
 
-  // Calculations
+  const handleSubmit = async () => {
+    if (!selectedSupplierId) return alert("Please select a supplier.");
+    if (rows.length === 0) return alert("Please add at least one component.");
+    if (rows.some(r => r.componentId === 0)) return alert("Please select components for all rows.");
+
+    setIsSubmitting(true);
+    try {
+      const poCode = `PO-${Date.now().toString().slice(-6)}`;
+
+      await purchaseOrderService.createPO({
+        code: poCode,
+        supplierId: Number(selectedSupplierId),
+        expectedDeliveryDate: deliveryDate || undefined,
+        discount: 0,
+        tax: taxRate,
+        shippingCost: shippingCost,
+        paymentTerms: paymentTerm,
+        deliveryTerms: deliveryTerm,
+        note: `Priority: ${priority}`,
+        details: rows.map(r => ({
+          componentId: r.componentId,
+          quantity: r.quantity,
+          unitPrice: r.unitPrice
+        }))
+      });
+
+      alert("Purchase Order Created Successfully!");
+      setRows([]);
+      setSelectedSupplierId("");
+      setSupplierInfo(null);
+
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to create order.";
+      alert(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const subtotal = rows.reduce((sum, r) => sum + r.total, 0);
   const taxAmount = subtotal * (taxRate / 100);
   const grandTotal = subtotal + taxAmount + shippingCost;
+
+  if (isLoadingData) {
+    return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>;
+  }
 
   return (
     <div className="space-y-6 pb-8">
@@ -125,15 +192,15 @@ export const CreateComponentOrder = (): JSX.Element => {
               onChange={handleSupplierChange}
             >
               <option value="">-- Select Supplier --</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.id} - {s.name}</option>
+              {suppliersList.map(s => (
+                <option key={s.supplierId} value={s.supplierId}>{s.code} - {s.supplierName}</option>
               ))}
             </select>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Phone</label>
-            <input type="text" readOnly value={supplierInfo?.phone || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
+            <input type="text" readOnly value={supplierInfo?.phoneNumber || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
           </div>
 
           <div className="space-y-2">
@@ -214,9 +281,9 @@ export const CreateComponentOrder = (): JSX.Element => {
                       value={row.componentId}
                       onChange={(e) => handleComponentSelect(row.id, e.target.value)}
                     >
-                      <option value="">Select Component...</option>
-                      {componentDatabase.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                      <option value="0">Select Component...</option>
+                      {componentsList.map(c => (
+                        <option key={c.componentId} value={c.componentId}>{c.code} - {c.componentName}</option>
                       ))}
                     </select>
                   </td>
@@ -290,9 +357,11 @@ export const CreateComponentOrder = (): JSX.Element => {
                             value={deliveryTerm} onChange={(e) => setDeliveryTerm(e.target.value)}
                             className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none cursor-pointer"
                         >
-                            <option value="FOB">FOB - Free On Board</option>
-                            <option value="CIF">CIF - Cost, Insurance and Freight</option>
-                            <option value="DDP">DDP - Delivered Duty Paid</option>
+                            <option value="FOB - Free On Board">FOB - Free On Board</option>
+                            <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
+                            <option value="DDP - Delivered Duty Paid">DDP - Delivered Duty Paid</option>
+                            <option value="EXW - Ex Works">EXW - Ex Works</option>
+                            <option value="null">null</option>
                         </select>
                     </div>
                 </div>
@@ -347,8 +416,13 @@ export const CreateComponentOrder = (): JSX.Element => {
                 <button className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                    <Calculator className="w-4 h-4" /> Recalculate
                 </button>
-                <button className="flex items-center justify-center gap-2 px-4 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md cursor-pointer">
-                   <Send className="w-4 h-4" /> Submit Order
+                <button 
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />}
+                   {isSubmitting ? "Submitting..." : "Submit Order"}
                 </button>
              </div>
           </div>

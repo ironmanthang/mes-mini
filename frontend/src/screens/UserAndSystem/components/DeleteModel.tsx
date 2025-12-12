@@ -1,5 +1,3 @@
-// src/pages/UserAndSystem/components/DeleteConfirmModal.tsx
-
 import { X } from "lucide-react";
 import type { JSX } from "react";
 
@@ -32,12 +30,10 @@ export const DeleteConfirmModal = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 text-center text-sm text-gray-600">
           User account and all associated data will be permanently removed.
         </div>
 
-        {/* Buttons */}
         <div className="flex items-center justify-center gap-4 pb-6">
           <button
             onClick={onClose}
