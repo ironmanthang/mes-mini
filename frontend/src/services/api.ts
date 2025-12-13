@@ -25,9 +25,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Nếu lỗi 401 (Unauthorized), có thể logout hoặc refresh token tại đây
-      // localStorage.removeItem("token");
-      // window.location.href = "/login";
+      console.warn("Phiên đăng nhập hết hạn, đang đăng xuất...");
+      
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }

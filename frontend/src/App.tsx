@@ -8,6 +8,7 @@ import { HumanResources } from "./screens/HumanResources";
 import { Production } from "./screens/Production";
 import { Warehouse } from "./screens/Warehouses";
 import { Components } from "./screens/Components";
+import { FinishedProduct } from "./screens/FinishedProduct";
 
 export default function App() {
   const [activePage, setActivePage] = useState("Dashboard");
@@ -41,6 +42,8 @@ export default function App() {
         return <Warehouse/>
       case "Components":
         return <Components/>
+      case "Finished Products":
+        return <FinishedProduct/>
       default:
         return <div className="p-8">Chức năng đang phát triển: {activePage}</div>;
     }
