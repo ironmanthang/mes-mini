@@ -25,12 +25,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      console.warn("Phiên đăng nhập hết hạn, đang đăng xuất...");
-      
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login") {
+          console.warn("Phiên đăng nhập hết hạn, đang đăng xuất...");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

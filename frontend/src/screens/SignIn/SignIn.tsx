@@ -18,7 +18,9 @@ export const SignIn = (): JSX.Element => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); 
+
     if (!username || !password) {
       setError("Please enter both username and password.");
       return;
@@ -38,11 +40,6 @@ export const SignIn = (): JSX.Element => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleLogin();
-    }
-  };
 
   return (
     <div className="bg-white overflow-hidden w-full min-w-[1440px] h-screen flex">
@@ -77,9 +74,12 @@ export const SignIn = (): JSX.Element => {
             Production Operations eXtended
           </h1>
 
-          <div className="w-full max-w-[380px] flex flex-col gap-6" onKeyDown={handleKeyDown}>
+          <form 
+            className="w-full max-w-[380px] flex flex-col gap-6" 
+            onSubmit={handleLogin}
+          >
             {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm text-center border border-red-200">
+              <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm text-center border border-red-200 animate-in fade-in slide-in-from-top-2">
                 {error}
               </div>
             )}
@@ -121,7 +121,7 @@ export const SignIn = (): JSX.Element => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#424242]"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#424242] cursor-pointer"
                   >
                     {showPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                   </button>
@@ -141,7 +141,7 @@ export const SignIn = (): JSX.Element => {
               </div>
 
               <Button 
-                onClick={handleLogin}
+                type="submit"
                 disabled={isLoading}
                 className="bg-[#7b76f1] hover:bg-[#6b66e1] text-white [font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-bold text-[12.8px] tracking-[0] 
                 leading-[22.5px] rounded-[56px] shadow-[0px_34px_40px_-8px_#7b76f13d] h-14 px-12 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
@@ -150,11 +150,14 @@ export const SignIn = (): JSX.Element => {
                 {isLoading ? "LOGGING IN..." : "LOG IN"}
               </Button>
             </div>
-          </div>
+          </form>
 
           <div className="[font-family:'Zen_Kaku_Gothic_Antique',Helvetica] font-normal text-[#424242] text-[12.8px] text-center tracking-[0] leading-[normal]">
             No Account yet?{" "}
-            <button className="font-bold text-[#212121] underline hover:text-[#7b76f1] cursor-pointer">
+            <button 
+              type="button" 
+              className="font-bold text-[#212121] underline hover:text-[#7b76f1] cursor-pointer"
+            >
               SIGN UP
             </button>
           </div>
