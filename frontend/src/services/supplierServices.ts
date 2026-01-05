@@ -15,6 +15,7 @@ export interface SupplierComponent {
   componentId: number;
   name: string;
   suggestedPrice?: number;
+  code?: string; 
 }
 
 export interface CreateSupplierRequest {
@@ -31,6 +32,7 @@ export interface UpdateSupplierRequest {
   phoneNumber?: string;
   address?: string;
 }
+
 
 export const supplierService = {
   getAllSuppliers: async () => {
@@ -54,7 +56,7 @@ export const supplierService = {
   },
 
   deleteSupplier: async (id: number) => {
-    const response = await api.delete(`/suppliers/${id}`);
+    const response = await api.delete<{ message: string }>(`/suppliers/${id}`);
     return response.data;
   },
 

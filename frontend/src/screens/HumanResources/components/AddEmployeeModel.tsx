@@ -28,7 +28,6 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   const [error, setError] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
 
-  // Fetch roles
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -46,6 +45,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
     }
   }, [isOpen]);
   
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -60,14 +60,14 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   };
 
   const handleAdd = async () => {
-    // Validate
+    // Validate cơ bản
     if (!formData.fullName || !formData.username || !formData.password || !formData.email) {
-      setError("Please fill in all required fields (*)");
+      setError("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
       return;
     }
 
     if (formData.roleIds.length === 0) {
-        setError("Please select a role.");
+        setError("Vui lòng chọn vai trò cho nhân viên.");
         return;
     }
 
@@ -77,8 +77,8 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
     try {
       await employeeService.createEmployee(formData);
       
-      onConfirm();
-      onClose(); 
+      onConfirm(); 
+      onClose();  
       
       setFormData({
         fullName: "", username: "", password: "", email: "", 
@@ -89,7 +89,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       });
 
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to create employee.");
+      setError(err.response?.data?.message || "Lỗi khi tạo nhân viên.");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +102,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       <div className="bg-white w-[700px] rounded-lg shadow-xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
         
         <div className="relative p-6 text-center border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">ADD EMPLOYEE INFORMATION</h2>
+          <h2 className="text-xl font-bold text-gray-900">THÊM THÔNG TIN NHÂN VIÊN</h2>
           <button onClick={onClose} className="absolute right-4 top-4 p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
@@ -118,60 +118,33 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Full Name<span className="text-red-500">*</span></label>
-                <input 
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  type="text" 
-                  placeholder="Nguyen Van A" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
+                <label className="text-sm font-bold text-gray-800">Họ và Tên<span className="text-red-500">*</span></label>
+                <input name="fullName" value={formData.fullName} onChange={handleChange} type="text" placeholder="Nguyễn Văn A" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-800">Email<span className="text-red-500">*</span></label>
-                <input 
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  type="email" 
-                  placeholder="user@example.com" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
+                <input name="email" value={formData.email} onChange={handleChange} type="email" placeholder="user@example.com" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Username<span className="text-red-500">*</span></label>
-                <input 
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  type="text" 
-                  placeholder="user123" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
+                <label className="text-sm font-bold text-gray-800">Tên đăng nhập<span className="text-red-500">*</span></label>
+                <input name="username" value={formData.username} onChange={handleChange} type="text" placeholder="user123" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Password<span className="text-red-500">*</span></label>
-                <input 
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  type="password" 
-                  placeholder="••••••" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
+                <label className="text-sm font-bold text-gray-800">Mật khẩu<span className="text-red-500">*</span></label>
+                <input name="password" value={formData.password} onChange={handleChange} type="password" placeholder="••••••" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Role<span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Vai trò<span className="text-red-500">*</span></label>
                 <select 
                   name="roleIds"
                   value={formData.roleIds[0] || ""}
                   onChange={handleRoleChange}
                   className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer"
                 >
+                  <option value="">-- Chọn vai trò --</option>
                   {roles.map((role) => (
                     <option key={role.roleId} value={role.roleId}>
                       {role.roleName}
@@ -181,49 +154,23 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Date of Birth</label>
-                <input 
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  type="date" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" 
-                />
+                <label className="text-sm font-bold text-gray-800">Ngày sinh</label>
+                <input name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Hire Date<span className="text-red-500">*</span></label>
-                <input 
-                  name="hireDate"
-                  value={formData.hireDate}
-                  onChange={handleChange}
-                  type="date" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" 
-                />
+                <label className="text-sm font-bold text-gray-800">Ngày vào làm<span className="text-red-500">*</span></label>
+                <input name="hireDate" value={formData.hireDate} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Phone Number</label>
-                <input 
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleChange}
-                  type="text" 
-                  placeholder="0901234567" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
+                <label className="text-sm font-bold text-gray-800">Số điện thoại</label>
+                <input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} type="text" placeholder="0901234567" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
             </div>
           </div>
           
           <div className="mt-4 space-y-2">
-            <label className="text-sm font-bold text-gray-800">Address</label>
-            <textarea 
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              rows={3} 
-              placeholder="123 Street, City..." 
-              className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none resize-none" 
-            />
+            <label className="text-sm font-bold text-gray-800">Địa chỉ</label>
+            <textarea name="address" value={formData.address} onChange={handleChange} rows={3} placeholder="123 Đường, Quận..." className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none resize-none" />
           </div>
         </div>
 
@@ -233,7 +180,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
             disabled={isLoading}
             className="px-8 py-2.5 bg-[#111111] text-white text-sm font-semibold rounded hover:bg-gray-900 transition-colors cursor-pointer disabled:opacity-50"
           >
-            CANCEL
+            HỦY
           </button>
           <button 
             onClick={handleAdd}
@@ -241,7 +188,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
             className="px-8 py-2.5 bg-[#2EE59D] text-white text-sm font-semibold rounded hover:bg-[#25D390] transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isLoading ? "ADDING..." : "ADD"}
+            {isLoading ? "ĐANG THÊM..." : "THÊM"}
           </button>
         </div>
       </div>

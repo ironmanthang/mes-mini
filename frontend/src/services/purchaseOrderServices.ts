@@ -1,24 +1,14 @@
 import api from "./api";
 
-export interface ComponentInfo {
-  componentId: number;
-  code: string;
-  componentName: string;
-  unit?: string;
-  description?: string;
-}
-
 export interface PurchaseOrderDetail {
   poDetailId: number;
   purchaseOrderId: number;
   componentId: number;
-  
-  component?: ComponentInfo; 
-
+  componentName?: string;
   quantityOrdered: number;
   quantityReceived: number;
-  
-  unitPrice: number | string; 
+  unitPrice: number;
+  code: number,
 }
 
 export interface PurchaseOrder {
@@ -27,25 +17,25 @@ export interface PurchaseOrder {
   status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RECEIVED';
   priority?: string;
   
-  totalAmount: number | string; 
-  tax: number | string;
-  discount: number | string;
-  shippingCost: number | string;
+  totalAmount: number; 
+  tax: number;
+  discount: number;
+  shippingCost: number;
   
   expectedDeliveryDate?: string;
   orderDate: string;
   
   supplierId: number;
-  supplier: {
+  supplier?: {
     supplierId: number;
     supplierName: string;
     code: string;
     email?: string;
-    phoneNumber?: string;
+    phone?: string;
   };
   
   employeeId: number;
-  employee: {
+  employee?: {
     employeeId: number;
     fullName: string;
   };
@@ -55,9 +45,6 @@ export interface PurchaseOrder {
   paymentTerms?: string;
   deliveryTerms?: string;
   note?: string;
-  
-  approvedAt?: string | null;
-  approverId?: number | null;
 }
 
 export interface CreatePORequest {
@@ -87,6 +74,7 @@ export interface UpdatePORequest {
   note?: string;
   status?: 'DRAFT' | 'PENDING' | 'CANCELLED';
 }
+
 
 export const purchaseOrderService = {
   getAllPOs: async () => {

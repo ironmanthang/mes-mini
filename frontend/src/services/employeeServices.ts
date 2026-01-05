@@ -32,7 +32,7 @@ export interface CreateEmployeeRequest {
   email: string;
   phoneNumber: string;
   address: string;
-  dateOfBirth: string; // Format: YYYY-MM-DD
+  dateOfBirth: string;
   hireDate: string;
   roleIds: number[];
   status: 'ACTIVE' | 'INACTIVE';
@@ -53,8 +53,9 @@ export interface UpdateEmployeeRequest {
 
 
 export const employeeService = {
-  getAllEmployees: async () => {
-    const response = await api.get<Employee[]>("/employees");
+  getAllEmployees: async (search?: string) => {
+    const params = search ? { search } : {};
+    const response = await api.get<Employee[]>("/employees", { params });
     return response.data;
   },
 
@@ -79,7 +80,7 @@ export const employeeService = {
   },
 
   deleteEmployee: async (id: number) => {
-    const response = await api.delete(`/employees/${id}`);
+    const response = await api.delete<{ message: string }>(`/employees/${id}`);
     return response.data;
   },
 };

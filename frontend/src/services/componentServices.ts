@@ -13,6 +13,15 @@ export interface Component {
   updatedAt?: string;
 }
 
+export interface SupplierComponent {
+  componentId: number;
+  name: string;
+  suggestedPrice: number;
+  code?: string;
+  unit?: string;
+  currentStock?: number;
+}
+
 export interface ComponentSupplier {
   supplierId: number;
   supplierName: string;
@@ -62,7 +71,7 @@ export const componentService = {
   },
 
   deleteComponent: async (id: number) => {
-    const response = await api.delete(`/components/${id}`);
+    const response = await api.delete<{ message: string }>(`/components/${id}`);
     return response.data;
   },
 

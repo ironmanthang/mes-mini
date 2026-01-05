@@ -43,16 +43,18 @@ export const ComponentOrders = (): JSX.Element => {
       setSelectedOrder(detail);
       setIsModalOpen(true);
     } catch (error) {
+      console.error(error);
       alert("Failed to load order details.");
     }
   };
 
   const handleApprove = async (id: number) => {
-    if (window.confirm("Approve this Purchase Order?")) {
+    if (window.confirm("Are you sure you want to approve this order?")) {
       try {
         await purchaseOrderService.approvePO(id);
         alert("Approved Successfully!");
         fetchOrders();
+        setIsModalOpen(false);
       } catch (error: any) {
         const msg = error.response?.data?.message || "Failed to approve.";
         alert(msg);
@@ -60,22 +62,11 @@ export const ComponentOrders = (): JSX.Element => {
     }
   };
 
-  const handleUpdateStatus = (id: number, newStatus: string) => {
-    alert(`Function to update status to ${newStatus} is under development.`);
+  const handleUpdateStatus = async (id: number, newStatus: string) => {
+    alert(`Change status to ${newStatus}: Feature is pending Backend API support.`);
   };
 
-  const filteredOrders = orders.filter(order => {
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
-      order.code.toLowerCase().includes(searchLower) || 
-      order.supplier?.supplierName.toLowerCase().includes(searchLower);
-    
-    const matchesFilter = filterStatus === "All" || order.status === filterStatus;
-    
-    return matchesSearch && matchesFilter;
-  });
-
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString('vi-VN');
   };
@@ -90,9 +81,22 @@ export const ComponentOrders = (): JSX.Element => {
     }
   };
 
+  // --- Filter Logic ---
+  const filteredOrders = orders.filter(order => {
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      (order.code?.toLowerCase() || "").includes(searchLower) || 
+      (order.supplier?.supplierName?.toLowerCase() || "").includes(searchLower);
+    
+    const matchesFilter = filterStatus === "All" || order.status === filterStatus;
+    
+    return matchesSearch && matchesFilter;
+  });
+
   return (
     <div className="space-y-6 pb-12">
       
+      {/* Toolbar */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
           <div className="relative w-72">
@@ -127,6 +131,7 @@ export const ComponentOrders = (): JSX.Element => {
         </button>
       </div>
 
+      {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden min-h-[300px]">
         {isLoading ? (
            <div className="flex h-[300px] items-center justify-center">
@@ -158,7 +163,7 @@ export const ComponentOrders = (): JSX.Element => {
                       </span>
                     </td>
                     <td className="p-4 text-right font-mono font-medium text-gray-800">
-                      ${order.totalAmount.toLocaleString()}
+                      ${Number(order.totalAmount).toLocaleString()}
                     </td>
                     <td className="p-4 text-gray-700">{order.employee?.fullName || "System"}</td>
                     <td className="p-4 flex items-center justify-center gap-2">
@@ -211,8 +216,9 @@ export const ComponentOrders = (): JSX.Element => {
           <OrderDetailModal 
             isOpen={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
-            orderId={selectedOrder.purchaseOrderId}
-            onReload={fetchOrders}
+            order={selectedOrder} 
+            onApprove={() => handleApprove(selectedOrder.purchaseOrderId)}
+            onUpdateStatus={() => handleUpdateStatus(selectedOrder.purchaseOrderId, "RECEIVED")}
           />
         )}
     </div>
