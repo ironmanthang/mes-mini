@@ -2,9 +2,8 @@ node_modules
 /src/generated/prisma
 # Keep environment variables out of version control
 .env
-
-# file riêng của tui
-flow.md
+.ai_context/
+.agent/
 
 # Docker-related state
 pgdata/

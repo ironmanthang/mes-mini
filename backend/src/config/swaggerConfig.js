@@ -10,7 +10,7 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'API documentation for the Mini-MES backend',
     },
-    servers: [{ url: `http://localhost:${process.env.HOST_PORT}` }],
+    servers: [{ url: process.env.API_URL || `http://localhost:${process.env.HOST_PORT}` }],
     tags: [
       { name: 'Auth', description: 'Authentication & Profile' },
       { name: 'Employees', description: 'User Management' },
