@@ -2,7 +2,8 @@ node_modules
 /src/generated/prisma
 # Keep environment variables out of version control
 .env
-
+.ai_context/
+.agent/
 # file riêng của tui
 flow.md
 

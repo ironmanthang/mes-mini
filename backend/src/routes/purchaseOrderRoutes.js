@@ -26,18 +26,18 @@ router.get('/:id',
 
 router.post('/', 
   validate(createPOSchema), 
-  authorize('Purchasing Staff'), 
+  authorize('System Admin','Purchasing Staff'), 
   createPO
 );
 
 router.put('/:id', 
-  authorize('Purchasing Staff'), 
+  authorize('System Admin','Purchasing Staff'), 
   validate(updatePOSchema), 
   updatePO
 );
 
 router.put('/:id/approve', 
-  authorize('Production Manager'), 
+  authorize('System Admin','Production Manager'), 
   approvePO
 );
 /**

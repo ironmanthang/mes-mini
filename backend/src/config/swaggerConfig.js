@@ -6,7 +6,7 @@ const swaggerOptions = {
   swaggerDefinition: {
     openapi: '3.0.0',
     info: {
-      title: 'Mini-MES API',
+      title: 'Lite MES API',
       version: '1.0.0',
       description: 'API documentation for the Mini-MES backend',
     },
