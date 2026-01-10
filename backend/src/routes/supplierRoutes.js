@@ -17,7 +17,7 @@ const { createSupplierSchema, updateSupplierSchema } = require('../validators/su
 router.use(protect);
 
 router.get('/', 
-  authorize('System Admin', 'Production Manager', 'Warehouse Keeper'), 
+  authorize('System Admin', 'Production Manager', 'Warehouse Keeper', 'Purchasing Staff'), 
   getAllSuppliers
 );
 router.get('/:id', 

@@ -1,10 +1,20 @@
-import { useState, type JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
 
 import { UserManagement } from "./components/UserManagement";
 import { AccountSettings } from "./components/AccountSettings";
 
-export const UserAndSystem = (): JSX.Element => {
-  const [activeTab, setActiveTab] = useState<"management" | "settings">("management");
+interface UserAndSystemProps {
+  tabType?: "management" | "settings";
+}
+
+export const UserAndSystem = ({tabType = "management"}: UserAndSystemProps): JSX.Element => {
+  const [activeTab, setActiveTab] = useState<"management" | "settings">(tabType);
+
+  useEffect(() => {
+    if (tabType) {
+      setActiveTab(tabType);
+    }
+  }, [tabType]);
 
   return (
         <div className="flex-1 overflow-auto">

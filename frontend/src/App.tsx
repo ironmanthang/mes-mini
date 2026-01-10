@@ -8,16 +8,32 @@ import { HumanResources } from "./screens/HumanResources";
 import { Production } from "./screens/Production";
 import { Warehouse } from "./screens/Warehouses";
 import { Components } from "./screens/Components";
+import { FinishedProduct } from "./screens/FinishedProduct";
 
 export default function App() {
   const [activePage, setActivePage] = useState("Dashboard");
+  const [userSystemTab, setUserSystemTab] = useState<"management" | "settings">("management");
+
+  const handleSidebarNavigate = (pageName: string) => {
+    setActivePage(pageName);
+    if (pageName === "User & System") {
+      setUserSystemTab("management");
+    }
+  };
+
+  const handleHeaderNavigate = (pageName: string) => {
+    setActivePage(pageName);
+    if (pageName === "User & System") {
+      setUserSystemTab("settings");
+    }
+  };
 
   const renderContent = () => {
     switch (activePage) {
       case "Dashboard":
         return <Dashboard />;
       case "User & System":
-        return <UserAndSystem />;
+        return <UserAndSystem tabType={userSystemTab}/>
       case "Human Resources":
         return <HumanResources />;
       case "Production":
@@ -26,6 +42,8 @@ export default function App() {
         return <Warehouse/>
       case "Components":
         return <Components/>
+      case "Finished Products":
+        return <FinishedProduct/>
       default:
         return <div className="p-8">Chức năng đang phát triển: {activePage}</div>;
     }
@@ -34,10 +52,10 @@ export default function App() {
   return (
     <div className="bg-white w-full min-h-screen flex [font-family:'Zen_Kaku_Gothic_Antique',Helvetica]">
       
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={handleSidebarNavigate} />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header />
+        <Header onNavigate={handleHeaderNavigate}/>
 
         <div className="flex-1 overflow-auto bg-white">
            {renderContent()}

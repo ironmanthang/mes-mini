@@ -16,7 +16,7 @@ const { createComponentSchema, updateComponentSchema } = require('../validators/
 router.use(protect);
 
 // All roles can VIEW components (needed for Warehouse, Production, Sales)
-router.get('/', authorize('System Admin', 'Production Manager'), getAllComponents);
+router.get('/', authorize('System Admin', 'Production Manager', 'Purchasing Staff'), getAllComponents);
 router.get('/:id', authorize('System Admin', 'Production Manager'), getComponentById);
 
 // Only Managers/Admins can MANAGE Master Data

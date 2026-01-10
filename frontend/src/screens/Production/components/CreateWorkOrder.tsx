@@ -5,7 +5,8 @@ import {
   CheckSquare, 
   Square,
   CalendarDays,
-  ArrowRight
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { useState, useMemo, type JSX } from "react";
 
@@ -81,183 +82,187 @@ export const CreateWorkOrder = (): JSX.Element => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-24">
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-blue-600" />
-              Create Work Order
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Consolidate requests and assign to a production line.
-            </p>
-          </div>
+    <div className="space-y-6 pb-8">
+      
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            Create Work Order
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Consolidate requests and assign to a production line.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                1. Product Selection<span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedProductId}
-                onChange={(e) => handleProductChange(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg 
-                focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
-              >
-                <option value="">-- Select Product to Produce --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.id})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                4. Production Line<span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                {productionLines.map((line) => (
-                  <label 
-                    key={line.id} 
-                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
-                        selectedLineId === line.id 
-                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" 
-                        : "border-gray-200 hover:border-gray-300"
-                    } ${line.status !== "Ready" ? "opacity-60 grayscale" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                        <input 
-                            type="radio" 
-                            name="productionLine"
-                            value={line.id}
-                            disabled={line.status !== "Ready"}
-                            checked={selectedLineId === line.id}
-                            onChange={(e) => setSelectedLineId(e.target.value)}
-                            className="w-4 h-4 text-blue-600 cursor-pointer"
-                        />
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">{line.name}</span>
-                            <span className="text-xs text-gray-500">ID: {line.id}</span>
-                        </div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded font-medium ${
-                        line.status === "Ready" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                    }`}>
-                        {line.status}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4">
-              <label className="text-sm font-medium text-gray-700">
-                3. Target Quantity<span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="1"
-                  value={targetQuantity || ""}
-                  onChange={(e) => setTargetQuantity(parseInt(e.target.value) || 0)}
-                  className="w-full p-3 border border-gray-300 rounded-lg 
-                  focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold text-blue-600"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 pr-4">Units</span>
-              </div>
-              <p className="text-xs text-gray-500">
-                *Can be manually adjusted or auto-summed from requests.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2 h-full flex flex-col">
-            <label className="text-sm font-medium text-gray-700 flex justify-between">
-              <span>2. Pending Requests (Multi-select)</span>
-              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">
-                {selectedRequestIds.length} selected
-              </span>
-            </label>
-            
-            <div className="flex-1 border border-gray-200 rounded-lg bg-gray-50 overflow-hidden flex flex-col">
-               {selectedProductId ? (
-                  availableRequests.length > 0 ? (
-                    <div className="overflow-y-auto p-2 space-y-2 max-h-[400px]">
-                        {availableRequests.map((req) => {
-                            const isSelected = selectedRequestIds.includes(req.id);
-                            return (
-                                <div 
-                                    key={req.id}
-                                    onClick={() => toggleRequestSelection(req.id, req.quantity)}
-                                    className={`p-3 rounded-md border cursor-pointer flex items-center gap-3 transition-colors ${
-                                        isSelected 
-                                        ? "bg-white border-blue-500 shadow-sm" 
-                                        : "bg-white border-gray-200 hover:border-blue-300"
-                                    }`}
-                                >
-                                    {isSelected 
-                                        ? <CheckSquare className="w-5 h-5 text-blue-600" /> 
-                                        : <Square className="w-5 h-5 text-gray-300" />
-                                    }
-                                    <div className="flex-1">
-                                        <div className="flex justify-between">
-                                            <span className="font-semibold text-sm text-gray-900">{req.id}</span>
-                                            <span className="font-bold text-sm text-blue-600">{req.quantity} units</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                            <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3"/> {req.date}</span>
-                                            <span>From: {req.requester}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
-                        <ClipboardList className="w-12 h-12 mb-2 opacity-20" />
-                        <p>No pending requests found for this product.</p>
-                    </div>
-                  )
-               ) : (
-                   <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
-                       <ArrowRight className="w-12 h-12 mb-2 opacity-20" />
-                       <p>Please select a Product on the left to view requests.</p>
-                   </div>
-               )}
-            </div>
-          </div>
-        </div>
+        
+        <button
+            onClick={handleAutoBatch}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 
+            font-medium rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer text-sm"
+        >
+            <Zap className="w-4 h-4" />
+            Auto-create Batch
+        </button>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 ml-[200px]">
-        <div className="max-w-7xl mx-auto flex items-center justify-end gap-3">
-          <button
-            onClick={handleAutoBatch}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-50 
-            text-indigo-700 font-medium rounded-lg hover:bg-indigo-100 transition-colors 
-            border border-indigo-200 cursor-pointer"
-          >
-            <Zap className="w-4 h-4" />
-            Auto-create Production Batch
-          </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          <button
-            onClick={handleCreateWorkOrder}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#2EE59D] 
-            text-white font-medium rounded-lg hover:bg-[#25D390] transition-colors 
-            shadow-sm cursor-pointer"
-          >
-            <Factory className="w-4 h-4"/>
-            Create Work Order
-          </button>
-        </div>
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-6">
+                
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
+                        Product Selection<span className="text-red-500">*</span>
+                    </label>
+                    <select
+                        value={selectedProductId}
+                        onChange={(e) => handleProductChange(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
+                    >
+                        <option value="">-- Select Product to Produce --</option>
+                        {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.name} ({p.id})
+                        </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
+                        Production Line<span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                        {productionLines.map((line) => (
+                        <label 
+                            key={line.id} 
+                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
+                                selectedLineId === line.id 
+                                ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" 
+                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                            } ${line.status !== "Ready" ? "opacity-60 grayscale cursor-not-allowed" : ""}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <input 
+                                    type="radio" 
+                                    name="productionLine"
+                                    value={line.id}
+                                    disabled={line.status !== "Ready"}
+                                    checked={selectedLineId === line.id}
+                                    onChange={(e) => setSelectedLineId(e.target.value)}
+                                    className="w-4 h-4 text-blue-600 cursor-pointer"
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-900">{line.name}</span>
+                                    <span className="text-xs text-gray-500">ID: {line.id}</span>
+                                </div>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded font-medium ${
+                                line.status === "Ready" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                            }`}>
+                                {line.status}
+                            </span>
+                        </label>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
+                        Target Quantity<span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <input
+                        type="number"
+                        min="1"
+                        value={targetQuantity || ""}
+                        onChange={(e) => setTargetQuantity(parseInt(e.target.value) || 0)}
+                        className="w-full p-3 border border-gray-300 
+                        rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold 
+                        text-blue-600"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 pr-4">Units</span>
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <Info className="w-3 h-3" /> Can be manually adjusted or auto-summed from requests.
+                    </p>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                    <button
+                        onClick={handleCreateWorkOrder}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-[0.98]"
+                    >
+                        <Factory className="w-5 h-5" />
+                        Confirm & Create Work Order
+                    </button>
+                </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1 h-full">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full flex flex-col">
+               <div className="flex justify-between items-center mb-3">
+                    <label className="text-sm font-bold text-gray-700">Pending Requests</label>
+                    <span className="text-xs bg-white border border-gray-200 px-2 py-0.5 rounded text-gray-600 font-medium">
+                        {selectedRequestIds.length} selected
+                    </span>
+               </div>
+            
+               <div className="flex-1 overflow-hidden flex flex-col">
+                   {selectedProductId ? (
+                      availableRequests.length > 0 ? (
+                        <div className="overflow-y-auto pr-1 space-y-2 max-h-[500px]">
+                            {availableRequests.map((req) => {
+                                const isSelected = selectedRequestIds.includes(req.id);
+                                return (
+                                    <div 
+                                        key={req.id}
+                                        onClick={() => toggleRequestSelection(req.id, req.quantity)}
+                                        className={`p-3 rounded-lg border cursor-pointer flex items-start gap-3 transition-all ${
+                                            isSelected 
+                                            ? "bg-white border-blue-500 shadow-md ring-1 ring-blue-500" 
+                                            : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm"
+                                        }`}
+                                    >
+                                        <div className="mt-0.5">
+                                            {isSelected 
+                                                ? <CheckSquare className="w-5 h-5 text-blue-600" /> 
+                                                : <Square className="w-5 h-5 text-gray-300" />
+                                            }
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-sm text-gray-900">{req.id}</span>
+                                                <span className="font-bold text-sm text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{req.quantity}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                                                <div className="flex items-center gap-1"><CalendarDays className="w-3 h-3"/> {req.date}</div>
+                                                <div>By: {req.requester}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
+                            <ClipboardList className="w-10 h-10 mb-2 opacity-30" />
+                            <p className="text-sm">No pending requests.</p>
+                        </div>
+                      )
+                   ) : (
+                       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
+                           <ArrowRight className="w-10 h-10 mb-2 opacity-30" />
+                           <p className="text-sm">Select a Product on the left.</p>
+                       </div>
+                   )}
+               </div>
+            </div>
+          </div>
+
       </div>
     </div>
   );
