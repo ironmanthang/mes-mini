@@ -1,10 +1,10 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
 }
 
 // --- ENUM DEFINITIONS ---
@@ -32,7 +32,6 @@ enum ProductionStatus {
   APPROVED
   IN_PROGRESS
   COMPLETED
-  CLOSED
   CANCELLED
 }
 
@@ -97,6 +96,7 @@ model Employee {
   inventoryTransactions  InventoryTransaction[]
   createdPurchaseOrders  PurchaseOrder[] @relation("POCreator")  
   approvedPurchaseOrders PurchaseOrder[] @relation("POApprover")
+  approvedSalesOrders    SalesOrder[]    @relation("SOApprover")
 
   createdAt              DateTime                @default(now()) @map("created_at")
   updatedAt              DateTime                @updatedAt @map("updated_at")
@@ -130,6 +130,7 @@ model EmployeeRole {
 // 4. Bảng agents (Đại lý)
 model Agent {
   agentId     Int          @id @default(autoincrement()) @map("agent_id")
+  code        String       @unique // AGT-001
   agentName   String       @map("agent_name")
   phoneNumber String?      @unique @map("phone_number")
   email       String?      @unique
@@ -301,30 +302,55 @@ model PurchaseOrderDetail {
 
 // 13. Bảng sales_orders (Đơn hàng)
 model SalesOrder {
-  salesOrderId Int                @id @default(autoincrement()) @map("sales_order_id")
-  orderDate    DateTime           @default(now()) @map("order_date")
-  status       OrderStatus        @default(PENDING)
-  employeeId   Int                @map("employee_id")
-  agentId      Int                @map("agent_id")
-  employee     Employee           @relation(fields: [employeeId], references: [employeeId])
-  agent        Agent              @relation(fields: [agentId], references: [agentId])
-  details      SalesOrderDetail[]
-  createdAt    DateTime           @default(now()) @map("created_at")
-  updatedAt    DateTime           @updatedAt @map("updated_at")
+  salesOrderId         Int                @id @default(autoincrement()) @map("sales_order_id")
+  code                 String             @unique // SO-2026-001
+  orderDate            DateTime           @default(now()) @map("order_date")
+  expectedShipDate     DateTime?          @map("expected_ship_date")
+  status               OrderStatus        @default(DRAFT)
+  
+  // Financials
+  totalAmount          Decimal            @default(0) @db.Decimal(15, 2) @map("total_amount")
+  discount             Decimal            @default(0) @db.Decimal(15, 2)
+  tax                  Decimal            @default(0) @db.Decimal(15, 2)
+  shippingCost         Decimal            @default(0) @db.Decimal(15, 2) @map("shipping_cost")
+  
+  // Terms
+  paymentTerms         String?            @map("payment_terms")
+  deliveryTerms        String?            @map("delivery_terms")
+  note                 String?
+  priority             Priority           @default(MEDIUM)
+  
+  // Relations
+  employeeId           Int                @map("employee_id")
+  agentId              Int                @map("agent_id")
+  
+  // Approval workflow
+  approverId           Int?               @map("approver_id")
+  approvedAt           DateTime?          @map("approved_at")
+  
+  employee             Employee           @relation(fields: [employeeId], references: [employeeId])
+  agent                Agent              @relation(fields: [agentId], references: [agentId])
+  approver             Employee?          @relation("SOApprover", fields: [approverId], references: [employeeId])
+  details              SalesOrderDetail[]
+  
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   @@map("sales_orders")
 }
 
 // 14. Bảng sales_order_details (Chi tiết đơn hàng)
 model SalesOrderDetail {
-  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [salesOrderId], onDelete: Cascade)
-  salesOrderId Int        @map("sales_order_id")
-  product      Product    @relation(fields: [productId], references: [productId])
-  productId    Int        @map("product_id")
-  quantity     Int
-  salePrice    Decimal    @db.Decimal(10, 2) @map("sale_price")
+  soDetailId       Int        @id @default(autoincrement()) @map("so_detail_id")
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [salesOrderId], onDelete: Cascade)
+  salesOrderId     Int        @map("sales_order_id")
+  product          Product    @relation(fields: [productId], references: [productId])
+  productId        Int        @map("product_id")
+  quantity         Int
+  quantityShipped  Int        @default(0) @map("quantity_shipped")
+  salePrice        Decimal    @db.Decimal(10, 2) @map("sale_price")
 
-  @@id([salesOrderId, productId])
+  @@unique([salesOrderId, productId])
   @@map("sales_order_details")
 }
 

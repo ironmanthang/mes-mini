@@ -1,14 +1,18 @@
 # Note: The 'version' tag is obsolete and has been removed.
 services:
   backend:
-    build: .
+    build:
+      context: .
+      target: builder  # Use the builder stage for development (has all deps)
     env_file:
       - .env 
     ports:
       - "${HOST_PORT}:${CONTAINER_PORT}"
+      - "5555:5555"
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
+      - /usr/src/app/src/generated
     command: npm run dev
     depends_on:
       db: # <-- CHANGE IS HERE
@@ -30,16 +34,16 @@ services:
       timeout: 5s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4
-    restart: always
-    env_file:
-      - .env # The pgadmin service will pick up the PGADMIN_* variables
-    ports:
-      - "${PGADMIN_PORT}:80"
-    depends_on:
-      db: # It's also good practice for pgadmin to wait for db to be healthy
-        condition: service_healthy
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   restart: always
+  #   env_file:
+  #     - .env # The pgadmin service will pick up the PGADMIN_* variables
+  #   ports:
+  #     - "${PGADMIN_PORT}:80"
+  #   depends_on:
+  #     db: # It's also good practice for pgadmin to wait for db to be healthy
+  #       condition: service_healthy
 
 volumes:
   pgdata:
