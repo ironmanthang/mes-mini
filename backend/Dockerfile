@@ -1,21 +1,42 @@
-# Use an official Node.js runtime as a parent image
-FROM node:22-alpine
-
-# Set the working directory in the container
+# Build Stage
+FROM node:24-alpine AS builder
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json to the container
+# Copy package files
 COPY package*.json ./
+COPY prisma ./prisma/
 
-COPY prisma ./prisma
-# Install app dependencies
-RUN npm install
+# Install dependencies
+RUN npm ci
 
-# Copy the rest of your app's source code
+# Copy source code
 COPY . .
 
-# Expose port 3000 to the outside world
+# Generate Prisma Client
+# Prisma 7 requires env vars to be present when loading config
+RUN DIRECT_URL="postgresql://dummy" DATABASE_URL="postgresql://dummy" npx prisma generate
+
+# Build TypeScript
+RUN npm run build
+
+# Production Stage (smaller image)
+FROM node:24-alpine AS production
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built files from builder
+COPY --from=builder /usr/src/app/dist ./dist
+# Compiled JS expects relative path ../../generated to exist in dist/
+COPY --from=builder /usr/src/app/src/generated ./dist/generated
+
+# Expose port
 EXPOSE 3000
 
-# Command to run your app
-CMD [ "node", "src/server.js" ]
+# Start app
+CMD ["node", "dist/server.js"]

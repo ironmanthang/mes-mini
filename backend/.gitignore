@@ -1,9 +1,10 @@
 node_modules
 /src/generated/prisma
+/dist
+
 # Keep environment variables out of version control
 .env
-.ai_context/
-.agent/
+.env.production
 
 # Docker-related state
 pgdata/
