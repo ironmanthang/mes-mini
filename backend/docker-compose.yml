@@ -44,6 +44,9 @@ services:
   #   depends_on:
   #     db: # It's also good practice for pgadmin to wait for db to be healthy
   #       condition: service_healthy
-
+  # --- pgAdmin Configuration ---
+  # PGADMIN_DEFAULT_EMAIL=admin@example.com
+  # PGADMIN_DEFAULT_PASSWORD=Th1s_is_a_V3ry-S3cur3-P4ss
+  # PGADMIN_PORT=5050
 volumes:
   pgdata:

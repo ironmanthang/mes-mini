@@ -3,7 +3,7 @@ import SupplierService from './supplierService.js';
 
 export const getAllSuppliers = async (req: Request, res: Response): Promise<void> => {
     try {
-        const suppliers = await SupplierService.getAllSuppliers();
+        const suppliers = await SupplierService.getAllSuppliers(req.query as any);
         res.status(200).json(suppliers);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });

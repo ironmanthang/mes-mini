@@ -46,8 +46,11 @@ const swaggerUiOptions = {
     swaggerOptions: {
         tryItOutEnabled: true,
         docExpansion: 'list',
+        displayRequestDuration: true,
     }
 };
+
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, swaggerUiOptions));
 
 

@@ -12,7 +12,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 
 export const getAllEmployees = async (req: Request, res: Response): Promise<void> => {
     try {
-        const employees = await EmployeeService.getAllEmployees();
+        const employees = await EmployeeService.getAllEmployees(req.query as any);
         res.status(200).json(employees);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });

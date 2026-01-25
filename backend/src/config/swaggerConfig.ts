@@ -14,15 +14,15 @@ const swaggerOptions: swaggerJsDoc.Options = {
             { url: `http://localhost:${process.env.HOST_PORT || 5000}`, description: 'Localhost' }
         ],
         tags: [
-            { name: 'Auth', description: 'Authentication & Profile' },
-            { name: 'Employees', description: 'User Management' },
-            { name: 'Roles', description: 'RBAC Management' },
-            { name: 'Agents', description: 'Customer/Distributor Management' },
-            { name: 'Products', description: 'Finished Goods Catalog' },
-            { name: 'Suppliers', description: 'Module A: Supply Chain' },
-            { name: 'Components', description: 'Master Data: Raw Materials' },
-            { name: 'Purchase Orders', description: 'Module A: Procurement' },
-            { name: 'Sales Orders', description: 'Customer Orders from Agents' },
+            { name: 'Auth', description: 'Login & Profile Management' },
+            { name: 'Employees', description: 'Staff & System Accounts' },
+            { name: 'Roles', description: 'Permissions & Access Control' },
+            { name: 'Products', description: 'Finished Goods (The devices you sell)' },
+            { name: 'Components', description: 'Raw Materials (Resistors, PCBs, etc.)' },
+            { name: 'Suppliers', description: 'Vendor Management' },
+            { name: 'Agents', description: 'B2B Distributors & Customers' },
+            { name: 'Purchase Orders', description: 'Procurement: Buying Materials' },
+            { name: 'Sales Orders', description: 'Sales: Selling Products' },
         ],
         components: {
             securitySchemes: {

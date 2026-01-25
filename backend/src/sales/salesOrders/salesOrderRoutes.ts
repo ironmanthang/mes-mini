@@ -66,6 +66,16 @@ router.put('/:id/reject',
  *     summary: List all Sales Orders
  *     tags: [Sales Orders]
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: List of SOs

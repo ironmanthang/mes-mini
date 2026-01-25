@@ -66,22 +66,38 @@ router.delete('/:id/components/:componentId',
  * @swagger
  * /api/suppliers:
  *   get:
- *     summary: List all suppliers
+ *     summary: List all suppliers (paginated)
  *     tags: [Suppliers]
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by name or code
  *     responses:
  *       200:
- *         description: List of suppliers
+ *         description: Paginated list of suppliers
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   supplierId: { type: integer }
- *                   code: { type: string }
- *                   supplierName: { type: string }
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer }
+ *                     page: { type: integer }
+ *                     last_page: { type: integer }
  *       401: 
  *         description: Not Authorized
  *       403: 

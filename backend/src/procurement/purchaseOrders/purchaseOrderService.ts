@@ -139,8 +139,7 @@ class PurchaseOrderService {
                 shippingCost: data.shippingCost,
                 tax: data.tax,
                 paymentTerms: data.paymentTerms,
-                deliveryTerms: data.deliveryTerms,
-                status: data.status as any
+                deliveryTerms: data.deliveryTerms
             }
         });
     }

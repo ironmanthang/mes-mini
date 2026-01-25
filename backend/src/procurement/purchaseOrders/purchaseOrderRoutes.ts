@@ -26,18 +26,18 @@ router.get('/:id',
 
 router.post('/',
     validate(createPOSchema),
-    authorize('System Admin','Purchasing Staff'),
+    authorize('System Admin', 'Purchasing Staff'),
     createPO
 );
 
 router.put('/:id',
-    authorize('System Admin','Purchasing Staff'),
+    authorize('System Admin', 'Purchasing Staff'),
     validate(updatePOSchema),
     updatePO
 );
 
 router.put('/:id/approve',
-    authorize('System Admin','Production Manager'),
+    authorize('System Admin', 'Production Manager'),
     approvePO
 );
 
@@ -56,6 +56,16 @@ router.put('/:id/approve',
  *     summary: List all Purchase Orders
  *     tags: [Purchase Orders]
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: List of POs

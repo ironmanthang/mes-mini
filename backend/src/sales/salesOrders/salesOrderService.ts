@@ -140,8 +140,7 @@ class SalesOrderService {
                 paymentTerms: data.paymentTerms,
                 deliveryTerms: data.deliveryTerms,
                 note: data.note,
-                priority: data.priority as any,
-                status: data.status as any
+                priority: data.priority as any
             }
         });
     }

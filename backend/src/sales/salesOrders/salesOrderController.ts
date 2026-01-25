@@ -22,7 +22,7 @@ export const updateSO = async (req: Request, res: Response): Promise<void> => {
 
 export const getAllSOs = async (req: Request, res: Response): Promise<void> => {
     try {
-        const list = await SOService.getAllSOs();
+        const list = await SOService.getAllSOs(req.query as any);
         res.status(200).json(list);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });

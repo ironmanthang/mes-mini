@@ -24,7 +24,7 @@ export const updatePO = async (req: Request, res: Response): Promise<void> => {
 
 export const getAllPOs = async (req: Request, res: Response): Promise<void> => {
     try {
-        const list = await POService.getAllPOs();
+        const list = await POService.getAllPOs(req.query as any);
         res.status(200).json(list);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
