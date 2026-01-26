@@ -30,7 +30,7 @@ export interface CreateSalesOrder {
         productId: number;
         quantity: number;
         salePrice: number;
-    };
+    }[];
 }
 
 export interface UpdateSalesOrder {

@@ -8,13 +8,8 @@ import {
   ArrowRight,
   Info
 } from "lucide-react";
-import { useState, useMemo, type JSX } from "react";
-
-const products = [
-  { id: "PROD001", name: "Gaming Laptop X1", category: "Electronics" },
-  { id: "PROD002", name: "Mechanical Keyboard", category: "Accessories" },
-  { id: "PROD004", name: "Smart Watch V2", category: "Wearables" },
-];
+import { useState, useMemo, type JSX, useEffect } from "react";
+import { productServices, type Product } from "../../../services/productServices";
 
 const productionLines = [
   { id: "LINE-A1", name: "Assembly Line Alpha", status: "Ready" },
@@ -81,6 +76,21 @@ export const CreateWorkOrder = (): JSX.Element => {
     }
   };
 
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    const fetchAllProducts = async () => {
+        try {
+            const response = await productServices.getAllProducts();
+            //@ts-expect-error data
+            setProducts(response.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    fetchAllProducts();
+  }, []);
+
   return (
     <div className="space-y-6 pb-8">
       
@@ -121,8 +131,8 @@ export const CreateWorkOrder = (): JSX.Element => {
                     >
                         <option value="">-- Select Product to Produce --</option>
                         {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name} ({p.id})
+                        <option key={p.productId} value={p.productId}>
+                            {p.productName} ({p.productId})
                         </option>
                         ))}
                     </select>

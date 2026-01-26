@@ -5,21 +5,14 @@ import {
   CheckCircle2, 
   Clock 
 } from "lucide-react";
-import { useState, type JSX } from "react";
-
-// --- Mock Data: Danh sách sản phẩm ---
-const products = [
-  { id: "PROD001", name: "Gaming Laptop X1", category: "Electronics" },
-  { id: "PROD002", name: "Mechanical Keyboard", category: "Accessories" },
-  { id: "PROD003", name: "Wireless Mouse", category: "Accessories" },
-  { id: "PROD004", name: "Smart Watch V2", category: "Wearables" },
-];
+import { useEffect, useState, type JSX } from "react";
+import { productServices, type Product } from "../../../services/productServices";
 
 export const CreateProductionRequest = (): JSX.Element => {
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState<number>(0);
   const [priority, setPriority] = useState("Medium");
-  const [status, setStatus] = useState<"Pending" | "Draft">("Pending"); // Mặc định hiển thị Pending
+  const [status, setStatus] = useState<"Pending" | "Draft">("Pending");
 
   const handleSaveDraft = () => {
     setStatus("Draft");
@@ -32,6 +25,21 @@ export const CreateProductionRequest = (): JSX.Element => {
     console.log("Submitted for Approval", { productId, quantity, priority, status: "PENDING" });
     alert("Request submitted for Approval!");
   };
+
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    const fetchAllProducts = async () => {
+      try {
+        const response = await productServices.getAllProducts();
+        //@ts-expect-error data
+        setProducts(response.data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchAllProducts();
+  }, [])
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
@@ -71,8 +79,8 @@ export const CreateProductionRequest = (): JSX.Element => {
               >
                 <option value="">-- Select Product --</option>
                 {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.id})
+                  <option key={p.productId} value={p.productId}>
+                    {p.productName} ({p.productId})
                   </option>
                 ))}
               </select>
@@ -104,7 +112,6 @@ export const CreateProductionRequest = (): JSX.Element => {
             </div>
           </div>
 
-          {/* Cột Phải */}
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
@@ -129,7 +136,8 @@ export const CreateProductionRequest = (): JSX.Element => {
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
               <h4 className="text-xs font-bold text-blue-800 uppercase mb-2">Request Summary</h4>
               <div className="text-sm text-blue-700 space-y-1">
-                <p>Product: <span className="font-medium">{products.find(p => p.id === productId)?.name || "Not selected"}</span></p>
+                <p>Product: <span className="font-medium">
+                  {products.find(p => p.productId.toString() === productId)?.productName || "Not selected"}</span></p>
                 <p>Est. Completion: <span className="font-medium">Calculated upon submission</span></p>
               </div>
             </div>

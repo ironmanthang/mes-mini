@@ -28,8 +28,9 @@ export const ComponentInformation = (): JSX.Element => {
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await componentService.getAllComponents(searchTerm);
-      setComponents(data);
+      const response = await componentService.getAllComponents(searchTerm);
+      //@ts-expect-error data
+      setComponents(response.data);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
@@ -60,7 +61,7 @@ export const ComponentInformation = (): JSX.Element => {
         await componentService.deleteComponent(id);
         fetchComponents();
       } catch (error) {
-        alert("Failed to delete component. It might be used in existing orders.");
+        console.log(error);
       }
     }
   };
@@ -243,12 +244,13 @@ export const ComponentInformation = (): JSX.Element => {
         </div>
       </div>
 
-      <AddComponentModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        initialData={selectedComponent}
-        onConfirm={handleSaveSuccess} 
-      />
+        <AddComponentModal 
+            isOpen={isModalOpen} 
+            onClose={() => setIsModalOpen(false)} 
+            initialData={selectedComponent || undefined}
+            onConfirm={handleSaveSuccess} 
+        />
+    
     </div>
   );
 };

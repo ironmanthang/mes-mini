@@ -1,12 +1,12 @@
 import { X, Save, Package, DollarSign, Loader2, AlertCircle } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
-import { componentService, type CreateComponentRequest } from "../../../services/componentServices";
+import { componentService, type CreateComponentRequest, type Component } from "../../../services/componentServices";
 
 interface AddComponentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  initialData?: any;
+  initialData?: Component;
 }
 
 export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: AddComponentModalProps): JSX.Element | null => {
@@ -31,10 +31,10 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
       if (initialData) {
         setFormData({
           code: initialData.code || "",
-          componentName: initialData.componentName || initialData.name || "",
+          componentName: initialData.componentName || "",
           unit: initialData.unit || "pcs",
-          minStockLevel: initialData.minStockLevel || initialData.minStock || 0,
-          standardCost: initialData.standardCost || initialData.cost || 0,
+          minStockLevel: initialData.minStockLevel || 0,
+          standardCost: initialData.standardCost || 0,
           description: initialData.description || "",
         });
       } else {
@@ -79,9 +79,8 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
       
       onConfirm();
       onClose();
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || "Failed to save component.";
-      setError(msg);
+    } catch (err) {
+      console.error("Failed", err);
     } finally {
       setIsLoading(false);
     }

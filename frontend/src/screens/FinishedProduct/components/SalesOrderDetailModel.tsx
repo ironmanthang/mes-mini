@@ -1,14 +1,19 @@
-import { X, Printer, Settings, FileText, CheckCircle, Truck, Package } from "lucide-react";
+import { X, Printer, FileText, CheckCircle, Truck, Package, User, Hash, DollarSign, Settings } from "lucide-react";
 import { type JSX } from "react";
+import { type SalesOrder } from "../../../services/salesOrderServices";
 
 interface SalesOrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  order: any;
+  order: SalesOrder | null;
 }
 
 export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDetailModalProps): JSX.Element | null => {
   if (!isOpen || !order) return null;
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
@@ -26,7 +31,15 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
                     {order.status}
                 </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">ID: <span className="font-mono font-bold text-gray-700">{order.id}</span> | Date: {order.date}</p>
+            <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                <span className="flex items-center gap-1">
+                    <Hash className="w-3 h-3" /> ID: <span className="font-mono font-bold text-gray-700">{order.salesOrderId}</span>
+                </span>
+                <span className="text-gray-300">|</span>
+                <span className="flex items-center gap-1">
+                    Code: <span className="font-mono font-bold text-gray-700">{order.code}</span>
+                </span>
+            </div>
           </div>
           <button onClick={onClose}><X className="w-5 h-5 text-gray-400 hover:text-blue-600 cursor-pointer" /></button>
         </div>
@@ -35,48 +48,49 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
             
             <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-1">Customer Info</h3>
-                    <div className="text-sm space-y-2">
-                        <div className="flex justify-between"><span className="text-gray-500">Agent:</span> <span className="font-medium">{order.agent}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Contact:</span> <span className="font-medium">Mr. John Doe</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Phone:</span> <span className="font-medium">(+84) 901 234 567</span></div>
+                    <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-1">General Info</h3>
+                    <div className="text-sm space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-500 flex items-center gap-2">
+                                <User className="w-4 h-4" /> Agent Name:
+                            </span> 
+                            <span className="font-medium text-gray-900">{order.agent.agentName}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-500 flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4" /> Sales Rep:
+                            </span> 
+                            <span className="font-medium text-gray-900">{order.employee.fullName}</span>
+                        </div>
                     </div>
                 </div>
+
                 <div className="space-y-4">
-                     <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-1">Shipping Info</h3>
-                     <div className="text-sm space-y-2">
-                        <div className="flex justify-between"><span className="text-gray-500">Delivery Date:</span> <span className="font-medium">{order.deliveryDate}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Address:</span> <span className="font-medium text-right max-w-[200px]">123 Industrial Park, Dist 9, HCMC</span></div>
+                     <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-1">Order Value</h3>
+                     <div className="text-sm space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-500 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" /> Total Amount:
+                            </span> 
+                            <span className="font-bold text-lg text-blue-600">
+                                {formatCurrency(order.totalAmount)}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Payment Status:</span> 
+                            <span className="font-medium text-gray-400 italic">Pending (No Data)</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div>
-                <h3 className="text-sm font-bold text-gray-900 mb-3">Product List</h3>
-                <table className="w-full text-left border rounded-lg overflow-hidden">
-                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                        <tr>
-                            <th className="p-3">Product Name</th>
-                            <th className="p-3 text-right">Qty</th>
-                            <th className="p-3 text-right">Unit Price</th>
-                            <th className="p-3 text-right">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-sm divide-y">
-                        <tr>
-                            <td className="p-3 font-medium">{order.product}</td>
-                            <td className="p-3 text-right">{order.quantity}</td>
-                            <td className="p-3 text-right">$1,200</td>
-                            <td className="p-3 text-right font-medium">${order.totalValue.toLocaleString()}</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 font-medium">Accessories Kit</td>
-                            <td className="p-3 text-right">10</td>
-                            <td className="p-3 text-right">$50</td>
-                            <td className="p-3 text-right font-medium">$500</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h3 className="text-sm font-bold text-gray-900 mb-3">Product Summary</h3>
+                <div className="border rounded-lg overflow-hidden bg-gray-50 p-8 text-center">
+                    <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 font-medium">Order details are not available in the current API response.</p>
+                    <p className="text-xs text-gray-400 mt-1">Please update `SalesOrder` interface to include `details[]`.</p>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
@@ -86,22 +100,27 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
                     </h4>
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span>Ready to Ship:</span>
-                            <span className="font-bold">45 / {order.quantity}</span>
+                            <span>Estimated Status:</span>
+                            <span className="font-bold">{order.status}</span>
                         </div>
                         <div className="w-full bg-blue-200 rounded-full h-1.5">
-                            <div className="bg-blue-600 h-1.5 rounded-full" style={{width: '45%'}}></div>
+                            <div className="bg-blue-600 h-1.5 rounded-full" 
+                                style={{
+                                    width: order.status === 'Completed' ? '100%' : 
+                                           order.status === 'Processing' ? '50%' : '10%'
+                                }}>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 cursor-pointer hover:bg-purple-100 transition-colors">
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                     <h4 className="text-xs font-bold text-purple-800 uppercase mb-2 flex items-center gap-2">
-                        <Settings className="w-4 h-4" /> Production Link
+                        <Settings className="w-4 h-4" /> System Info
                     </h4>
-                    <p className="text-sm text-purple-700 mb-1">Linked to Production Request:</p>
-                    <div className="flex items-center gap-2 font-bold text-purple-900">
-                        <Package className="w-4 h-4" /> PR-2025-089
+                    <p className="text-sm text-purple-700 mb-1">Internal Reference Code:</p>
+                    <div className="flex items-center gap-2 font-bold text-purple-900 font-mono">
+                        <Package className="w-4 h-4" /> {order.code}
                     </div>
                 </div>
             </div>
@@ -110,16 +129,16 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-lg">
             <button className="flex items-center gap-2 px-4 py-2 bg-white border 
             border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer">
-                <Printer className="w-4 h-4" /> Print Order
+                <Printer className="w-4 h-4" /> Print
             </button>
             <button className="flex items-center gap-2 px-4 py-2 bg-white border 
             border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer">
-                <FileText className="w-4 h-4" /> Generate Invoice
+                <FileText className="w-4 h-4" /> Invoice
             </button>
             {order.status !== 'Completed' && (
                 <button className="flex items-center gap-2 px-6 py-2 bg-green-600 
                 text-white font-medium rounded-lg hover:bg-green-500 shadow-md cursor-pointer">
-                    <CheckCircle className="w-4 h-4" /> Process Fulfillment
+                    <CheckCircle className="w-4 h-4" /> Process
                 </button>
             )}
         </div>
