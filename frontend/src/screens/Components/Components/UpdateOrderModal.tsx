@@ -11,12 +11,12 @@ interface UpdateOrderModalProps {
 
 export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: UpdateOrderModalProps): JSX.Element | null => {
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
-  const [discount, setDiscount] = useState<number>(0);
-  const [tax, setTax] = useState<number>(0);
+  const [taxRate, setTaxRate] = useState<number>(0);
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
   const [deliveryTerms, setDeliveryTerms] = useState("FOB - Free On Board");
-  const [status, setStatus] = useState<'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED'>('DRAFT');
+  const [priority, setPriority] = useState("NORMAL");
+  const [note, setNote] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,15 +28,12 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
         .then((data) => {
           const dateStr = data.expectedDeliveryDate ? data.expectedDeliveryDate.split('T')[0] : "";
           setExpectedDeliveryDate(dateStr);
-          setDiscount(Number(data.discount) || 0);
-          setTax(Number(data.tax) || 0);
+          setTaxRate(Number(data.taxRate) || 0);
           setShippingCost(Number(data.shippingCost) || 0);
           setPaymentTerms(data.paymentTerms || "Net 30");
           setDeliveryTerms(data.deliveryTerms || "FOB - Free On Board");
-          
-          if (['DRAFT', 'PENDING_APPROVAL', 'CANCELLED'].includes(data.status)) {
-              setStatus(data.status as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED');
-          }
+          setPriority(data.priority || "NORMAL");
+          setNote(data.note || "");
         })
         .catch(err => console.error("Failed to load PO details", err))
         .finally(() => setIsLoading(false));
@@ -50,12 +47,12 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
     try {
       const payload: UpdatePORequest = {
         expectedDeliveryDate: expectedDeliveryDate || undefined,
-        discount,
-        tax,
+        taxRate,
         shippingCost,
         paymentTerms,
         deliveryTerms,
-        status
+        priority,
+        note
       };
 
       await purchaseOrderService.updatePO(orderId, payload);
@@ -77,7 +74,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div className="bg-white w-[600px] max-h-[90vh] flex flex-col rounded-lg shadow-xl animate-in fade-in zoom-in duration-200">
         
-        {/* Header */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -91,7 +87,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
@@ -100,20 +95,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Status</label>
-                    <select 
-                        value={status} 
-                        onChange={e => setStatus(e.target.value as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED')}
-                        disabled={isSubmitting}
-                        className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                        <option value="DRAFT">Draft</option>
-                        <option value="PENDING_APPROVAL">Pending Approval</option>
-                        <option value="CANCELLED">Cancelled</option>
-                    </select>
-                </div>
-
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700">Expected Delivery Date</label>
                     <input 
@@ -124,25 +105,29 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                         className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" 
                     />
                 </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">Priority</label>
+                    <select 
+                        value={priority} 
+                        onChange={e => setPriority(e.target.value)}
+                        disabled={isSubmitting}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                        <option value="URGENT">High (Urgent)</option>
+                        <option value="NORMAL">Medium (Normal)</option>
+                        <option value="LOW">Low</option>
+                    </select>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Discount ($)</label>
+                    <label className="text-sm font-bold text-gray-700">Tax Rate (%)</label>
                     <input 
                         type="number" min="0"
-                        value={discount} 
-                        onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
-                        disabled={isSubmitting}
-                        className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-right" 
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Tax ($)</label>
-                    <input 
-                        type="number" min="0"
-                        value={tax} 
-                        onChange={e => setTax(Math.max(0, parseFloat(e.target.value) || 0))}
+                        value={taxRate} 
+                        onChange={e => setTaxRate(Math.max(0, parseFloat(e.target.value) || 0))}
                         disabled={isSubmitting}
                         className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-right" 
                     />
@@ -182,15 +167,27 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                     >
                         <option value="FOB - Free On Board">FOB - Free On Board</option>
                         <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
+                        <option value="DDP - Delivered Duty Paid">DDP - Delivered Duty Paid</option>
                         <option value="EXW - Ex Works">EXW - Ex Works</option>
                     </select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Internal Note</label>
+                <textarea 
+                    value={note} 
+                    onChange={e => setNote(e.target.value)}
+                    disabled={isSubmitting}
+                    rows={3}
+                    placeholder="Add specific instructions or notes..."
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
               </div>
             </>
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-end gap-3">
           <button 
             onClick={onClose} 

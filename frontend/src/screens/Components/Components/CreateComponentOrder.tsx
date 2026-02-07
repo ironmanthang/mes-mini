@@ -20,6 +20,10 @@ interface OrderRow {
 export const CreateComponentOrder = (): JSX.Element => {
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   const [componentsList, setComponentsList] = useState<SupplierComponent[]>([]); 
+  
+  const [warehousesList, setWarehousesList] = useState<any[]>([]); 
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | "">("");
+
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingComponents, setIsLoadingComponents] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,9 +31,10 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | "">("");
   const [supplierInfo, setSupplierInfo] = useState<Supplier | null>(null);
   
-  const [orderDate, setOrderDate] = useState("");
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [priority, setPriority] = useState("Medium");
+  const [note, setNote] = useState("");
 
   const [rows, setRows] = useState<OrderRow[]>([]);
 
@@ -45,17 +50,22 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const fetchData = async () => {
       try {
         const suppliers = await supplierService.getAllSuppliers();
         setSuppliersList(Array.isArray(suppliers) ? suppliers : (suppliers as any).data || []);
+        
+        setWarehousesList([
+            { warehouseId: 1, name: "WH-01: Main Component Warehouse" },
+            { warehouseId: 2, name: "WH-02: Sub Storage" }
+        ]);
       } catch (error) {
-        console.error("Failed to load suppliers", error);
+        console.error("Failed to load initial data", error);
       } finally {
         setIsLoadingData(false);
       }
     };
-    fetchSuppliers();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -131,9 +141,7 @@ export const CreateComponentOrder = (): JSX.Element => {
   const taxAmount = subtotal * (taxRate / 100);
   const grandTotal = subtotal + taxAmount + shippingCost;
 
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
+  const triggerFileUpload = () => fileInputRef.current?.click();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -141,9 +149,7 @@ export const CreateComponentOrder = (): JSX.Element => {
       const uniqueNewFiles = newFiles.filter(newFile => 
         !attachedFiles.some(existingFile => existingFile.name === newFile.name && existingFile.size === newFile.size)
       );
-      
       setAttachedFiles(prev => [...prev, ...uniqueNewFiles]);
-      
       event.target.value = '';
     }
   };
@@ -152,25 +158,26 @@ export const CreateComponentOrder = (): JSX.Element => {
     setAttachedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  const handleSubmit = async () => {
+  const handleSave = async (submitStatus: 'DRAFT' | 'PENDING') => {
     if (!selectedSupplierId) return alert("Please select a supplier.");
+    if (!selectedWarehouseId) return alert("Please select a destination warehouse.");
     if (rows.length === 0) return alert("Please add at least one component.");
     if (rows.some(r => r.componentId === 0)) return alert("Please select components for all rows.");
 
     setIsSubmitting(true);
     try {
-      const poCode = `PO-${Date.now().toString().slice(-6)}`;
-
       await purchaseOrderService.createPO({
-        code: poCode,
+        status: submitStatus,
         supplierId: Number(selectedSupplierId),
+        warehouseId: Number(selectedWarehouseId),
+        orderDate: orderDate || undefined,
         expectedDeliveryDate: deliveryDate || undefined,
-        discount: 0,
-        tax: taxAmount,
+        taxRate: taxRate,
         shippingCost: shippingCost,
         paymentTerms: paymentTerm,
         deliveryTerms: deliveryTerm,
-        note: `Priority: ${priority}`,
+        priority: priority,
+        note: note,
         details: rows.map(r => ({
           componentId: r.componentId,
           quantity: r.quantity,
@@ -178,20 +185,25 @@ export const CreateComponentOrder = (): JSX.Element => {
         }))
       });
 
-      setMessage("Purchase Order Created Successfully!");
+      setMessage(submitStatus === 'DRAFT' ? "Draft saved successfully!" : "Purchase Order Submitted!");
       setShowSuccess(true);
-      setOrderDate("");
+      
+      setOrderDate(new Date().toISOString().split('T')[0]);
       setDeliveryDate("");
+      setNote("");
       setRows([]);
       setSelectedSupplierId("");
+      setSelectedWarehouseId("");
       setSupplierInfo(null);
+      
       setTimeout(() => {
         setMessage("");
         setShowSuccess(false);
       }, 3000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to handle submit:", error);
+      alert(error?.response?.data?.message || "An error occurred while saving the Purchase Order.");
     } finally {
       setIsSubmitting(false);
     }
@@ -203,18 +215,16 @@ export const CreateComponentOrder = (): JSX.Element => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">New Component Order</h2>
           <p className="text-sm text-gray-500">Create a purchase order for raw materials.</p>
         </div>
-
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
         <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3 mb-5">
-          <FileText className="w-4 h-4 text-blue-600" /> Supplier Information
+          <FileText className="w-4 h-4 text-blue-600" /> General Information
         </h3>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -230,6 +240,20 @@ export const CreateComponentOrder = (): JSX.Element => {
                 <option value="">-- Select Supplier --</option>
                 {suppliersList.map(s => (
                   <option key={s.supplierId} value={s.supplierId}>{s.code} - {s.supplierName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Destination Warehouse<span className="text-red-500">*</span></label>
+              <select 
+                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
+                value={selectedWarehouseId}
+                onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
+              >
+                <option value="">-- Select Warehouse --</option>
+                {warehousesList.map(w => (
+                  <option key={w.warehouseId} value={w.warehouseId}>{w.name}</option>
                 ))}
               </select>
             </div>
@@ -257,9 +281,9 @@ export const CreateComponentOrder = (): JSX.Element => {
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
+                <option value="URGENT">High (Urgent)</option>
+                <option value="NORMAL">Medium (Normal)</option>
+                <option value="LOW">Low</option>
               </select>
             </div>
           </div>
@@ -432,6 +456,15 @@ export const CreateComponentOrder = (): JSX.Element => {
                             <option value="EXW - Ex Works">EXW - Ex Works</option>
                         </select>
                     </div>
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 block mb-1">Internal Note</label>
+                        <textarea 
+                            value={note} onChange={(e) => setNote(e.target.value)}
+                            placeholder="Add specific instructions for suppliers..."
+                            rows={2}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                        ></textarea>
+                    </div>
 
                     <div className="pt-3 border-t border-gray-100 space-y-3">
                         <div className="flex items-center justify-between gap-2">
@@ -494,7 +527,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                  
                  <div className="flex justify-between items-center text-sm text-gray-600">
                    <div className="flex items-center gap-2">
-                     <span>Tax (%)</span>
+                     <span>Tax Rate (%)</span>
                      <input 
                         type="number" 
                         min="0"
@@ -523,12 +556,17 @@ export const CreateComponentOrder = (): JSX.Element => {
              </div>
 
              <div className="mt-8 flex justify-end gap-3">
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
-                  <Save className="w-4 h-4" /> Save Draft
+                <button 
+                  onClick={() => handleSave('DRAFT')}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer disabled:opacity-70"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                  Save Draft
                 </button>
 
                 <button 
-                    onClick={handleSubmit}
+                    onClick={() => handleSave('PENDING')}
                     disabled={isSubmitting}
                     className="flex items-center gap-2 px-8 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md disabled:opacity-70 cursor-pointer"
                 >

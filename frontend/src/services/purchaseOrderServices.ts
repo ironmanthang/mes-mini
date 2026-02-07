@@ -18,30 +18,31 @@ export interface PurchaseOrderDetail {
     minStockLevel: number;
     standardCost: string;
     unit: string;
-  }
+  };
 }
 
 export interface PurchaseOrder {
   purchaseOrderId: number;
+  code: string;
   orderDate: string;
+  expectedDeliveryDate: string;
   employeeId: number;
   supplierId: number;
-  createdAt: string;
-  updatedAt: string;
-  deliveryTerms: string;
-  expectedDeliveryDate: string;
-  paymentTerms: string;
+  warehouseId: number;
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'ORDERED' | 'RECEIVING' | 'COMPLETED' | 'CANCELLED';
   priority: string;
   shippingCost: string;
-  tax: string;
-  code: string;
+  taxRate: string;
   totalAmount: string;
-  discount: string;
+  paymentTerms: string;
+  deliveryTerms: string;
+  note: string | null;
   approvedAt: string | null;
   approverId: number | null;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RECEIVED';
+  createdAt: string;
+  updatedAt: string;
 
-  supplier: {
+  supplier?: {
     supplierId: number;
     supplierName: string;
     phoneNumber: string;
@@ -52,45 +53,80 @@ export interface PurchaseOrder {
     updatedAt: string;
   };
   
-  employee: {
+  employee?: {
+    fullName: string;
+  };
+
+  approver?: {
     fullName: string;
   };
   
-  details: PurchaseOrderDetail[];
+  details?: PurchaseOrderDetail[];
+  
+  _count?: {
+    details: number;
+  };
 }
 
+export interface ComponentLot {
+  lotCode: string;
+  componentId: number;
+  poDetailId: number;
+  warehouseId: number;
+  quantity: number;
+  component: { componentName: string; code: string };
+  warehouse: { warehouseName: string; code: string };
+}
+
+
 export interface CreatePORequest {
-  code: string;
+  status?: 'DRAFT' | 'PENDING';
   supplierId: number;
+  warehouseId: number;
+  orderDate?: string;
   expectedDeliveryDate?: string;
-  discount?: number;
-  tax?: number;
-  shippingCost?: number;
+  taxRate: number;
+  shippingCost: number;
   paymentTerms?: string;
   deliveryTerms?: string;
+  priority?: string;
   note?: string;
   details: {
     componentId: number;
     quantity: number;
     unitPrice: number;
+    productionRequestId?: number;
   }[];
 }
 
 export interface UpdatePORequest {
   expectedDeliveryDate?: string;
-  discount?: number;
-  tax?: number;
+  warehouseId?: number;
+  taxRate?: number;
   shippingCost?: number;
   paymentTerms?: string;
   deliveryTerms?: string;
+  priority?: string;
   note?: string;
-  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED';
+  details?: {
+    componentId: number;
+    quantity: number;
+    unitPrice: number;
+    productionRequestId?: number;
+  }[];
 }
 
+export interface ReceiveGoodsRequest {
+  items: {
+    componentId: number;
+    quantity: number;
+    warehouseId: number;
+  }[];
+}
 
 export const purchaseOrderService = {
-  getAllPOs: async () => {
-    const response = await api.get<PurchaseOrder[]>("/purchase-orders");
+  getAllPOs: async (params?: { page?: number; limit?: number; search?: string; status?: string; priority?: string }) => {
+    const response = await api.get("/purchase-orders", { params });
     return response.data;
   },
 
@@ -109,8 +145,38 @@ export const purchaseOrderService = {
     return response.data;
   },
 
+  deletePO: async (id: number) => {
+    const response = await api.delete<{ message: string }>(`/purchase-orders/${id}`);
+    return response.data;
+  },
+
+  submitPO: async (id: number) => {
+    const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/submit`);
+    return response.data;
+  },
+
   approvePO: async (id: number) => {
-    const response = await api.put<PurchaseOrder>(`/purchase-orders/${id}/approve`);
+    const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/approve`);
+    return response.data;
+  },
+
+  sendToSupplier: async (id: number, data?: { note?: string }) => {
+    const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/send-to-supplier`, data || {});
+    return response.data;
+  },
+
+  cancelPO: async (id: number, data?: { note?: string }) => {
+    const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`, data || {});
+    return response.data;
+  },
+
+  receiveGoods: async (id: number, data: ReceiveGoodsRequest) => {
+    const response = await api.post<{ po: PurchaseOrder; generatedLots: any[] }>(`/purchase-orders/${id}/receive`, data);
+    return response.data;
+  },
+
+  getLotsByPO: async (id: number) => {
+    const response = await api.get<ComponentLot[]>(`/purchase-orders/${id}/lots`);
     return response.data;
   }
 };

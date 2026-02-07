@@ -1,5 +1,5 @@
 import { 
-  X, CheckCircle, RefreshCw, Printer, User, Package
+  X, CheckCircle, Printer, User, Package
 } from "lucide-react";
 import { type JSX } from "react";
 import type { PurchaseOrder } from "../../../services/purchaseOrderServices";
@@ -33,11 +33,14 @@ export const OrderDetailModal = ({
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "PENDING_APPROVAL": return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      case "APPROVED": return "bg-blue-100 text-blue-700 border-blue-200";
-      case "RECEIVED": return "bg-green-100 text-green-700 border-green-200";
-      case "CANCELLED": return "bg-red-100 text-red-700 border-red-200";
-      default: return "bg-gray-100 text-gray-700";
+      case 'DRAFT': return 'bg-gray-100 text-gray-700 border-gray-300';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'APPROVED': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'ORDERED': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+      case 'RECEIVING': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'COMPLETED': return 'bg-green-100 text-green-700 border-green-200';
+      case 'CANCELLED': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -88,7 +91,7 @@ export const OrderDetailModal = ({
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
-    }, 0);
+    }, 100);
   };
 
   return (
@@ -126,6 +129,10 @@ export const OrderDetailModal = ({
                                 <span className="text-gray-500">Email:</span> 
                                 <span className="font-medium text-gray-900">{order.supplier?.email || "N/A"}</span>
                             </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Phone:</span> 
+                                <span className="font-medium text-gray-900">{order.supplier?.phoneNumber || "N/A"}</span>
+                            </div>
                         </div>
                     </div>
 
@@ -154,7 +161,7 @@ export const OrderDetailModal = ({
                             <div className="flex justify-between pt-2 border-t border-gray-100">
                                 <span className="text-gray-500">Total Amount:</span> 
                                 <span className="font-bold text-blue-700 text-lg">
-                                    {parseCurrency(order.totalAmount).toLocaleString('vi-VN')} VND
+                                    ${parseCurrency(order.totalAmount).toLocaleString('vi-VN')}
                                 </span>
                             </div>
                         </div>
@@ -170,7 +177,8 @@ export const OrderDetailModal = ({
                             <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold">
                                 <tr>
                                     <th className="p-3 border-b">Component Name</th>
-                                    <th className="p-3 border-b text-right">Quantity</th>
+                                    <th className="p-3 border-b text-center">Ordered</th>
+                                    <th className="p-3 border-b text-center">Received</th>
                                     <th className="p-3 border-b text-right">Unit Price</th>
                                     <th className="p-3 border-b text-right">Total</th>
                                 </tr>
@@ -178,26 +186,33 @@ export const OrderDetailModal = ({
                             <tbody className="text-sm divide-y divide-gray-100">
                                 {order.details && order.details.length > 0 ? (
                                     order.details.map((detail, idx) => {
-                                      const qty = detail.quantityOrdered || 0;
+                                      const qtyOrd = detail.quantityOrdered || 0;
+                                      const qtyRec = detail.quantityReceived || 0;
                                       const price = parseCurrency(detail.unitPrice);
-                                      const lineTotal = qty * price;
+                                      const lineTotal = qtyOrd * price;
 
                                       return (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="p-3 font-medium text-gray-900">
                                                 {detail.component?.componentName || `Item #${detail.componentId}`}
+                                                <div className="text-xs text-gray-500">{detail.component?.code}</div>
                                             </td>
-                                            <td className="p-3 text-right">{qty}</td>
-                                            <td className="p-3 text-right">{price.toLocaleString('vi-VN')}</td>
+                                            <td className="p-3 text-center">{qtyOrd}</td>
+                                            <td className="p-3 text-center">
+                                              <span className={qtyRec < qtyOrd ? "text-orange-600 font-medium" : "text-green-600 font-bold"}>
+                                                {qtyRec}
+                                              </span>
+                                            </td>
+                                            <td className="p-3 text-right">${price.toLocaleString('vi-VN')}</td>
                                             <td className="p-3 text-right font-medium">
-                                                {lineTotal.toLocaleString('vi-VN')}
+                                                ${lineTotal.toLocaleString('vi-VN')}
                                             </td>
                                         </tr>
                                       );
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="p-6 text-center text-gray-400 italic">
+                                        <td colSpan={5} className="p-6 text-center text-gray-400 italic">
                                             No items found in this order.
                                         </td>
                                     </tr>
@@ -207,10 +222,16 @@ export const OrderDetailModal = ({
                     </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600 grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
+                <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600 grid grid-cols-2 gap-4 border border-gray-100">
+                    <div className="space-y-2">
                         <p><span className="font-bold text-gray-700">Payment Terms:</span> {order.paymentTerms || "N/A"}</p>
                         <p><span className="font-bold text-gray-700">Delivery Terms:</span> {order.deliveryTerms || "N/A"}</p>
+                        <p><span className="font-bold text-gray-700">Priority:</span> {order.priority || "NORMAL"}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <p><span className="font-bold text-gray-700">Tax Rate:</span> {order.taxRate ? `${order.taxRate}%` : "0%"}</p>
+                        <p><span className="font-bold text-gray-700">Shipping Cost:</span> ${parseCurrency(order.shippingCost).toLocaleString('vi-VN')}</p>
+                        <p><span className="font-bold text-gray-700">Note:</span> {order.note || "N/A"}</p>
                     </div>
                 </div>
             </div>
@@ -224,7 +245,7 @@ export const OrderDetailModal = ({
             <Printer className="w-4 h-4" /> Print
           </button>
           
-          {order.status === 'PENDING_APPROVAL' && (
+          {order.status === 'PENDING' && (
             <button 
               onClick={onApprove}
               className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
@@ -233,12 +254,12 @@ export const OrderDetailModal = ({
             </button>
           )}
 
-          {order.status === 'APPROVED' && (
+          {(order.status === 'ORDERED' || order.status === 'RECEIVING') && (
              <button 
                 onClick={onUpdateStatus}
-                className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
+                className="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
              >
-               <RefreshCw className="w-4 h-4" /> Mark as Received
+               <Package className="w-4 h-4" /> Receive Goods
              </button>
           )}
         </div>

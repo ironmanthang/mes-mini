@@ -1,5 +1,6 @@
 import api from "./api";
 
+
 export interface Component {
   componentId: number;
   code: string;
@@ -26,8 +27,16 @@ export interface ComponentSupplier {
   supplierId: number;
   supplierName: string;
   code: string;
-  phone?: string;
-  email?: string;
+  phoneNumber?: string | null;
+  email?: string | null;
+}
+
+export interface ComponentBarcodeData {
+  componentId: number;
+  code: string;
+  componentName: string;
+  barcode: string;
+  unit: string;
 }
 
 export interface CreateComponentRequest {
@@ -47,11 +56,9 @@ export interface UpdateComponentRequest {
   description?: string;
 }
 
-
 export const componentService = {
-  getAllComponents: async (search?: string) => {
-    const params = search ? { search } : {};
-    const response = await api.get<Component[]>("/components", { params });
+  getAllComponents: async (params?: { search?: string; page?: number; limit?: number }) => {
+    const response = await api.get("/components", { params });
     return response.data;
   },
 
@@ -71,12 +78,17 @@ export const componentService = {
   },
 
   deleteComponent: async (id: number) => {
-    const response = await api.delete<{ message: string }>(`/components/${id}`);
+    const response = await api.delete<{ message: string } | Component>(`/components/${id}`);
     return response.data;
   },
 
   getComponentSuppliers: async (id: number) => {
     const response = await api.get<ComponentSupplier[]>(`/components/${id}/suppliers`);
+    return response.data;
+  },
+
+  getComponentBarcode: async (id: number) => {
+    const response = await api.get<ComponentBarcodeData>(`/components/${id}/barcode`);
     return response.data;
   }
 };
