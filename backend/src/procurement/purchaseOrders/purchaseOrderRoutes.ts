@@ -5,6 +5,7 @@ import {
     getAllPOs,
     getPOById,
     approvePO,
+    receiveGoods,
 } from './purchaseOrderController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -39,6 +40,11 @@ router.put('/:id',
 router.put('/:id/approve',
     authorize('System Admin', 'Production Manager'),
     approvePO
+);
+
+router.post('/:id/receive',
+    authorize('System Admin', 'Purchasing Staff'),
+    receiveGoods
 );
 
 /**
@@ -165,6 +171,44 @@ router.put('/:id/approve',
  *         description: Logic Error (Self-approval or wrong status)
  *       403:
  *         description: Forbidden (Must be Production Manager)
+ */
+
+/**
+ * @swagger
+ * /api/purchase-orders/{id}/receive:
+ *   post:
+ *     summary: Receive Goods (Goods Receipt)
+ *     description: Record items arriving at the warehouse. Updates Inventory and PO Status.
+ *     tags: [Purchase Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [items]
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     componentId: { type: integer, example: 1 }
+ *                     quantity: { type: integer, example: 50 }
+ *                     warehouseId: { type: integer, example: 1 }
+ *     responses:
+ *       200:
+ *         description: Goods Received successfully
+ *       400:
+ *         description: Logic Error (e.g. Received more than ordered)
+ *       403:
+ *         description: Forbidden
  */
 
 /**

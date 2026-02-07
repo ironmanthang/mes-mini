@@ -10,6 +10,16 @@ export const createSO = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
+export const deleteSO = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        await SOService.deleteSO(id as string, req.user!.employeeId);
+        res.status(200).json({ message: 'Sales Order (Draft) deleted successfully' });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
 export const updateSO = async (req: Request, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
@@ -68,6 +78,39 @@ export const rejectSO = async (req: Request, res: Response): Promise<void> => {
         }
         const result = await SOService.rejectSO(id as string, req.user!.employeeId, reason);
         res.status(200).json({ message: 'Sales Order Rejected', result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
+export const startProcessing = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const result = await SOService.startProcessing(id as string, req.user!.employeeId);
+        res.status(200).json({ message: 'Sales Order Processing Started', result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
+export const shipOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { shipments, courierShippingCost } = req.body;
+
+        const result = await SOService.shipOrder(id as string, shipments, req.user!.employeeId, courierShippingCost);
+        res.status(200).json({ message: 'Shipment Processed Successfully', result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
+export const cancelSO = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const result = await SOService.cancelSO(id as string, req.user!.employeeId, reason);
+        res.status(200).json({ message: 'Sales Order Cancelled', result });
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
     }

@@ -4,7 +4,8 @@ import {
     getProductById,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getProductBarcode
 } from './productController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -19,6 +20,11 @@ router.get('/:id', authorize('System Admin', 'Production Manager', 'Sales Staff'
 router.post('/', authorize('System Admin', 'Production Manager'), validate(createProductSchema), createProduct);
 router.put('/:id', authorize('System Admin', 'Production Manager'), validate(updateProductSchema), updateProduct);
 router.delete('/:id', authorize('System Admin'), deleteProduct);
+
+router.get('/:id/barcode',
+    authorize('System Admin', 'Production Manager', 'Warehouse Keeper', 'QC Inspector'),
+    getProductBarcode
+);
 
 /**
  * @swagger
@@ -143,6 +149,36 @@ router.delete('/:id', authorize('System Admin'), deleteProduct);
  *         description: Cannot delete (has orders)
  *       404:
  *         description: Not found
+ */
+
+/**
+ * @swagger
+ * /api/products/{id}/barcode:
+ *   get:
+ *     summary: Get barcode data for a product
+ *     description: Returns barcode string for printing/display
+ *     tags: [Products]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Barcode data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 productId: { type: integer }
+ *                 code: { type: string }
+ *                 productName: { type: string }
+ *                 barcode: { type: string, example: "PRD-THERMOSTAT001" }
+ *                 unit: { type: string }
+ *       404:
+ *         description: Product not found
  */
 
 export default router;

@@ -59,3 +59,17 @@ export const getComponentSuppliers = async (req: Request, res: Response): Promis
         res.status(500).json({ message: err.message });
     }
 };
+
+export const getComponentBarcode = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const barcode = await ComponentService.getComponentBarcode(req.params.id as string);
+        res.status(200).json(barcode);
+    } catch (error) {
+        const err = error as Error;
+        if (err.message === 'Component not found') {
+            res.status(404).json({ message: err.message });
+            return;
+        }
+        res.status(500).json({ message: err.message });
+    }
+};

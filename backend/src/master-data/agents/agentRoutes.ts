@@ -16,7 +16,11 @@ router.use(protect);
 
 router.get('/', authorize('System Admin', 'Production Manager', 'Sales Staff'), getAllAgents);
 router.get('/:id', authorize('System Admin', 'Production Manager', 'Sales Staff'), getAgentById);
-router.post('/', authorize('System Admin', 'Sales Staff'), validate(createAgentSchema), createAgent);
+router.post('/',
+    authorize('Procurement Manager', 'Sales Manager', 'System Admin'),
+    validate(createAgentSchema),
+    createAgent
+);
 router.put('/:id', authorize('System Admin', 'Sales Staff'), validate(updateAgentSchema), updateAgent);
 router.delete('/:id', authorize('System Admin'), deleteAgent);
 

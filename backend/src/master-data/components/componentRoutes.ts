@@ -5,7 +5,8 @@ import {
     createComponent,
     updateComponent,
     deleteComponent,
-    getComponentSuppliers
+    getComponentSuppliers,
+    getComponentBarcode
 } from './componentController.js';
 
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
@@ -40,6 +41,11 @@ router.delete('/:id',
 router.get('/:id/suppliers',
     authorize('System Admin', 'Production Manager', 'Purchasing Staff'),
     getComponentSuppliers
+);
+
+router.get('/:id/barcode',
+    authorize('System Admin', 'Production Manager', 'Warehouse Keeper'),
+    getComponentBarcode
 );
 
 /**
@@ -200,6 +206,36 @@ router.get('/:id/suppliers',
  *                   supplierId: { type: integer }
  *                   supplierName: { type: string }
  *                   code: { type: string }
+ *       404:
+ *         description: Component not found
+ */
+
+/**
+ * @swagger
+ * /api/components/{id}/barcode:
+ *   get:
+ *     summary: Get barcode data for a component
+ *     description: Returns barcode string for printing/display
+ *     tags: [Components]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Barcode data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 componentId: { type: integer }
+ *                 code: { type: string }
+ *                 componentName: { type: string }
+ *                 barcode: { type: string, example: "COM-RESISTOR001" }
+ *                 unit: { type: string }
  *       404:
  *         description: Component not found
  */

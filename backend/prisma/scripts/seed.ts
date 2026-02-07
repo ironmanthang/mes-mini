@@ -8,12 +8,16 @@ import { EmployeeStatus } from '../../src/generated/prisma/index.js';
 // Toggle these to TRUE/FALSE to control what gets seeded
 // ============================================================================
 const SEED_CONFIG = {
-    MINIMAL: false,  // true = Only Roles + Employees (for Swagger testing)
+    MINIMAL: false,  // false = Seed all users for full testing
     ROLES: true,
     EMPLOYEES: true,
     SUPPLIERS: true,
     COMPONENTS: true,
+    WAREHOUSES: true,
+    PRODUCTS: true,
+    LINES: true,
     RELATIONS: true,
+    INSTANCES: true, // NEW: Seed Inventory
 };
 
 const DEFAULT_PASSWORD = '123456';
@@ -21,16 +25,78 @@ const DEFAULT_PASSWORD = '123456';
 async function main(): Promise<void> {
     console.log('Starting Seeding Process...');
 
+    // FORCE RUN RELATIONS because they seem missing
+    await seedSupplierComponents();
+
     if (SEED_CONFIG.ROLES) await seedRoles();
     if (SEED_CONFIG.EMPLOYEES) await seedEmployees();
-    if (!SEED_CONFIG.MINIMAL) {
-        if (SEED_CONFIG.SUPPLIERS) await seedSuppliers();
-        if (SEED_CONFIG.COMPONENTS) await seedComponents();
-        if (SEED_CONFIG.RELATIONS) await seedSupplierComponents();
-    }
+
+    // Master Data - Seed these even in MINIMAL mode if flags are true, or logic requires it.
+    // Modified to allow Master Data with Minimal Users.
+    if (SEED_CONFIG.SUPPLIERS) await seedSuppliers();
+    if (SEED_CONFIG.COMPONENTS) await seedComponents();
+    if (SEED_CONFIG.WAREHOUSES) await seedWarehouses();
+    if (SEED_CONFIG.PRODUCTS) await seedProducts();
+    if (SEED_CONFIG.LINES) await seedProductionLines();
+    if (SEED_CONFIG.RELATIONS) await seedSupplierComponents();
+    if (SEED_CONFIG.INSTANCES) await seedProductInstances(); // NEW
+    await seedAgents();
 
     console.log('Seeding Completed.');
 }
+
+// ============================================================================
+// 9. SEED PRODUCT INSTANCES (INVENTORY)
+// ============================================================================
+async function seedProductInstances(): Promise<void> {
+    console.log('...Seeding Product Instances (Mock Inventory)');
+
+    // Find our Laptop
+    const laptop = await prisma.product.findFirst({ where: { code: 'PROD-LAPTOP-X1' } });
+    if (!laptop) return;
+
+    // We must link instances to a Production Batch (Traceability)
+    const admin = await prisma.employee.findFirst();
+
+    // Create Dummy Work Order (Required parent for Batch)
+    const workOrder = await prisma.workOrder.create({
+        data: {
+            code: 'WO-OPENING-STOCK',
+            quantity: 50,
+            employeeId: admin?.employeeId || 1,
+            productId: laptop.productId,
+            status: 'COMPLETED'
+        }
+    });
+
+    // Create Dummy Production Batch
+    const prodBatch = await prisma.productionBatch.create({
+        data: {
+            batchCode: 'BATCH-OPENING-' + Date.now(),
+            productionDate: new Date(),
+            workOrderId: workOrder.workOrderId
+        }
+    });
+
+    // Create 50 Units in Stock
+    console.log('   Creating 50 Laptops in Stock...');
+    const instancesData = [];
+    for (let i = 1; i <= 50; i++) {
+        instancesData.push({
+            productId: laptop.productId,
+            serialNumber: `SN-${new Date().getFullYear()}-LAPTOP-${i.toString().padStart(4, '0')}`,
+            status: 'IN_STOCK' as const, // Force Literal Type
+            unitProductionCost: 1500000, // Mock cost
+            productionBatchId: prodBatch.productionBatchId // REQUIRED LINK
+        });
+    }
+
+    await prisma.productInstance.createMany({
+        data: instancesData,
+        skipDuplicates: true
+    });
+}
+
 
 // ============================================================================
 // 1. SEED ROLES (Based on ISA-95 & Electronics Manufacturing Best Practices)
@@ -56,7 +122,8 @@ async function seedRoles(): Promise<void> {
         'Production Worker',
         'Sales Staff',
         'Purchasing Staff',
-        'QC Inspector'
+        'QC Inspector',
+        'Warehouse Staff'
     ];
 
     for (const roleName of roles) {
@@ -113,31 +180,35 @@ async function seedEmployees(): Promise<void> {
 
     for (let i = 0; i < users.length; i++) {
         const u = users[i];
-        const role = await prisma.role.findUnique({ where: { roleName: u.role } });
-        if (!role) {
-            console.warn(`   ⚠️ Role "${u.role}" not found. Skipping user ${u.username}.`);
-            continue;
-        }
-
-        await prisma.employee.upsert({
-            where: { username: u.username },
-            update: { status: EmployeeStatus.ACTIVE },
-            create: {
-                fullName: u.name,
-                username: u.username,
-                password: hashedPassword,
-                email: u.email,
-                phoneNumber: `09000000${i.toString().padStart(2, '0')}`,
-                address: 'Spark Electronics Factory',
-                dateOfBirth: new Date('1990-01-01'),
-                hireDate: new Date(),
-                status: EmployeeStatus.ACTIVE,
-                roles: {
-                    create: { roleId: role.roleId }
-                }
+        try {
+            const role = await prisma.role.findUnique({ where: { roleName: u.role } });
+            if (!role) {
+                console.warn(`   ⚠️ Role "${u.role}" not found. Skipping user ${u.username}.`);
+                continue;
             }
-        });
-        console.log(`   ✓ ${u.username} (${u.role})`);
+
+            await prisma.employee.upsert({
+                where: { username: u.username },
+                update: { status: EmployeeStatus.ACTIVE },
+                create: {
+                    fullName: u.name,
+                    username: u.username,
+                    password: hashedPassword,
+                    email: u.email,
+                    phoneNumber: `09000000${i.toString().padStart(2, '0')}`,
+                    address: 'Spark Electronics Factory',
+                    dateOfBirth: new Date('1990-01-01'),
+                    hireDate: new Date(),
+                    status: EmployeeStatus.ACTIVE,
+                    roles: {
+                        create: { roleId: role.roleId }
+                    }
+                }
+            });
+            console.log(`   ✓ ${u.username} (${u.role})`);
+        } catch (error) {
+            console.error(`   ❌ Failed to seed user ${u.username}:`, error);
+        }
     }
 }
 
@@ -163,6 +234,18 @@ async function seedSuppliers(): Promise<void> {
                 phoneNumber: s.phone,
                 address: 'Industrial Zone'
             }
+        });
+    }
+}
+
+async function seedAgents(): Promise<void> {
+    console.log('...Seeding Agents');
+    const agents = [{ code: 'AGT-001', name: 'Authorized Dealer Alpha', email: 'alpha@dealer.com', phone: '0912345678', address: 'Hanoi, VN' }];
+    for (const a of agents) {
+        await prisma.agent.upsert({
+            where: { code: a.code },
+            update: {},
+            create: { code: a.code, agentName: a.name, email: a.email, phoneNumber: a.phone, address: a.address }
         });
     }
 }
@@ -195,7 +278,103 @@ async function seedComponents(): Promise<void> {
 }
 
 // ============================================================================
-// 5. SEED RELATIONS (Supplier <-> Component)
+// 5. SEED WAREHOUSES
+// ============================================================================
+async function seedWarehouses(): Promise<void> {
+    console.log('...Seeding Warehouses');
+    const warehouses = [
+        { code: 'WH-MAIN', name: 'Main Warehouse (Materials)', location: 'Zone A', type: 'COMPONENT' },
+        { code: 'WH-PROD', name: 'Production Floor', location: 'Zone B', type: 'COMPONENT' },
+        { code: 'WH-FG', name: 'Finished Goods', location: 'Zone C', type: 'PRODUCT' },
+        { code: 'WH-DEFECT', name: 'Defect Warehouse', location: 'Zone D', type: 'DEFECT' }
+    ];
+
+    for (const w of warehouses) {
+        await prisma.warehouse.upsert({
+            where: { code: w.code },
+            update: {},
+            create: {
+                code: w.code,
+                warehouseName: w.name,
+                location: w.location,
+            }
+        });
+    }
+}
+
+// ============================================================================
+// 6. SEED PRODUCTS & BILL OF MATERIALS (BOM)
+// ============================================================================
+async function seedProducts(): Promise<void> {
+    console.log('...Seeding Products & BOM');
+
+    // 1. Create Product
+    const product = await prisma.product.upsert({
+        where: { code: 'PROD-LAPTOP-X1' },
+        update: {},
+        create: {
+            code: 'PROD-LAPTOP-X1',
+            productName: 'Laptop X1 Pro',
+            unit: 'pcs'
+        }
+    });
+
+    // 2. Link BOM (1 Laptop uses 1 Chip, 10 Screws)
+    const chip = await prisma.component.findUnique({ where: { code: 'COM-CHIP-X1' } });
+    const screw = await prisma.component.findUnique({ where: { code: 'COM-SCREW-M5' } });
+
+    if (chip) {
+        await prisma.productComposition.upsert({
+            where: {
+                productId_componentId: {
+                    productId: product.productId,
+                    componentId: chip.componentId
+                }
+            },
+            update: {},
+            create: { productId: product.productId, componentId: chip.componentId, quantityNeeded: 1 }
+        });
+    }
+
+    if (screw) {
+        await prisma.productComposition.upsert({
+            where: {
+                productId_componentId: {
+                    productId: product.productId,
+                    componentId: screw.componentId
+                }
+            },
+            update: {},
+            create: { productId: product.productId, componentId: screw.componentId, quantityNeeded: 10 }
+        });
+    }
+}
+
+// ============================================================================
+// 7. SEED PRODUCTION LINES
+// ============================================================================
+async function seedProductionLines(): Promise<void> {
+    console.log('...Seeding Production Lines');
+    const lines = [
+        { name: 'Line 1 (Assembly)', location: 'Zone B' },
+        { name: 'Line 2 (Testing)', location: 'Zone C' }
+    ];
+
+    for (const l of lines) {
+        const existing = await prisma.productionLine.findFirst({ where: { lineName: l.name } });
+        if (!existing) {
+            await prisma.productionLine.create({
+                data: {
+                    lineName: l.name,
+                    location: l.location
+                }
+            });
+        }
+    }
+}
+
+// ============================================================================
+// 8. SEED RELATIONS (Supplier <-> Component)
 // ============================================================================
 async function seedSupplierComponents(): Promise<void> {
     console.log('...Linking Suppliers to Components');

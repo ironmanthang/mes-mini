@@ -1,5 +1,6 @@
 import prisma from '../../common/lib/prisma.js';
 import type { Component } from '../../generated/prisma/index.js';
+import { generateBarcode, BarcodeType } from '../../common/utils/barcode.js';
 
 interface ComponentQuery {
     search?: string;
@@ -20,6 +21,14 @@ interface ComponentSupplier {
     code: string;
     email: string | null;
     phoneNumber: string | null;
+}
+
+interface ComponentBarcodeData {
+    componentId: number;
+    code: string;
+    componentName: string;
+    barcode: string;
+    unit: string;
 }
 
 class ComponentService {
@@ -125,6 +134,23 @@ class ComponentService {
             phoneNumber: r.supplier.phoneNumber
         }));
     }
+
+    async getComponentBarcode(id: string | number): Promise<ComponentBarcodeData> {
+        const componentId = typeof id === 'string' ? parseInt(id) : id;
+        const component = await prisma.component.findUnique({ where: { componentId } });
+        if (!component) throw new Error('Component not found');
+
+        const barcode = generateBarcode(BarcodeType.COMPONENT, component.code);
+
+        return {
+            componentId: component.componentId,
+            code: component.code,
+            componentName: component.componentName,
+            barcode,
+            unit: component.unit
+        };
+    }
 }
 
 export default new ComponentService();
+

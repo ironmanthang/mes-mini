@@ -1,2 +1,5 @@
+node_modules
+.env
+npm-debug.log
 .agent/
-.ai_context/
+ai_context/

@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "../src/generated/prisma"
 }
 
 datasource db {
@@ -15,32 +16,60 @@ enum Priority {
   LOW
 }
 
-enum OrderStatus {
+enum SalesOrderStatus {
   DRAFT               
-  PENDING
-  APPROVED            // Added
-  PROCESSING
-  PARTIALLY_RECEIVED  // Added: Critical for real purchasing
-  SHIPPED
-  COMPLETED
+  PENDING_APPROVAL    // Internal review for discount/credit
+  APPROVED            // Order confirmed by customer
+  IN_PROGRESS         // Picking / Packing / Partial Shipping
+  COMPLETED           // Fully Shipped
+  CANCELLED           // Deal lost
+  RETURNED            // Customer returned goods (RMA)
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SENT_TO_SUPPLIER    // Emailed/Portal upload
+  PARTIALLY_RECEIVED
+  COMPLETED           // Fully Received
   CANCELLED
 }
 
-enum ProductionStatus {
-  DRAFT               
-  REQUESTED
-  APPROVED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
+
+enum ProductionRequestStatus {
+  PENDING             // Waiting for Production Manager review
+  APPROVED            // Manager approved, ready to create Work Order
+  REJECTED            // Manager rejected (insufficient capacity, etc.)
+  PARTIALLY_FULFILLED // Some qty covered by Work Orders
+  FULFILLED           // All qty covered by completed Work Orders
+  CANCELLED           // Request withdrawn
 }
 
+
+enum WorkOrderStatus {
+  PLANNED             // Scheduled, materials not yet reserved
+  RELEASED            // Materials reserved/issued, ready for floor
+  IN_PROGRESS         // Operator started production
+  ON_HOLD             // Waiting for parts, QC issue, or breakdown
+  COMPLETED           // All units produced, pending cost calculation
+  CLOSED              // Costing finalized, archived
+  CANCELLED           // Aborted (materials returned to warehouse)
+}
+
+enum QualityCheckResult {
+  PASSED
+  FAILED
+  NEEDS_REWORK
+}
+// Product Instance Status (Lifecycle of a specific Serial Number)
 enum ProductInstanceStatus {
-  IN_STOCK
-  SOLD
-  IN_REPAIR
-  SCRAPPED           
-  RETURNED
+  WIP                 // Currently being built
+  IN_STOCK            // Finished, in Warehouse
+  RESERVED            // Allocated to a Sales Order
+  SHIPPED             // Sent to Customer
+  RETURNED            // RMA
+  DEFECTIVE           // Failed QC, waiting for decision
+  SCRAPPED            // Destroyed
 }
 
 enum EmployeeStatus {
@@ -49,23 +78,20 @@ enum EmployeeStatus {
   TERMINATED  
 }
 
-enum QualityCheckResult {
-  PASSED
-  FAILED
-  NEEDS_REWORK
-}
 
 enum InventoryTransactionType {
-  IMPORT_PO         // From Supplier
-  EXPORT_PRODUCTION // To Line (Material Issue)
-  IMPORT_PRODUCTION // From Line (Finished Goods)
-  EXPORT_SALES      // To Customer
-  TRANSFER
-  ADJUSTMENT
-  RETURN
+  IMPORT_PO         // Purchase Receipt
+  EXPORT_PRODUCTION // Issue to Work Order
+  IMPORT_PRODUCTION // Receive Finished Goods
+  EXPORT_SALES      // Shipment
+  TRANSFER          // Warehouse to Warehouse
+  ADJUSTMENT        // Stocktake correction
+  RETURN_IN         // Customer Return
+  RETURN_OUT        // Supplier Return
+  SCRAP             // Damaged/Destroyed
 }
 
-enum RequestStatus {     // NEW ENUM for Module C
+enum RequestStatus {
   PENDING
   APPROVED
   REJECTED
@@ -97,9 +123,12 @@ model Employee {
   createdPurchaseOrders  PurchaseOrder[] @relation("POCreator")  
   approvedPurchaseOrders PurchaseOrder[] @relation("POApprover")
   approvedSalesOrders    SalesOrder[]    @relation("SOApprover")
+  createdStocktakes      Stocktake[]     @relation("StocktakeCreator") // NEW
 
   createdAt              DateTime                @default(now()) @map("created_at")
   updatedAt              DateTime                @updatedAt @map("updated_at")
+
+  notifications          Notification[]
 
   @@map("employees")
   @@index([status])
@@ -229,6 +258,7 @@ model Component {
   inventoryTransactions InventoryTransaction[]
   materialReqDetails    MaterialRequestDetail[] 
   suppliedBy         SupplierComponent[] // Relation
+  stocktakeItems        StocktakeItem[] // Relation
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
@@ -254,7 +284,7 @@ model PurchaseOrder {
   purchaseOrderId      Int                     @id @default(autoincrement()) @map("purchase_order_id")
   code                 String                  @unique 
   orderDate            DateTime                @default(now()) @map("order_date")
-  status               OrderStatus             @default(PENDING)
+  status               PurchaseOrderStatus     @default(DRAFT)
   totalAmount          Decimal                 @default(0) @db.Decimal(15, 2) @map("total_amount")
   discount             Decimal                 @default(0) @db.Decimal(15, 2) // Added
   shippingCost         Decimal                 @default(0) @db.Decimal(15, 2) @map("shipping_cost")
@@ -306,13 +336,14 @@ model SalesOrder {
   code                 String             @unique // SO-2026-001
   orderDate            DateTime           @default(now()) @map("order_date")
   expectedShipDate     DateTime?          @map("expected_ship_date")
-  status               OrderStatus        @default(DRAFT)
+  status               SalesOrderStatus   @default(DRAFT)
   
   // Financials
   totalAmount          Decimal            @default(0) @db.Decimal(15, 2) @map("total_amount")
   discount             Decimal            @default(0) @db.Decimal(15, 2)
   tax                  Decimal            @default(0) @db.Decimal(15, 2)
-  shippingCost         Decimal            @default(0) @db.Decimal(15, 2) @map("shipping_cost")
+  agentShippingPrice   Decimal            @default(0) @db.Decimal(15, 2) @map("shipping_cost")
+  courierShippingCost  Decimal            @default(0) @db.Decimal(15, 2) @map("actual_shipping_cost")
   
   // Terms
   paymentTerms         String?            @map("payment_terms")
@@ -332,6 +363,8 @@ model SalesOrder {
   agent                Agent              @relation(fields: [agentId], references: [agentId])
   approver             Employee?          @relation("SOApprover", fields: [approverId], references: [employeeId])
   details              SalesOrderDetail[]
+  productionRequests   ProductionRequest[] // NEW: Reverse relation
+  productInstances     ProductInstance[]   // NEW: For specific serial numbers
   
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
@@ -359,7 +392,7 @@ model ProductionRequest {
   productionRequestId   Int                      @id @default(autoincrement()) @map("production_request_id")
   code                  String                   @unique // NEW
   requestDate           DateTime                 @default(now()) @map("request_date")
-  status                ProductionStatus         @default(REQUESTED)
+  status                ProductionRequestStatus  @default(PENDING)
   
   priority              Priority                 @default(MEDIUM)
 
@@ -368,6 +401,10 @@ model ProductionRequest {
   productId             Int                      @map("product_id")
   employee              Employee                 @relation(fields: [employeeId], references: [employeeId])
   product               Product                  @relation(fields: [productId], references: [productId])
+  
+  salesOrderId          Int?                     @map("sales_order_id")
+  salesOrder            SalesOrder?              @relation(fields: [salesOrderId], references: [salesOrderId])
+
   workOrderFulfillments WorkOrderFulfillment[]
   createdAt             DateTime                 @default(now()) @map("created_at")
   updatedAt             DateTime                 @updatedAt @map("updated_at")
@@ -381,6 +418,7 @@ model ProductionLine {
   lineName          String            @map("line_name")
   location          String?
   productionBatches ProductionBatch[]
+  workOrders        WorkOrder[]       // NEW: Reverse relation
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
@@ -392,13 +430,17 @@ model WorkOrder {
   workOrderId           Int                      @id @default(autoincrement()) @map("work_order_id")
   code                  String                   @unique // NEW: WO-001
   createDate            DateTime                 @default(now()) @map("create_date")
-  status                ProductionStatus         @default(DRAFT) // Changed default
+  status                WorkOrderStatus          @default(PLANNED)
   quantity              Int                      // NEW: Planned Qty
 
   employeeId            Int                      @map("employee_id")
   
   productId             Int                      @map("product_id")
   product               Product                  @relation(fields: [productId], references: [productId])
+
+  // Production Line Assignment (NEW)
+  productionLineId      Int?                     @map("production_line_id")
+  productionLine        ProductionLine?          @relation(fields: [productionLineId], references: [productionLineId])
 
   employee              Employee                 @relation(fields: [employeeId], references: [employeeId])
   workOrderFulfillments WorkOrderFulfillment[]
@@ -445,12 +487,17 @@ model ProductionBatch {
 model ProductInstance {
   productInstanceId     Int                    @id @default(autoincrement()) @map("product_instance_id")
   serialNumber          String                 @unique @map("serial_number")
-  status                ProductInstanceStatus  @default(IN_STOCK)
+  status                ProductInstanceStatus  @default(WIP)
   unitProductionCost    Decimal?               @db.Decimal(10, 2) @map("unit_production_cost")
   productId             Int                    @map("product_id")
   productionBatchId     Int                    @map("production_batch_id")
   product               Product                @relation(fields: [productId], references: [productId])
   productionBatch       ProductionBatch        @relation(fields: [productionBatchId], references: [productionBatchId])
+  
+  // Reservation Link (Added for "Stock > Demand" logic)
+  salesOrderId          Int?                   @map("sales_order_id")
+  salesOrder            SalesOrder?            @relation(fields: [salesOrderId], references: [salesOrderId])
+  
   warranty              Warranty?
   qualityChecks         QualityCheck[]
   inventoryTransactions InventoryTransaction[]
@@ -513,6 +560,7 @@ model Warehouse {
   location              String?
   componentStocks       ComponentStock[]
   inventoryTransactions InventoryTransaction[]
+  stocktakes            Stocktake[] // NEW
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
@@ -631,4 +679,79 @@ model MaterialRequestDetail {
   component     Component             @relation(fields: [componentId], references: [componentId])
 
   @@map("material_request_details")
+}
+
+// 32. Notification System
+enum NotificationType {
+  PO_APPROVED
+  PO_RECEIVED
+  SO_APPROVED
+  SO_SHIPPED
+  PR_APPROVED
+  WO_COMPLETED
+  LOW_STOCK
+  MATERIAL_ISSUED
+  GENERAL
+}
+
+model Notification {
+  notificationId    Int               @id @default(autoincrement()) @map("notification_id")
+  type              NotificationType
+  title             String
+  message           String
+  isRead            Boolean           @default(false) @map("is_read")
+  
+  // Target user who should see this notification
+  employeeId        Int               @map("employee_id")
+  employee          Employee          @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  
+  // Optional: Link to related entity for "View" action
+  relatedEntityType String?           @map("related_entity_type") // e.g., "PurchaseOrder", "SalesOrder"
+  relatedEntityId   Int?              @map("related_entity_id")
+  
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  @@index([employeeId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// 33. Stocktaking (Kiểm kê kho)
+model Stocktake {
+  stocktakeId       Int               @id @default(autoincrement()) @map("stocktake_id")
+  code              String            @unique // ST-2026-001
+  status            String            @default("DRAFT") // DRAFT, IN_PROGRESS, COMPLETED, CANCELLED
+  warehouseId       Int               @map("warehouse_id")
+  warehouse         Warehouse         @relation(fields: [warehouseId], references: [warehouseId])
+  
+  description       String?
+  startedAt         DateTime?         @map("started_at")
+  completedAt       DateTime?         @map("completed_at")
+  
+  createdBy         Int               @map("created_by")
+  creator           Employee          @relation("StocktakeCreator", fields: [createdBy], references: [employeeId])
+  
+  items             StocktakeItem[]
+  
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@map("stocktaking")
+}
+
+model StocktakeItem {
+  stocktakeItemId   Int               @id @default(autoincrement()) @map("stocktake_item_id")
+  stocktakeId       Int               @map("stocktake_id")
+  stocktake         Stocktake         @relation(fields: [stocktakeId], references: [stocktakeId], onDelete: Cascade)
+  
+  componentId       Int               @map("component_id")
+  component         Component         @relation(fields: [componentId], references: [componentId])
+  
+  systemQuantity    Int               @map("system_quantity") // Snapshot at start
+  actualQuantity    Int?              @map("actual_quantity") // Counted value
+  
+  notes             String?
+  
+  @@unique([stocktakeId, componentId])
+  @@map("stocktake_items")
 }

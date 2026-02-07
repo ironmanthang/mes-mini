@@ -1,0 +1,35 @@
+name: Cost Simulation
+
+on:
+  push:
+    paths:
+      - 'backend/cost-simulation.js'
+  schedule:
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
+  workflow_dispatch:      
+
+jobs:
+  run-simulation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          npm install axios
+          npm list axios
+          node -v
+
+      - name: Run Simulation
+        env:
+          SIMULATION_PASSWORD: ${{ secrets.SIMULATION_PASSWORD }}
+        working-directory: ./backend
+        run: node cost-simulation.js

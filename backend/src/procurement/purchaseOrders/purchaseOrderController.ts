@@ -49,3 +49,20 @@ export const approvePO = async (req: Request, res: Response): Promise<void> => {
         res.status(400).json({ message: (error as Error).message });
     }
 };
+
+export const receiveGoods = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { items } = req.body; // Expecting array of { componentId, quantity, warehouseId }
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            res.status(400).json({ message: "Items list is required and cannot be empty." });
+            return;
+        }
+
+        const result = await POService.receiveGoods(id as string, items, req.user!.employeeId);
+        res.status(200).json({ message: 'Goods Received Successfully', result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
