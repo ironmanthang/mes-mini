@@ -19,6 +19,20 @@ export const getAllWorkOrders = async (req: Request, res: Response): Promise<voi
     }
 };
 
+export const cancelWorkOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { reason } = req.body;
+        const workOrderId = parseInt(String(req.params.id));
+        const userId = req.user!.employeeId;
+        const reasonStr = String(reason || ''); // Force string conversion safely
+
+        const result = await WorkOrderService.cancelWorkOrder(workOrderId, userId, reasonStr);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
 export const getWorkOrderById = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(String(req.params.id));

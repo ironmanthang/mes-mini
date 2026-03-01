@@ -13,7 +13,7 @@ class MaterialRequestService {
         if (!wo) throw new Error("Work Order not found");
 
         // Get BOM
-        const bom = await prisma.productComposition.findMany({
+        const bom = await prisma.billOfMaterial.findMany({
             where: { productId: wo.productId },
             include: { component: true }
         });

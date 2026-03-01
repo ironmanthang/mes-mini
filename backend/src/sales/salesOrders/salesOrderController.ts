@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import SOService from './salesOrderService.js';
+import FeasibilityService from '../../production/mrp/feasibilityService.js';
 
 export const createSO = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -111,6 +112,18 @@ export const cancelSO = async (req: Request, res: Response): Promise<void> => {
         const { reason } = req.body;
         const result = await SOService.cancelSO(id as string, req.user!.employeeId, reason);
         res.status(200).json({ message: 'Sales Order Cancelled', result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
+export const checkFeasibility = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = parseInt(String(req.params.id));
+        if (isNaN(id)) throw new Error("Invalid Sales Order ID");
+
+        const result = await FeasibilityService.checkSalesOrderFeasibility(id);
+        res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
     }

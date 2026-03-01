@@ -11,6 +11,7 @@ import {
     shipOrder,
     deleteSO,
     cancelSO,
+    checkFeasibility,
 } from './salesOrderController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -23,6 +24,11 @@ router.use(protect);
 router.get('/',
     authorize('System Admin', 'Production Manager', 'Sales Staff'),
     getAllSOs
+);
+
+router.get('/:id/feasibility',
+    authorize('Production Manager', 'Sales Staff', 'System Admin'),
+    checkFeasibility
 );
 
 router.get('/:id',
@@ -158,26 +164,74 @@ router.post('/:id/ship',
  *             type: object
  *             required: [agentId, details]
  *             properties:
- *               agentId: { type: integer, example: 1, description: "Code is auto-generated (D-YYMMDD-ID for drafts, SO-YYYY-XXX on submit)" }
- *               orderDate: { type: string, format: "date-time", example: "2026-02-02T10:00:00Z", description: "Optional. Defaults to now." }
- *               expectedShipDate: { type: string, example: "2026-02-15" }
- *               discount: { type: number, default: 0 }
- *               tax: { type: number, default: 0 }
- *               agentShippingPrice: { type: number, default: 0 }
- *               paymentTerms: { type: string, enum: ["Net 30", "Due upon receipt", "50% Advance, 50% on delivery", "COD - Cash on Delivery"] }
- *               deliveryTerms: { type: string, enum: ["FOB - Free On Board", "CIF - Cost, Insurance and Freight", "EXW - Ex Works", "DDP - Delivered Duty Paid"] }
- *               note: { type: string }
- *               status: { type: string, enum: ["DRAFT", "PENDING_APPROVAL"], default: "PENDING_APPROVAL" }
- *               priority: { type: string, enum: ["HIGH", "MEDIUM", "LOW"], default: "MEDIUM" }
+ *               agentId:
+ *                 type: integer
+ *                 example: 1
+ *                 description: "Code is auto-generated (D-YYMMDD-ID for drafts, SO-YYYY-XXX on submit)"
+ *               orderDate:
+ *                 type: string
+ *                 format: "date-time"
+ *                 example: "2026-02-02T10:00:00Z"
+ *                 description: "Optional. Defaults to now."
+ *               expectedShipDate:
+ *                 type: string
+ *                 format: "date-time"
+ *                 example: "2026-02-15T00:00:00Z"
+ *                 description: "Optional. Must be in the future."
+ *               discount:
+ *                 type: number
+ *                 minimum: 0
+ *                 default: 0
+ *                 example: 5
+ *               tax:
+ *                 type: number
+ *                 minimum: 0
+ *                 default: 0
+ *                 example: 10
+ *               agentShippingPrice:
+ *                 type: number
+ *                 minimum: 0
+ *                 default: 0
+ *                 example: 50
+ *               paymentTerms:
+ *                 type: string
+ *                 enum: ["Net 30", "Due upon receipt", "50% Advance, 50% on delivery", "COD - Cash on Delivery"]
+ *                 example: "Net 30"
+ *               deliveryTerms:
+ *                 type: string
+ *                 enum: ["FOB - Free On Board", "CIF - Cost, Insurance and Freight", "EXW - Ex Works", "DDP - Delivered Duty Paid"]
+ *                 example: "EXW - Ex Works"
+ *               note:
+ *                 type: string
+ *                 example: "Please ship with extra care."
+ *               status:
+ *                 type: string
+ *                 enum: ["DRAFT", "PENDING_APPROVAL"]
+ *                 default: "DRAFT"
+ *                 example: "DRAFT"
+ *               priority:
+ *                 type: string
+ *                 enum: ["HIGH", "MEDIUM", "LOW"]
+ *                 default: "MEDIUM"
+ *                 example: "MEDIUM"
  *               details:
  *                 type: array
+ *                 minItems: 1
  *                 items:
  *                   type: object
  *                   required: [productId, quantity, salePrice]
  *                   properties:
- *                     productId: { type: integer, example: 1 }
- *                     quantity: { type: integer, example: 1 }
- *                     salePrice: { type: number, example: 150 }
+ *                     productId:
+ *                       type: integer
+ *                       example: 1
+ *                     quantity:
+ *                       type: integer
+ *                       minimum: 1
+ *                       example: 10
+ *                     salePrice:
+ *                       type: number
+ *                       minimum: 0
+ *                       example: 150.50
  *     responses:
  *       201:
  *         description: "SO Created successfully"
@@ -311,15 +365,57 @@ router.post('/:id/ship',
  *           schema:
  *             type: object
  *             properties:
- *               expectedShipDate: { type: string, format: date }
- *               discount: { type: number }
- *               tax: { type: number }
- *               agentShippingPrice: { type: number }
- *               note: { type: string }
- *               priority: { type: string, enum: ["HIGH", "MEDIUM", "LOW"] }
- *               paymentTerms: { type: string, enum: ["Net 30", "Due upon receipt", "50% Advance, 50% on delivery", "COD - Cash on Delivery"] }
- *               deliveryTerms: { type: string, enum: ["FOB - Free On Board", "CIF - Cost, Insurance and Freight", "EXW - Ex Works", "DDP - Delivered Duty Paid"] }
- *               status: { type: string, enum: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "RETURNED"], description: "Manually set status (Be careful)" }
+ *               expectedShipDate: 
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2026-03-15T00:00:00Z"
+ *                 description: "Optional. Must be in the future."
+ *               discount: 
+ *                 type: number
+ *                 example: 10
+ *                 minimum: 0
+ *               tax: 
+ *                 type: number
+ *                 example: 5
+ *                 minimum: 0
+ *               agentShippingPrice: 
+ *                 type: number
+ *                 example: 15.5
+ *                 minimum: 0
+ *               note: 
+ *                 type: string
+ *                 example: "Updated shipping details."
+ *               priority: 
+ *                 type: string
+ *                 enum: ["HIGH", "MEDIUM", "LOW"]
+ *                 example: "HIGH"
+ *               paymentTerms: 
+ *                 type: string
+ *                 enum: ["Net 30", "Due upon receipt", "50% Advance, 50% on delivery", "COD - Cash on Delivery"]
+ *                 example: "Net 30"
+ *               deliveryTerms: 
+ *                 type: string
+ *                 enum: ["FOB - Free On Board", "CIF - Cost, Insurance and Freight", "EXW - Ex Works", "DDP - Delivered Duty Paid"]
+ *                 example: "FOB - Free On Board"
+ *               details:
+ *                 type: array
+ *                 description: "Full replacement of line items (optional). If provided, all existing lines are deleted and replaced."
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [productId, quantity, salePrice]
+ *                   properties:
+ *                     productId: 
+ *                       type: integer
+ *                       example: 2
+ *                     quantity: 
+ *                       type: integer
+ *                       minimum: 1
+ *                       example: 5
+ *                     salePrice: 
+ *                       type: number
+ *                       minimum: 0
+ *                       example: 120.00
  *     responses:
  *       200:
  *         description: "Updated successfully"
@@ -415,6 +511,26 @@ router.post('/:id/ship',
  *         description: "Error (Serial not found, already sold, etc)"
  *       403:
  *         description: "Forbidden"
+ */
+
+/**
+ * @swagger
+ * /api/sales-orders/{id}/feasibility:
+ *   get:
+ *     summary: "Check Feasibility (Traffic Light)"
+ *     description: "Returns GREEN (ship from stock), YELLOW (can produce), or RED (material shortage) for each line item."
+ *     tags: [Sales Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: "Feasibility result with per-line-item traffic light status"
+ *       400:
+ *         description: "Error (Wrong SO status or not found)"
  */
 
 export default router;

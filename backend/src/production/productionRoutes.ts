@@ -5,7 +5,7 @@ import productionLineRoutes from './productionLines/productionLineRoutes.js';
 
 const router = Router();
 
-router.use('/production-requests', productionRequestRoutes);
+// router.use('/production-requests', productionRequestRoutes); // MOVED TO ROOT
 router.use('/work-orders', workOrderRoutes);
 router.use('/lines', productionLineRoutes);
 

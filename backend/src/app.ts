@@ -18,6 +18,7 @@ import warehouseRoutes from './warehouse/warehouseRoutes.js';
 import notificationRoutes from './notifications/notificationRoutes.js';
 import dashboardRoutes from './dashboard/dashboardRoutes.js';
 import qualityRoutes from './production/quality/qualityRoutes.js';
+import productionRequestRoutes from './production/productionRequests/productionRequestRoutes.js';
 
 const app: Express = express();
 
@@ -42,6 +43,7 @@ app.use('/api/agents', agentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
+app.use('/api/production-requests', productionRequestRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -60,5 +62,18 @@ const swaggerUiOptions = {
 
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, swaggerUiOptions));
+
+
+
+const STARTUP_TIME = new Date().toISOString();
+
+app.get('/version', (req, res) => {
+    res.json({
+        service: 'mes-mini-backend',
+        version: '1.0.0',
+        deployedAt: STARTUP_TIME,
+        machine: require('os').hostname()
+    });
+});
 
 export default app;

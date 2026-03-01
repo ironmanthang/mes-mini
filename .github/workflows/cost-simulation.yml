@@ -1,4 +1,4 @@
-name: Cost Simulation
+name: Ping Simulation
 
 on:
   push:

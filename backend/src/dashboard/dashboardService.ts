@@ -94,7 +94,7 @@ class DashboardService {
             prisma.workOrder.count({
                 where: { status: 'COMPLETED', updatedAt: { gte: startOfMonth } }
             }),
-            prisma.productionRequest.count({ where: { status: 'PENDING' } }),
+            prisma.productionRequest.count({ where: { status: 'WAITING_MATERIAL' } }),
             prisma.salesOrder.count({ where: { status: 'PENDING_APPROVAL' } }),
             prisma.salesOrder.count({ where: { status: 'IN_PROGRESS' } }),
             prisma.salesOrder.count({
@@ -240,7 +240,7 @@ class DashboardService {
 
         // Production requests queue (pending approval)
         const prQueue = await prisma.productionRequest.findMany({
-            where: { status: { in: ['PENDING', 'APPROVED'] } },
+            where: { status: { in: ['WAITING_MATERIAL', 'APPROVED'] } },
             take: 10,
             orderBy: [{ priority: 'asc' }, { requestDate: 'asc' }],
             include: { product: { select: { productName: true } } }

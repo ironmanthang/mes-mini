@@ -95,7 +95,7 @@ class ComponentService {
         const componentId = typeof id === 'string' ? parseInt(id) : id;
 
         // 1. Check if used in BOM (Product Composition)
-        const inBOM = await prisma.productComposition.findFirst({ where: { componentId } });
+        const inBOM = await prisma.billOfMaterial.findFirst({ where: { componentId } });
         if (inBOM) throw new Error('Cannot delete: This component is part of a Product BOM.');
 
         // 2. Check if used in Purchase Orders

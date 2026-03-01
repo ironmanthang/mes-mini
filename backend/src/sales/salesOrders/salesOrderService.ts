@@ -55,7 +55,7 @@ class SalesOrderService {
      * Prevents N+1 performance bottleneck.
      */
     async getBulkAvailableStock(productIds: number[], tx?: Prisma.TransactionClient): Promise<Map<number, number>> {
-            const db = tx || prisma;
+        const db = tx || prisma;
         const counts = await db.productInstance.groupBy({
             by: ['productId'],
             where: {
@@ -390,15 +390,50 @@ class SalesOrderService {
                         }
                     },
 
-                    _count: {
-                        select: { details: true }
+                    details: {
+                        select: {
+                            soDetailId: true,
+                            productId: true,
+                            quantity: true,
+                            quantityShipped: true,
+                            salePrice: true,
+                            product: {
+                                select: {
+                                    code: true,
+                                    productName: true,
+                                    unit: true
+                                }
+                            },
+                            productionRequests: {
+                                where: { status: { notIn: ['CANCELLED'] } },
+                                select: { productionRequestId: true, code: true, status: true, quantity: true }
+                            }
+                        }
                     }
                 }
             }),
             prisma.salesOrder.count({ where })
         ]);
 
-        return createPaginatedResponse(data, total, page, limit);
+        // Phase 1 Fast-Path: Single bulk stock query for ALL products across ALL SOs on this page
+        const allProductIds = [...new Set(data.flatMap(so => so.details.map(d => d.productId)))];
+        const stockMap = allProductIds.length > 0
+            ? await this.getBulkAvailableStock(allProductIds)
+            : new Map<number, number>();
+
+        // Enrich each SO with per-line-item availability + overall hasShortage flag
+        const enrichedData = data.map(so => {
+            const enrichedDetails = so.details.map(detail => {
+                const availableStock = stockMap.get(detail.productId) || 0;
+                const quantityNeeded = detail.quantity - (detail.quantityShipped || 0);
+                const shortage = Math.max(0, quantityNeeded - availableStock);
+                return { ...detail, availableStock, shortage };
+            });
+            const hasShortage = enrichedDetails.some(d => d.shortage > 0);
+            return { ...so, details: enrichedDetails, hasShortage };
+        });
+
+        return createPaginatedResponse(enrichedData, total, page, limit);
     }
 
     // UPDATED: Accepts optional 'tx' for Transaction context
@@ -428,6 +463,10 @@ class SalesOrderService {
                                 productName: true,
                                 unit: true
                             }
+                        },
+                        productionRequests: {
+                            where: { status: { notIn: ['CANCELLED'] } },
+                            select: { productionRequestId: true, code: true, status: true, quantity: true }
                         }
                     }
                 }
@@ -688,7 +727,7 @@ class SalesOrderService {
             return this.getSOById(id, tx);
         });
     }
-    
+
     async cancelSO(soId: string | number, userId: number, reason: string) {
         const id = typeof soId === 'string' ? parseInt(soId) : soId;
 
@@ -722,6 +761,36 @@ class SalesOrderService {
                     data: {
                         status: 'IN_STOCK',
                         salesOrderId: null
+                    }
+                });
+            }
+
+            // 3.5. Flag Linked Production Requests (Manual Gate)
+            // We do NOT auto-cancel them, but we must warn the Production Manager.
+            // Query PRs through SalesOrderDetail path (salesOrderId FK removed in schema redesign)
+            const soWithPRs = await tx.salesOrder.findUnique({
+                where: { salesOrderId: id },
+                include: {
+                    details: {
+                        include: {
+                            productionRequests: {
+                                where: { status: { notIn: ['FULFILLED', 'CANCELLED'] } }
+                            }
+                        }
+                    }
+                }
+            });
+            const linkedRequests = soWithPRs?.details.flatMap(d => d.productionRequests) || [];
+
+            for (const req of linkedRequests) {
+                const alertMsg = `[SYSTEM ALERT ${new Date().toISOString().split('T')[0]}]: Sales Order ${so.code} was CANCELLED. Please review this request manually.`;
+
+                const newNote = req.note ? `${req.note}\n${alertMsg}` : alertMsg;
+
+                await tx.productionRequest.update({
+                    where: { productionRequestId: req.productionRequestId },
+                    data: {
+                        note: newNote
                     }
                 });
             }

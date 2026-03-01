@@ -45,10 +45,12 @@ const swaggerOptions: swaggerJsDoc.Options = {
         './src/master-data/**/*Routes.ts',
         './src/procurement/**/*Routes.ts',
         './src/sales/**/*Routes.ts',
+        './src/production/**/*Routes.ts',
         './dist/core/**/*Routes.js',
         './dist/master-data/**/*Routes.js',
         './dist/procurement/**/*Routes.js',
-        './dist/sales/**/*Routes.js'
+        './dist/sales/**/*Routes.js',
+        './dist/production/**/*Routes.js'
     ],
 };
 

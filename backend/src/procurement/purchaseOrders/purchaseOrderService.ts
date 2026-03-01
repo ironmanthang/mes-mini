@@ -5,6 +5,7 @@ interface PODetailItem {
     componentId: number;
     quantity: number;
     unitPrice: number;
+    productionRequestId?: number;
 }
 
 interface POCreateData {
@@ -95,7 +96,8 @@ class PurchaseOrderService {
                             componentId: item.componentId,
                             quantityOrdered: item.quantity,
                             unitPrice: item.unitPrice,
-                            quantityReceived: 0
+                            quantityReceived: 0,
+                            productionRequestId: item.productionRequestId || null
                         }))
                     }
                 },

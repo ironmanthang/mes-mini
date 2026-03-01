@@ -5,5 +5,6 @@ export const createProductionRequestSchema = Joi.object({
     quantity: Joi.number().integer().min(1).required(),
     priority: Joi.string().valid('HIGH', 'MEDIUM', 'LOW').default('MEDIUM'),
     dueDate: Joi.date().iso().min('now').optional(),
-    salesOrderId: Joi.number().integer().optional()
+    soDetailId: Joi.number().integer().optional(),
+    note: Joi.string().max(500).optional()
 });

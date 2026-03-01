@@ -4,7 +4,8 @@ import {
     getAllWorkOrders,
     getWorkOrderById,
     startWorkOrder,
-    completeWorkOrder
+    completeWorkOrder,
+    cancelWorkOrder
 } from './workOrderController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -39,6 +40,11 @@ router.put('/:id/complete',
     authorize('Production Manager'),
     validate(completeWOSchema),
     completeWorkOrder
+);
+
+router.put('/:id/cancel',
+    authorize('Production Manager', 'System Admin'),
+    cancelWorkOrder
 );
 
 /**
@@ -132,6 +138,31 @@ router.put('/:id/complete',
  *     responses:
  *       200:
  *         description: Completed
+ */
+
+/**
+ * @swagger
+ * /api/work-orders/{id}/cancel:
+ *   put:
+ *     summary: Cancel a Work Order
+ *     description: Reverts the associated Production Request status
+ *     tags: [Work Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cancelled
  */
 
 export default router;
