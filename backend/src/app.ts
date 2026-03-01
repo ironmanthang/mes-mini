@@ -20,7 +20,6 @@ import warehouseOpsRoutes from './warehouse-ops/warehouseRoutes.js';
 import notificationRoutes from './notifications/notificationRoutes.js';
 import qualityRoutes from './production/quality/qualityRoutes.js';
 import productionRequestRoutes from './production/productionRequests/productionRequestRoutes.js';
-import workOrderRoutes from './production/workOrders/workOrderRoutes.js';
 
 const app: Express = express();
 
@@ -48,9 +47,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/warehouses', warehouseMasterRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
-app.use('/api/sales/dashboard', salesDashboardRoutes);
 app.use('/api/production-requests', productionRequestRoutes);
-app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/warehouse-ops', warehouseOpsRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -68,22 +65,6 @@ const swaggerUiOptions = {
 
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, swaggerUiOptions));
-
-// For import to postman
-app.get('/api-docs-json', async (req, res) => {
-    try {
-        // Re-import/re-build to avoid stale memory
-        const { swaggerOptions: freshOptions } = await import('./config/swaggerConfig.js');
-        const swaggerJsDoc = (await import('swagger-jsdoc')).default;
-        const freshDocs = swaggerJsDoc(freshOptions);
-        
-        res.setHeader('Content-Type', 'application/json');
-        res.send(freshDocs);
-    } catch (error) {
-        console.error('Swagger dynamic build failed:', error);
-        res.status(500).json({ error: 'Failed to generate documentation' });
-    }
-});
 
 
 

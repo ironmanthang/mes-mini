@@ -1,6 +1,8 @@
 import prisma from '../../common/lib/prisma.js';
 import { Priority } from '../../generated/prisma/index.js';
 import MrpService, { MrpResult } from '../mrp/mrpService.js';
+import { Priority } from '../../generated/prisma/index.js';
+import MrpService, { MrpResult } from '../mrp/mrpService.js';
 
 interface CreateProductionRequestData {
     productId: number;
@@ -68,7 +70,7 @@ class ProductionRequestService {
             }
         }
 
-        // 3. Run BOM Check (MRP) — uses master BOM; this is the only time we read live BOM for a PR
+        // 3. Run BOM Check (MRP)
         const mrpResult = await MrpService.calculateRequirements(productId, quantity);
 
         // 4. Determine status based on BOM check
@@ -79,9 +81,7 @@ class ProductionRequestService {
         const autoNote = isMTS ? "Manual Request (MTS)" : undefined;
         const finalNote = [autoNote, note].filter(Boolean).join(' — ') || undefined;
 
-        // 6. Create PR + BOM Snapshot atomically within the same retry-safe loop.
-        //    WHY ATOMIC: If snapshot creation fails, we must not leave an orphan PR
-        //    with no detail rows (downstream would silently fall back to master BOM).
+        // 6. Create PR with retry for code collision
         let code = this.generateCode();
         let retries = 3;
         while (retries > 0) {
@@ -97,29 +97,13 @@ class ProductionRequestService {
                         note: finalNote,
                         status,
                         employeeId: userId,
-                        soDetailId: soDetailId || null,
-                        // ── BOM SNAPSHOT ─────────────────────────────────────────────────────
-                        // Freeze the BOM calculation result at creation time.
-                        // From this point forward, all downstream operations (recheck,
-                        // draft PO, material requests) read from these rows, NOT the
-                        // master BillOfMaterial table. This ensures BOM edits made after
-                        // PR creation do NOT silently change shop-floor material requirements.
-                        details: {
-                            create: mrpResult.requirements.map(r => ({
-                                componentId: r.componentId,
-                                quantityPerUnit: r.quantityPerUnit,
-                                totalRequired: r.totalRequired
-                            }))
-                        }
+                        soDetailId: soDetailId || null
                     },
                     include: {
                         product: true,
                         employee: { select: { fullName: true } },
                         salesOrderDetail: {
                             include: { salesOrder: { select: { code: true } } }
-                        },
-                        details: {
-                            include: { component: { select: { code: true, componentName: true, unit: true } } }
                         }
                     }
                 });
@@ -138,9 +122,6 @@ class ProductionRequestService {
     }
 
     // ─── RE-CHECK FEASIBILITY ──────────────────────────────────────────
-    // Checks if stock levels are now sufficient for a WAITING_MATERIAL PR.
-    // Uses the FROZEN SNAPSHOT (not master BOM) so the comparison is always
-    // against the same quantities that were committed at PR creation.
 
     async recheckFeasibility(id: number) {
         const pr = await prisma.productionRequest.findUnique({
@@ -153,8 +134,8 @@ class ProductionRequestService {
             throw new Error(`Cannot re-check: PR status is ${pr.status}. Only WAITING_MATERIAL requests can be re-checked.`);
         }
 
-        // Re-run feasibility check using the frozen snapshot
-        const mrpResult = await MrpService.calculateFromSnapshot(pr.productionRequestId);
+        // Re-run BOM check
+        const mrpResult = await MrpService.calculateRequirements(pr.productId, pr.quantity, pr.productionRequestId);
 
         if (mrpResult.canProduce) {
             // Transition to APPROVED
@@ -166,9 +147,6 @@ class ProductionRequestService {
                     employee: { select: { fullName: true } },
                     salesOrderDetail: {
                         include: { salesOrder: { select: { code: true } } }
-                    },
-                    details: {
-                        include: { component: { select: { code: true, componentName: true, unit: true } } }
                     }
                 }
             });
@@ -180,8 +158,6 @@ class ProductionRequestService {
     }
 
     // ─── DRAFT PURCHASE ORDER ──────────────────────────────────────────
-    // Returns shortage data pre-filled from SNAPSHOT vs current stock.
-    // Purchasing staff use this to quickly create a PO for missing materials.
 
     async draftPurchaseOrder(id: number) {
         const pr = await prisma.productionRequest.findUnique({
@@ -194,8 +170,8 @@ class ProductionRequestService {
             throw new Error(`Cannot draft PO: PR status is ${pr.status}. Only WAITING_MATERIAL requests have shortages.`);
         }
 
-        // Use snapshot-based MRP — shortages are always relative to what was originally committed
-        const mrpResult = await MrpService.calculateFromSnapshot(pr.productionRequestId);
+        // Run MRP to get current shortages
+        const mrpResult = await MrpService.calculateRequirements(pr.productId, pr.quantity, pr.productionRequestId);
 
         // Filter to only components with shortages
         const shortages = mrpResult.requirements
@@ -268,14 +244,6 @@ class ProductionRequestService {
                     include: {
                         component: true,
                         purchaseOrder: { select: { code: true, status: true } }
-                    }
-                },
-                // ── SNAPSHOT ──────────────────────────────────────────────────────
-                // Expose the frozen BOM requirements so the frontend can display
-                // exactly what materials were committed at PR creation.
-                details: {
-                    include: {
-                        component: { select: { code: true, componentName: true, unit: true } }
                     }
                 }
             }

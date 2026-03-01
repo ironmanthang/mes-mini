@@ -2,6 +2,7 @@ generator client {
   provider        = "prisma-client-js"
   output          = "../src/generated/prisma"
   previewFeatures = ["driverAdapters"]
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -25,12 +26,13 @@ model Employee {
   roles                  EmployeeRole[]
   inventoryTransactions  InventoryTransaction[]
   approvedMaterialReqs   MaterialExportRequest[] @relation("Approver")
+  inventoryTransactions  InventoryTransaction[]
+  approvedMaterialReqs   MaterialExportRequest[] @relation("Approver")
   createdMaterialReqs    MaterialExportRequest[] @relation("Requester")
   notifications          Notification[]
   createdProductionReqs  ProductionRequest[]
   approvedPurchaseOrders PurchaseOrder[]         @relation("POApprover")
   createdPurchaseOrders  PurchaseOrder[]         @relation("POCreator")
-  attachments            Attachment[]
   performedQualityChecks QualityCheck[]
   approvedSalesOrders    SalesOrder[]            @relation("SOApprover")
   managedSalesOrders     SalesOrder[]
@@ -121,7 +123,6 @@ model Product {
   productId          Int                 @id @default(autoincrement()) @map("product_id")
   productName        String              @map("product_name")
   categoryId         Int?                @map("category_id")
-  minStockLevel      Int                 @default(0) @map("min_stock_level")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   code               String              @unique
@@ -147,24 +148,23 @@ model Component {
   minStockLevel         Int                     @default(0) @map("min_stock_level")
   standardCost          Decimal                 @default(0) @map("standard_cost") @db.Decimal(10, 2)
   unit                  String
-  bom                      BillOfMaterial[]
-  componentStocks          ComponentStock[]
-  inventoryTransactions    InventoryTransaction[]
-  materialReqDetails       MaterialRequestDetail[]
-  purchaseOrderDetails     PurchaseOrderDetail[]
-  productionRequestDetails ProductionRequestDetail[]
-  stocktakeItems           StocktakeItem[]
-  suppliedBy               SupplierComponent[]
-  componentLots            ComponentLot[]
+  bom                   BillOfMaterial[]
+  componentStocks       ComponentStock[]
+  inventoryTransactions InventoryTransaction[]
+  materialReqDetails    MaterialRequestDetail[]
+  purchaseOrderDetails  PurchaseOrderDetail[]
+  stocktakeItems        StocktakeItem[]
+  suppliedBy            SupplierComponent[]
 
   @@index([componentName])
   @@map("components")
 }
 
 model BillOfMaterial {
+model BillOfMaterial {
   productId      Int       @map("product_id")
   componentId    Int       @map("component_id")
-  quantityNeeded Int       @map("quantity_needed")
+  quantityNeeded Decimal   @map("quantity_needed") @db.Decimal(10, 4)
   component      Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
   product        Product   @relation(fields: [productId], references: [productId], onDelete: Cascade)
 
@@ -184,11 +184,10 @@ model PurchaseOrder {
   paymentTerms          String?                @map("payment_terms")
   priority              Priority               @default(MEDIUM)
   shippingCost          Decimal                @default(0) @map("shipping_cost") @db.Decimal(15, 2)
-  taxRate               Decimal                @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  warehouseId           Int                    @map("warehouse_id")
+  tax                   Decimal                @default(0) @db.Decimal(15, 2)
   code                  String                 @unique
   totalAmount           Decimal                @default(0) @map("total_amount") @db.Decimal(15, 2)
-  note                  String?
+  discount              Decimal                @default(0) @db.Decimal(15, 2)
   approvedAt            DateTime?              @map("approved_at")
   approverId            Int?                   @map("approver_id")
   status                PurchaseOrderStatus    @default(DRAFT)
@@ -197,7 +196,6 @@ model PurchaseOrder {
   approver              Employee?              @relation("POApprover", fields: [approverId], references: [employeeId])
   employee              Employee               @relation("POCreator", fields: [employeeId], references: [employeeId])
   supplier              Supplier               @relation(fields: [supplierId], references: [supplierId])
-  warehouse             Warehouse              @relation(fields: [warehouseId], references: [warehouseId])
 
   @@map("purchase_orders")
 }
@@ -213,30 +211,37 @@ model PurchaseOrderDetail {
   component           Component          @relation(fields: [componentId], references: [componentId])
   purchaseOrder       PurchaseOrder      @relation(fields: [purchaseOrderId], references: [purchaseOrderId], onDelete: Cascade)
   productionRequest   ProductionRequest? @relation(fields: [productionRequestId], references: [productionRequestId])
-  componentLots       ComponentLot[]
 
   @@unique([purchaseOrderId, componentId])
   @@map("purchase_order_details")
 }
 
-model ComponentLot {
-  componentLotId      Int                 @id @default(autoincrement()) @map("component_lot_id")
-  lotCode             String              @unique @map("lot_code")
-  componentId         Int                 @map("component_id")
-  poDetailId          Int                 @map("po_detail_id")
-  warehouseId         Int                 @map("warehouse_id")
-  quantity            Int
-  receivedAt          DateTime            @default(now()) @map("received_at")
-  createdAt           DateTime            @default(now()) @map("created_at")
-
-  component           Component           @relation(fields: [componentId], references: [componentId])
-  poDetail            PurchaseOrderDetail @relation(fields: [poDetailId], references: [poDetailId])
-  warehouse           Warehouse           @relation(fields: [warehouseId], references: [warehouseId])
-
-  @@map("component_lots")
-}
-
 model SalesOrder {
+  salesOrderId        Int                 @id @default(autoincrement()) @map("sales_order_id")
+  orderDate           DateTime            @default(now()) @map("order_date")
+  employeeId          Int                 @map("employee_id")
+  agentId             Int                 @map("agent_id")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  approvedAt          DateTime?           @map("approved_at")
+  approverId          Int?                @map("approver_id")
+  code                String              @unique
+  deliveryTerms       String?             @map("delivery_terms")
+  discount            Decimal             @default(0) @db.Decimal(15, 2)
+  expectedShipDate    DateTime?           @map("expected_ship_date")
+  note                String?
+  paymentTerms        String?             @map("payment_terms")
+  priority            Priority            @default(MEDIUM)
+  agentShippingPrice  Decimal             @default(0) @map("shipping_cost") @db.Decimal(15, 2)
+  tax                 Decimal             @default(0) @db.Decimal(15, 2)
+  totalAmount         Decimal             @default(0) @map("total_amount") @db.Decimal(15, 2)
+  courierShippingCost Decimal             @default(0) @map("actual_shipping_cost") @db.Decimal(15, 2)
+  status              SalesOrderStatus    @default(DRAFT)
+  productInstances    ProductInstance[]
+  details             SalesOrderDetail[]
+  agent               Agent               @relation(fields: [agentId], references: [agentId])
+  approver            Employee?           @relation("SOApprover", fields: [approverId], references: [employeeId])
+  employee            Employee            @relation(fields: [employeeId], references: [employeeId])
   salesOrderId        Int                 @id @default(autoincrement()) @map("sales_order_id")
   orderDate           DateTime            @default(now()) @map("order_date")
   employeeId          Int                 @map("employee_id")
@@ -276,12 +281,23 @@ model SalesOrderDetail {
   product            Product             @relation(fields: [productId], references: [productId])
   salesOrder         SalesOrder          @relation(fields: [salesOrderId], references: [salesOrderId], onDelete: Cascade)
   productionRequests ProductionRequest[]
+  salesOrderId       Int                 @map("sales_order_id")
+  productId          Int                 @map("product_id")
+  quantity           Int
+  salePrice          Decimal             @map("sale_price") @db.Decimal(10, 2)
+  quantityShipped    Int                 @default(0) @map("quantity_shipped")
+  soDetailId         Int                 @id @default(autoincrement()) @map("so_detail_id")
+  product            Product             @relation(fields: [productId], references: [productId])
+  salesOrder         SalesOrder          @relation(fields: [salesOrderId], references: [salesOrderId], onDelete: Cascade)
+  productionRequests ProductionRequest[]
 
   @@unique([salesOrderId, productId])
   @@map("sales_order_details")
 }
 
 model ProductionRequest {
+  productionRequestId   Int                     @id @default(autoincrement()) @map("production_request_id")
+  requestDate           DateTime                @default(now()) @map("request_date")
   productionRequestId   Int                     @id @default(autoincrement()) @map("production_request_id")
   requestDate           DateTime                @default(now()) @map("request_date")
   quantity              Int
@@ -298,25 +314,23 @@ model ProductionRequest {
   employee              Employee                @relation(fields: [employeeId], references: [employeeId])
   product               Product                 @relation(fields: [productId], references: [productId])
   salesOrderDetail      SalesOrderDetail?       @relation(fields: [soDetailId], references: [soDetailId])
+  employeeId            Int                     @map("employee_id")
+  productId             Int                     @map("product_id")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  priority              Priority                @default(MEDIUM)
+  code                  String                  @unique
+  soDetailId            Int?                    @map("so_detail_id")
+  status                ProductionRequestStatus
+  dueDate               DateTime?               @map("due_date")
+  note                  String?
+  employee              Employee                @relation(fields: [employeeId], references: [employeeId])
+  product               Product                 @relation(fields: [productId], references: [productId])
+  salesOrderDetail      SalesOrderDetail?       @relation(fields: [soDetailId], references: [soDetailId])
   workOrderFulfillments WorkOrderFulfillment[]
   purchaseOrderDetails  PurchaseOrderDetail[]
-  details               ProductionRequestDetail[]
 
   @@map("production_requests")
-}
-
-model ProductionRequestDetail {
-  prDetailId          Int               @id @default(autoincrement()) @map("pr_detail_id")
-  productionRequestId Int               @map("production_request_id")
-  componentId         Int               @map("component_id")
-  quantityPerUnit     Int               @map("quantity_per_unit")
-  totalRequired       Int               @map("total_required")
-
-  productionRequest   ProductionRequest @relation(fields: [productionRequestId], references: [productionRequestId], onDelete: Cascade)
-  component           Component         @relation(fields: [componentId], references: [componentId])
-
-  @@unique([productionRequestId, componentId])
-  @@map("production_request_details")
 }
 
 model ProductionLine {
@@ -325,6 +339,8 @@ model ProductionLine {
   location          String?
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
+  productionBatches ProductionBatch[]
+  workOrders        WorkOrder[]
   productionBatches ProductionBatch[]
   workOrders        WorkOrder[]
 
@@ -347,8 +363,27 @@ model WorkOrder {
   startDate             DateTime?               @map("start_date")
   targetDate            DateTime?               @map("target_date")
   materialRequests      MaterialExportRequest[]
+  workOrderId           Int                     @id @default(autoincrement()) @map("work_order_id")
+  createDate            DateTime                @default(now()) @map("create_date")
+  employeeId            Int                     @map("employee_id")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  productId             Int                     @map("product_id")
+  code                  String                  @unique
+  quantity              Int
+  productionLineId      Int?                    @map("production_line_id")
+  status                WorkOrderStatus         @default(PLANNED)
+  endDate               DateTime?               @map("end_date")
+  note                  String?
+  startDate             DateTime?               @map("start_date")
+  targetDate            DateTime?               @map("target_date")
+  materialRequests      MaterialExportRequest[]
   productionBatches     ProductionBatch[]
   productionCosts       ProductionCost[]
+  workOrderFulfillments WorkOrderFulfillment[]
+  employee              Employee                @relation(fields: [employeeId], references: [employeeId])
+  product               Product                 @relation(fields: [productId], references: [productId])
+  productionLine        ProductionLine?         @relation(fields: [productionLineId], references: [productionLineId])
   workOrderFulfillments WorkOrderFulfillment[]
   employee              Employee                @relation(fields: [employeeId], references: [employeeId])
   product               Product                 @relation(fields: [productId], references: [productId])
@@ -361,7 +396,10 @@ model WorkOrderFulfillment {
   workOrderId         Int               @map("work_order_id")
   productionRequestId Int               @map("production_request_id")
   quantity            Int               @default(0)
+  productionRequestId Int               @map("production_request_id")
+  quantity            Int               @default(0)
   productionRequest   ProductionRequest @relation(fields: [productionRequestId], references: [productionRequestId], onDelete: Cascade)
+  workOrder           WorkOrder         @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
   workOrder           WorkOrder         @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
 
   @@id([workOrderId, productionRequestId])
@@ -388,19 +426,19 @@ model ProductInstance {
   productInstanceId     Int                    @id @default(autoincrement()) @map("product_instance_id")
   serialNumber          String                 @unique @map("serial_number")
   unitProductionCost    Decimal?               @map("unit_production_cost") @db.Decimal(10, 2)
+  unitProductionCost    Decimal?               @map("unit_production_cost") @db.Decimal(10, 2)
   productId             Int                    @map("product_id")
   productionBatchId     Int                    @map("production_batch_id")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   status                ProductInstanceStatus  @default(WIP)
   salesOrderId          Int?                   @map("sales_order_id")
-  warehouseId           Int?                   @map("warehouse_id")
   inventoryTransactions InventoryTransaction[]
   product               Product                @relation(fields: [productId], references: [productId])
   productionBatch       ProductionBatch        @relation(fields: [productionBatchId], references: [productionBatchId])
   salesOrder            SalesOrder?            @relation(fields: [salesOrderId], references: [salesOrderId])
-  warehouse             Warehouse?             @relation(fields: [warehouseId], references: [warehouseId])
   qualityChecks         QualityCheck[]
+  warranty              Warranty?
   warranty              Warranty?
 
   @@map("product_instances")
@@ -416,6 +454,8 @@ model Warranty {
   updatedAt         DateTime        @updatedAt @map("updated_at")
   customer          Customer        @relation(fields: [customerId], references: [customerId])
   productInstance   ProductInstance @relation(fields: [productInstanceId], references: [productInstanceId])
+  customer          Customer        @relation(fields: [customerId], references: [customerId])
+  productInstance   ProductInstance @relation(fields: [productInstanceId], references: [productInstanceId])
 
   @@map("warranties")
 }
@@ -426,6 +466,7 @@ model QualityChecklist {
   description   String?
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+  qualityChecks QualityCheck[]
   qualityChecks QualityCheck[]
 
   @@map("quality_checklists")
@@ -442,6 +483,10 @@ model QualityCheck {
   updatedAt         DateTime           @updatedAt @map("updated_at")
   result            QualityCheckResult
   checklist         QualityChecklist   @relation(fields: [checklistId], references: [checklistId])
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  result            QualityCheckResult
+  checklist         QualityChecklist   @relation(fields: [checklistId], references: [checklistId])
   employee          Employee           @relation(fields: [employeeId], references: [employeeId])
   productInstance   ProductInstance    @relation(fields: [productInstanceId], references: [productInstanceId])
 
@@ -452,16 +497,12 @@ model Warehouse {
   warehouseId           Int                    @id @default(autoincrement()) @map("warehouse_id")
   warehouseName         String                 @map("warehouse_name")
   location              String?
-  warehouseType         WarehouseType          @map("warehouse_type")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   code                  String                 @unique
   componentStocks       ComponentStock[]
   inventoryTransactions InventoryTransaction[]
   stocktakes            Stocktake[]
-  productInstances      ProductInstance[]
-  componentLots         ComponentLot[]
-  purchaseOrders        PurchaseOrder[]
 
   @@map("warehouses")
 }
@@ -470,6 +511,7 @@ model ComponentStock {
   warehouseId       Int       @map("warehouse_id")
   componentId       Int       @map("component_id")
   quantity          Int
+  allocatedQuantity Int       @default(0) @map("allocated_quantity")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   component         Component @relation(fields: [componentId], references: [componentId])
   warehouse         Warehouse @relation(fields: [warehouseId], references: [warehouseId])
@@ -490,11 +532,17 @@ model InventoryTransaction {
   transactionType   InventoryTransactionType @map("transaction_type")
   materialReqId     Int?                     @map("material_req_id")
   purchaseOrderId   Int?                     @map("purchase_order_id")
+  transactionType   InventoryTransactionType @map("transaction_type")
+  materialReqId     Int?                     @map("material_req_id")
+  purchaseOrderId   Int?                     @map("purchase_order_id")
   component         Component?               @relation(fields: [componentId], references: [componentId])
+  employee          Employee                 @relation(fields: [employeeId], references: [employeeId])
+  materialReq       MaterialExportRequest?   @relation(fields: [materialReqId], references: [requestId])
   employee          Employee                 @relation(fields: [employeeId], references: [employeeId])
   materialReq       MaterialExportRequest?   @relation(fields: [materialReqId], references: [requestId])
   productInstance   ProductInstance?         @relation(fields: [productInstanceId], references: [productInstanceId])
   purchaseOrder     PurchaseOrder?           @relation(fields: [purchaseOrderId], references: [purchaseOrderId])
+  warehouse         Warehouse                @relation(fields: [warehouseId], references: [warehouseId])
   warehouse         Warehouse                @relation(fields: [warehouseId], references: [warehouseId])
 
   @@index([transactionType])
@@ -509,6 +557,7 @@ model CostCategory {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   productionCosts ProductionCost[]
+  productionCosts ProductionCost[]
 
   @@map("cost_categories")
 }
@@ -519,6 +568,8 @@ model ProductionCost {
   description      String?
   workOrderId      Int          @map("work_order_id")
   costCategoryId   Int          @map("cost_category_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  costCategory     CostCategory @relation(fields: [costCategoryId], references: [costCategoryId])
   createdAt        DateTime     @default(now()) @map("created_at")
   costCategory     CostCategory @relation(fields: [costCategoryId], references: [costCategoryId])
   workOrder        WorkOrder    @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
@@ -532,7 +583,10 @@ model SupplierComponent {
   createdAt   DateTime  @default(now()) @map("created_at")
   component   Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
   supplier    Supplier  @relation(fields: [supplierId], references: [supplierId], onDelete: Cascade)
+  component   Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
+  supplier    Supplier  @relation(fields: [supplierId], references: [supplierId], onDelete: Cascade)
 
+  @@id([supplierId, componentId])
   @@id([supplierId, componentId])
   @@map("supplier_components")
 }
@@ -551,11 +605,30 @@ model MaterialExportRequest {
   requester    Employee                @relation("Requester", fields: [requesterId], references: [employeeId])
   workOrder    WorkOrder               @relation(fields: [workOrderId], references: [workOrderId])
   details      MaterialRequestDetail[]
+  requestId    Int                     @id @default(autoincrement()) @map("material_req_id")
+  code         String                  @unique
+  requestDate  DateTime                @default(now()) @map("request_date")
+  status       RequestStatus           @default(PENDING)
+  note         String?
+  workOrderId  Int                     @map("work_order_id")
+  requesterId  Int                     @map("requester_id")
+  approverId   Int?                    @map("approver_id")
+  transactions InventoryTransaction[]
+  approver     Employee?               @relation("Approver", fields: [approverId], references: [employeeId])
+  requester    Employee                @relation("Requester", fields: [requesterId], references: [employeeId])
+  workOrder    WorkOrder               @relation(fields: [workOrderId], references: [workOrderId])
+  details      MaterialRequestDetail[]
 
   @@map("material_export_requests")
 }
 
 model MaterialRequestDetail {
+  detailId    Int                   @id @default(autoincrement())
+  requestId   Int                   @map("material_req_id")
+  componentId Int                   @map("component_id")
+  quantity    Int
+  component   Component             @relation(fields: [componentId], references: [componentId])
+  request     MaterialExportRequest @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
   detailId    Int                   @id @default(autoincrement())
   requestId   Int                   @map("material_req_id")
   componentId Int                   @map("component_id")
@@ -615,43 +688,10 @@ model StocktakeItem {
   @@map("stocktake_items")
 }
 
-model CodeSequence {
-  scope        String   @id
-  currentValue Int      @default(0) @map("current_value")
-
-  @@map("code_sequences")
-}
-
 enum Priority {
   HIGH
   MEDIUM
   LOW
-}
-
-enum AttachmentCategory {
-  CONTRACT
-  INVOICE
-  PACKING_SLIP
-  INSPECTION
-  OTHER
-}
-
-model Attachment {
-  attachmentId Int                @id @default(autoincrement()) @map("attachment_id")
-  entityType   String             @map("entity_type")  // "PURCHASE_ORDER", "WORK_ORDER", "QUALITY_CHECK"
-  entityId     Int                @map("entity_id")    // FK-like reference to the parent entity PK
-  fileKey      String             @map("file_key")     // R2 object key, e.g. "purchase-orders/47/invoice.pdf"
-  fileName     String             @map("file_name")    // Original filename for display
-  fileSize     Int                @map("file_size")    // Bytes
-  mimeType     String             @map("mime_type")    // "application/pdf", "video/mp4", etc.
-  category     AttachmentCategory @default(OTHER)
-  uploadedBy   Int                @map("uploaded_by")
-  uploadedAt   DateTime           @default(now()) @map("uploaded_at")
-
-  employee     Employee           @relation(fields: [uploadedBy], references: [employeeId])
-
-  @@index([entityType, entityId])
-  @@map("attachments")
 }
 
 enum SalesOrderStatus {
@@ -666,10 +706,9 @@ enum SalesOrderStatus {
 
 enum PurchaseOrderStatus {
   DRAFT
-  PENDING
-  APPROVED
-  ORDERED
-  RECEIVING
+  PENDING_APPROVAL
+  SENT_TO_SUPPLIER
+  PARTIALLY_RECEIVED
   COMPLETED
   CANCELLED
 }
@@ -701,6 +740,7 @@ enum QualityCheckResult {
 enum ProductInstanceStatus {
   WIP
   IN_STOCK
+  RESERVED
   SHIPPED
   RETURNED
   DEFECTIVE
@@ -730,12 +770,6 @@ enum RequestStatus {
   APPROVED
   REJECTED
   COMPLETED
-}
-
-enum WarehouseType {
-  COMPONENT
-  SALES
-  ERROR
 }
 
 enum NotificationType {

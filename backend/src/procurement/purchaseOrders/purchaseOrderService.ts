@@ -14,6 +14,7 @@ interface PODetailItem {
     quantity: number;
     unitPrice: number;
     productionRequestId?: number;
+    productionRequestId?: number;
 }
 
 interface POCreateData {
@@ -261,46 +262,16 @@ class PurchaseOrderService {
                     totalAmount: finalTotal,
                     paymentTerms,
                     deliveryTerms,
-                    priority,
-                    note,
-                    details: { create: detailCreatePayload }
-                },
-                include: { details: { include: { component: true } } }
-            });
 
-            return newPO;
-        });
-    }
-
-
-    async submitPO(id: string | number, userId: number) {
-        const poId = typeof id === 'string' ? parseInt(id) : id;
-
-        // Fetch PO with detail count
-        const po = await prisma.purchaseOrder.findUnique({
-            where: { purchaseOrderId: poId },
-            include: { _count: { select: { details: true } } }
-        });
-
-        if (!po) throw new AppError('Purchase Order not found', 404);
-        if (po.status !== PurchaseOrderStatus.DRAFT) {
-            throw new AppError(`Cannot submit. PO status is ${po.status}. Only DRAFT POs can be submitted.`, 400);
-        }
-        if (po.employeeId !== userId) {
-            throw new AppError('Only the creator can submit this Purchase Order.', 403);
-        }
-        if (po._count.details === 0) {
-            throw new AppError('Cannot submit an empty Purchase Order. Add at least one line item first.', 400);
-        }
-
-        return await prisma.$transaction(async (tx) => {
-            const officialCode = await this.generateOfficialPOCode(tx);
-
-            return tx.purchaseOrder.update({
-                where: { purchaseOrderId: poId },
-                data: {
-                    code: officialCode,
-                    status: PurchaseOrderStatus.PENDING
+                    details: {
+                        create: details.map(item => ({
+                            componentId: item.componentId,
+                            quantityOrdered: item.quantity,
+                            unitPrice: item.unitPrice,
+                            quantityReceived: 0,
+                            productionRequestId: item.productionRequestId || null
+                        }))
+                    }
                 },
                 include: {
                     details: { include: { component: true } },
