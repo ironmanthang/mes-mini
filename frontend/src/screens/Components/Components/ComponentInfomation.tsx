@@ -28,8 +28,8 @@ export const ComponentInformation = (): JSX.Element => {
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await componentService.getAllComponents(searchTerm);
-      setComponents(data);
+      const response = await componentService.getAllComponents(searchTerm);
+      setComponents(response.data);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
@@ -60,7 +60,7 @@ export const ComponentInformation = (): JSX.Element => {
         await componentService.deleteComponent(id);
         fetchComponents();
       } catch (error) {
-        alert("Failed to delete component. It might be used in existing orders.");
+        console.error("Failed to delete component. It might be used in existing orders.", error);
       }
     }
   };

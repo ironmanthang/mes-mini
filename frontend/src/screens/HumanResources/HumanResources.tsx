@@ -26,8 +26,8 @@ export const HumanResources = (): JSX.Element => {
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await employeeService.getAllEmployees();
-      setEmployees(data);
+      const response = await employeeService.getAllEmployees();
+      setEmployees(response.data);
     } catch (error) {
       console.error("Failed to fetch employees:", error);
     } finally {

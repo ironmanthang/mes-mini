@@ -24,8 +24,8 @@ export const ComponentOrders = (): JSX.Element => {
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await purchaseOrderService.getAllPOs();
-      setOrders(data);
+      const response = await purchaseOrderService.getAllPOs();
+      setOrders(response.data);
     } catch (error) {
       console.error("Failed to fetch POs:", error);
     } finally {
@@ -55,14 +55,13 @@ export const ComponentOrders = (): JSX.Element => {
         alert("Approved Successfully!");
         fetchOrders();
         setIsModalOpen(false);
-      } catch (error: any) {
-        const msg = error.response?.data?.message || "Failed to approve.";
-        alert(msg);
+      } catch (error) {
+        console.error("Failed to approve: ", error);
       }
     }
   };
 
-  const handleUpdateStatus = async (id: number, newStatus: string) => {
+  const handleUpdateStatus = async (_id: number, newStatus: string) => {
     alert(`Change status to ${newStatus}: Feature is pending Backend API support.`);
   };
 

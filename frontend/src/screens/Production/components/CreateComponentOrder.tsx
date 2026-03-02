@@ -32,7 +32,7 @@ export const CreateComponentOrder = (): JSX.Element => {
 
   const [rows, setRows] = useState<OrderRow[]>([]);
 
-  const [taxRate, setTaxRate] = useState(10);
+  const [taxRate, ] = useState(10);
   const [shippingCost, setShippingCost] = useState(0);
   const [paymentTerm, setPaymentTerm] = useState("Net 30");
   const [deliveryTerm, setDeliveryTerm] = useState("FOB - Free On Board");
@@ -41,7 +41,7 @@ export const CreateComponentOrder = (): JSX.Element => {
     const fetchSuppliers = async () => {
       try {
         const suppliers = await supplierService.getAllSuppliers();
-        setSuppliersList(suppliers);
+        setSuppliersList(suppliers.data);
       } catch (error) {
         console.error("Failed to load suppliers", error);
       } finally {
@@ -151,9 +151,8 @@ export const CreateComponentOrder = (): JSX.Element => {
       setSelectedSupplierId("");
       setSupplierInfo(null);
 
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to create order.";
-      alert(msg);
+    } catch (error) {
+      console.error("Failed to handle submit:", error);
     } finally {
       setIsSubmitting(false);
     }
