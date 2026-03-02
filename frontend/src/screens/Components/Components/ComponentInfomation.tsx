@@ -28,8 +28,8 @@ export const ComponentInformation = (): JSX.Element => {
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await componentService.getAllComponents(searchTerm);
-      setComponents(data);
+      const response = await componentService.getAllComponents(searchTerm);
+      setComponents(response.data);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
