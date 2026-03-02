@@ -35,7 +35,6 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
     setIsLoading(true);
     try {
       const response = await employeeService.getAllEmployees();
-      //@ts-expect-error have data
       setEmployees(response.data);
     } catch (error) {
       console.error("Failed to fetch employees:", error);
