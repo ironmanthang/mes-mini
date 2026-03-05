@@ -6,11 +6,13 @@ import {
   CheckCircle, 
   RefreshCw,
   Loader2,
-  FileText
+  FileText,
+  Edit
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
 import { purchaseOrderService, type PurchaseOrder } from "../../../services/purchaseOrderServices";
+import { UpdateOrderModal } from "./UpdateOrderModal";
 
 export const ComponentOrders = (): JSX.Element => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -20,6 +22,7 @@ export const ComponentOrders = (): JSX.Element => {
   
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -47,6 +50,10 @@ export const ComponentOrders = (): JSX.Element => {
       alert("Failed to load order details.");
     }
   };
+
+  const handleUpdate = (id: number) => {
+    setSelectedUpdateId(id);
+  }
 
   const handleApprove = async (id: number) => {
     if (window.confirm("Are you sure you want to approve this order?")) {
@@ -174,6 +181,14 @@ export const ComponentOrders = (): JSX.Element => {
                         <Eye className="w-4 h-4" />
                       </button>
                       
+                      <button 
+                        onClick={() => handleUpdate(order.purchaseOrderId)}
+                        className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
+                        title="Update Product"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      
                       {order.status === 'PENDING' && (
                         <button 
                             onClick={() => handleApprove(order.purchaseOrderId)}
@@ -220,6 +235,13 @@ export const ComponentOrders = (): JSX.Element => {
             onUpdateStatus={() => handleUpdateStatus(selectedOrder.purchaseOrderId, "RECEIVED")}
           />
         )}
+
+        <UpdateOrderModal
+          isOpen={selectedUpdateId !== null}
+          onClose={() => setSelectedUpdateId(null)}
+          orderId={selectedUpdateId}
+          onSuccess={() => fetchOrders()}
+      />
     </div>
   );
 };

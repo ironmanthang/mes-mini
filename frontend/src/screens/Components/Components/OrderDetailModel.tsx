@@ -19,9 +19,6 @@ export const OrderDetailModal = ({
   onApprove, 
   onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
-useEffect(() => {
-    console.log(order);
-  }, []);
 
   if (!isOpen || !order) return null;
 

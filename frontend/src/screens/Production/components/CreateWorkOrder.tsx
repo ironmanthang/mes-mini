@@ -1,83 +1,84 @@
 import { 
-  ClipboardList, 
   Factory, 
-  Zap, 
-  CheckSquare, 
-  Square,
   CalendarDays,
   ArrowRight,
-  Info
+  Loader2,
+  Package,
+  Hash,
+  CheckCircle2
 } from "lucide-react";
-import { useState, useMemo, type JSX } from "react";
-
-const products = [
-  { id: "PROD001", name: "Gaming Laptop X1", category: "Electronics" },
-  { id: "PROD002", name: "Mechanical Keyboard", category: "Accessories" },
-  { id: "PROD004", name: "Smart Watch V2", category: "Wearables" },
-];
-
-const productionLines = [
-  { id: "LINE-A1", name: "Assembly Line Alpha", status: "Ready" },
-  { id: "LINE-B2", name: "Assembly Line Beta", status: "Maintenance" },
-  { id: "LINE-C3", name: "Packaging Line", status: "Ready" },
-];
-
-const pendingRequestsData = [
-  { id: "REQ-001", productId: "PROD001", quantity: 50, requester: "Sales Dept", date: "2025-11-20" },
-  { id: "REQ-002", productId: "PROD001", quantity: 30, requester: "Warehouse", date: "2025-11-21" },
-  { id: "REQ-003", productId: "PROD002", quantity: 100, requester: "Sales Dept", date: "2025-11-22" },
-  { id: "REQ-004", productId: "PROD004", quantity: 200, requester: "Export Team", date: "2025-11-23" },
-];
+import { useState, useEffect, type JSX } from "react";
+import { ProductionRequestServices, type ProductionRequest } from "../../../services/productionRequestServices";
+import { ProductionLineServices, type ProductionLine } from "../../../services/productionLineServices"; // THÊM IMPORT API
 
 export const CreateWorkOrder = (): JSX.Element => {
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
-  const [targetQuantity, setTargetQuantity] = useState<number>(0);
-  const [selectedLineId, setSelectedLineId] = useState("");
-
+  const [approvedRequests, setApprovedRequests] = useState<ProductionRequest[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
   
-  const availableRequests = useMemo(() => {
-    if (!selectedProductId) return [];
-    return pendingRequestsData.filter(req => req.productId === selectedProductId);
-  }, [selectedProductId]);
+  const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
+  const [isLoadingLines, setIsLoadingLines] = useState(true);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleProductChange = (productId: string) => {
-    setSelectedProductId(productId);
-    setSelectedRequestIds([]);
-    setTargetQuantity(0);
-  };
+  const [selectedRequestId, setSelectedRequestId] = useState<number | "">("");
+  const [selectedLineId, setSelectedLineId] = useState<number | "">("");
 
-  const toggleRequestSelection = (reqId: string, quantity: number) => {
-    if (selectedRequestIds.includes(reqId)) {
-      setSelectedRequestIds(prev => prev.filter(id => id !== reqId));
-      setTargetQuantity(prev => prev - quantity);
-    } else {
-      setSelectedRequestIds(prev => [...prev, reqId]);
-      setTargetQuantity(prev => prev + quantity);
+  const fetchApprovedRequests = async () => {
+    setIsLoadingRequests(true);
+    try {
+      const response = await ProductionRequestServices.getAllProductionRequests({ status: 'APPROVED' });
+      const data = Array.isArray(response) ? response : response.data || [];
+      setApprovedRequests(data);
+    } catch (error) {
+      console.error("Failed to fetch approved requests", error);
+    } finally {
+      setIsLoadingRequests(false);
     }
   };
 
-  const handleCreateWorkOrder = () => {
-    if (!selectedProductId || !selectedLineId || targetQuantity <= 0) {
-      alert("Please fill in all required fields.");
+  const fetchProductionLines = async () => {
+    setIsLoadingLines(true);
+    try {
+      const response = await ProductionLineServices.getAllProductionLines();
+      const data = Array.isArray(response) ? response : (response as any).data || [];
+      setProductionLines(data);
+    } catch (error) {
+      console.error("Failed to fetch production lines", error);
+    } finally {
+      setIsLoadingLines(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedRequests();
+    fetchProductionLines();
+  }, []);
+
+  const selectedRequest = approvedRequests.find(r => r.productionRequestId === selectedRequestId);
+
+  const handleCreateWorkOrder = async () => {
+    if (!selectedRequestId || !selectedLineId) {
+      alert("Please select both a Production Request and a Production Line.");
       return;
     }
-    console.log("Creating Work Order:", {
-      product: selectedProductId,
-      requests: selectedRequestIds,
-      quantity: targetQuantity,
-      line: selectedLineId
-    });
-    alert("Work Order Created Successfully!");
-  };
 
-  const handleAutoBatch = () => {
-    alert("System is calculating optimal batch size based on AI...");
-    if(availableRequests.length > 0) {
-        setSelectedRequestIds(availableRequests.map(r => r.id));
-        const totalQty = availableRequests.reduce((sum, r) => sum + r.quantity, 0);
-        setTargetQuantity(totalQty);
-        setSelectedLineId(productionLines[0].id);
+    setIsSubmitting(true);
+    try {
+      await ProductionRequestServices.convertToWorkOrder(
+        [Number(selectedRequestId)], 
+        Number(selectedLineId)
+      );
+      
+      alert("✅ Work Order Created Successfully!");
+      setSelectedRequestId("");
+      setSelectedLineId("");
+      fetchApprovedRequests();
+      fetchProductionLines();
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to create Work Order.";
+      alert(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -90,18 +91,10 @@ export const CreateWorkOrder = (): JSX.Element => {
             Create Work Order
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Consolidate requests and assign to a production line.
+            Convert an Approved Production Request into an active Work Order.
           </p>
         </div>
         
-        <button
-            onClick={handleAutoBatch}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 
-            font-medium rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer text-sm"
-        >
-            <Zap className="w-4 h-4" />
-            Auto-create Batch
-        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -112,151 +105,151 @@ export const CreateWorkOrder = (): JSX.Element => {
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                         <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
-                        Product Selection<span className="text-red-500">*</span>
+                        Production Request<span className="text-red-500">*</span>
+                        {isLoadingRequests && <Loader2 className="w-3 h-3 animate-spin text-blue-500 ml-2" />}
                     </label>
                     <select
-                        value={selectedProductId}
-                        onChange={(e) => handleProductChange(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
+                        value={selectedRequestId}
+                        onChange={(e) => setSelectedRequestId(e.target.value === "" ? "" : Number(e.target.value))}
+                        disabled={isLoadingRequests || isSubmitting}
+                        className="w-full p-3 border border-gray-300 rounded-lg 
+                        focus:ring-2 focus:ring-blue-500 outline-none text-sm 
+                        bg-white cursor-pointer disabled:bg-gray-50"
                     >
-                        <option value="">-- Select Product to Produce --</option>
-                        {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name} ({p.id})
+                        <option value="">
+                            {isLoadingRequests ? "Loading requests..." : "-- Select an Approved Request --"}
                         </option>
+                        {approvedRequests.map((req) => (
+                            <option key={req.productionRequestId} value={req.productionRequestId}>
+                                {req.code} — {req.product?.productName} (Qty: {req.quantity})
+                            </option>
                         ))}
                     </select>
+                    {!isLoadingRequests && approvedRequests.length === 0 && (
+                        <p className="text-xs text-orange-600 mt-1">No approved requests found. Please approve a request first.</p>
+                    )}
                 </div>
 
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
                         <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
                         Production Line<span className="text-red-500">*</span>
+                        {isLoadingLines && <Loader2 className="w-3 h-3 animate-spin text-blue-500 ml-2" />}
                     </label>
-                    <div className="grid grid-cols-1 gap-2">
-                        {productionLines.map((line) => (
-                        <label 
-                            key={line.id} 
-                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
-                                selectedLineId === line.id 
-                                ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" 
-                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                            } ${line.status !== "Ready" ? "opacity-60 grayscale cursor-not-allowed" : ""}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <input 
-                                    type="radio" 
-                                    name="productionLine"
-                                    value={line.id}
-                                    disabled={line.status !== "Ready"}
-                                    checked={selectedLineId === line.id}
-                                    onChange={(e) => setSelectedLineId(e.target.value)}
-                                    className="w-4 h-4 text-blue-600 cursor-pointer"
-                                />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-900">{line.name}</span>
-                                    <span className="text-xs text-gray-500">ID: {line.id}</span>
-                                </div>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                line.status === "Ready" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                            }`}>
-                                {line.status}
-                            </span>
-                        </label>
-                        ))}
-                    </div>
+
+                    {isLoadingLines ? (
+                        <div className="text-sm text-gray-500 py-2">Loading production lines...</div>
+                    ) : productionLines.length === 0 ? (
+                        <div className="text-sm text-red-500 py-2">No production lines configured in the system.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-2">
+                            {productionLines.map((line) => {
+                                const activeWOs = line._count?.workOrders || 0;
+                                return (
+                                    <label 
+                                        key={line.productionLineId} 
+                                        className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-all ${
+                                            selectedLineId === line.productionLineId 
+                                            ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500" 
+                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <input 
+                                                type="radio" 
+                                                name="productionLine"
+                                                value={line.productionLineId}
+                                                disabled={isSubmitting}
+                                                checked={selectedLineId === line.productionLineId}
+                                                onChange={(e) => setSelectedLineId(Number(e.target.value))}
+                                                className="w-4 h-4 text-blue-600 cursor-pointer disabled:cursor-not-allowed"
+                                            />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-gray-900">{line.lineName}</span>
+                                                <span className="text-xs text-gray-500">Location: {line.location}</span>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                                            activeWOs === 0 ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                                        }`}>
+                                            {activeWOs === 0 ? "Idle" : `${activeWOs} Active WOs`}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
-                        Target Quantity<span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                        <input
-                        type="number"
-                        min="1"
-                        value={targetQuantity || ""}
-                        onChange={(e) => setTargetQuantity(parseInt(e.target.value) || 0)}
-                        className="w-full p-3 border border-gray-300 
-                        rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold 
-                        text-blue-600"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 pr-4">Units</span>
-                    </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                        <Info className="w-3 h-3" /> Can be manually adjusted or auto-summed from requests.
-                    </p>
-                </div>
-
+                {/* Nút Submit */}
                 <div className="pt-4 border-t border-gray-100">
                     <button
                         onClick={handleCreateWorkOrder}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-[0.98]"
+                        disabled={isSubmitting || !selectedRequestId || !selectedLineId}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        <Factory className="w-5 h-5" />
-                        Confirm & Create Work Order
+                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Factory className="w-5 h-5" />}
+                        {isSubmitting ? "Creating..." : "Confirm & Create Work Order"}
                     </button>
                 </div>
             </div>
           </div>
 
           <div className="lg:col-span-1 h-full">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full flex flex-col">
-               <div className="flex justify-between items-center mb-3">
-                    <label className="text-sm font-bold text-gray-700">Pending Requests</label>
-                    <span className="text-xs bg-white border border-gray-200 px-2 py-0.5 rounded text-gray-600 font-medium">
-                        {selectedRequestIds.length} selected
-                    </span>
+            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 h-full flex flex-col">
+               <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-3">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-gray-500" />
+                        Selected Request Info
+                    </label>
                </div>
             
-               <div className="flex-1 overflow-hidden flex flex-col">
-                   {selectedProductId ? (
-                      availableRequests.length > 0 ? (
-                        <div className="overflow-y-auto pr-1 space-y-2 max-h-[500px]">
-                            {availableRequests.map((req) => {
-                                const isSelected = selectedRequestIds.includes(req.id);
-                                return (
-                                    <div 
-                                        key={req.id}
-                                        onClick={() => toggleRequestSelection(req.id, req.quantity)}
-                                        className={`p-3 rounded-lg border cursor-pointer flex items-start gap-3 transition-all ${
-                                            isSelected 
-                                            ? "bg-white border-blue-500 shadow-md ring-1 ring-blue-500" 
-                                            : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm"
-                                        }`}
-                                    >
-                                        <div className="mt-0.5">
-                                            {isSelected 
-                                                ? <CheckSquare className="w-5 h-5 text-blue-600" /> 
-                                                : <Square className="w-5 h-5 text-gray-300" />
-                                            }
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-bold text-sm text-gray-900">{req.id}</span>
-                                                <span className="font-bold text-sm text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{req.quantity}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                                                <div className="flex items-center gap-1"><CalendarDays className="w-3 h-3"/> {req.date}</div>
-                                                <div>By: {req.requester}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                      ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
-                            <ClipboardList className="w-10 h-10 mb-2 opacity-30" />
-                            <p className="text-sm">No pending requests.</p>
-                        </div>
-                      )
+               <div className="flex-1 flex flex-col">
+                   {selectedRequest ? (
+                      <div className="space-y-4">
+                          <div className="p-4 bg-white rounded-lg border border-green-200 shadow-sm relative overflow-hidden">
+                              <div className="absolute top-0 right-0 w-2 h-full bg-green-500"></div>
+                              <p className="text-xs font-bold text-green-600 mb-1 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> APPROVED
+                              </p>
+                              <h4 className="font-mono text-lg font-bold text-gray-900">{selectedRequest.code}</h4>
+                              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                 <CalendarDays className="w-3 h-3" />
+                                 {new Date(selectedRequest.requestDate).toLocaleDateString('vi-VN')}
+                              </p>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3 text-sm">
+                              <div>
+                                  <span className="text-gray-500 block text-xs">Target Product:</span>
+                                  <span className="font-bold text-gray-900">{selectedRequest.product?.productName}</span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                                  <span className="text-gray-500 text-xs">Quantity to Produce:</span>
+                                  <span className="font-bold text-blue-600 text-base">{selectedRequest.quantity} <span className="text-xs font-normal text-gray-500">{selectedRequest.product?.unit}</span></span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                                  <span className="text-gray-500 text-xs">Priority:</span>
+                                  <span className={`font-bold ${
+                                      selectedRequest.priority === 'HIGH' ? 'text-red-600' : 
+                                      selectedRequest.priority === 'MEDIUM' ? 'text-orange-500' : 'text-green-600'
+                                  }`}>
+                                      {selectedRequest.priority}
+                                  </span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                                  <span className="text-gray-500 text-xs">Type:</span>
+                                  <span className="font-medium text-gray-700 flex items-center gap-1">
+                                      <Hash className="w-3 h-3" />
+                                      {selectedRequest.soDetailId ? "Make to Order (Sales)" : "Make to Stock"}
+                                  </span>
+                              </div>
+                          </div>
+                      </div>
                    ) : (
-                       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
-                           <ArrowRight className="w-10 h-10 mb-2 opacity-30" />
-                           <p className="text-sm">Select a Product on the left.</p>
+                       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-white">
+                           <ArrowRight className="w-10 h-10 mb-3 opacity-30" />
+                           <p className="text-sm">Select a Production Request from the list to view its details.</p>
                        </div>
                    )}
                </div>
