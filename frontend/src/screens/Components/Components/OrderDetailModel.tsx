@@ -1,7 +1,7 @@
 import { 
   X, CheckCircle, RefreshCw, Printer, User, Package
 } from "lucide-react";
-import { type JSX } from "react";
+import { useEffect, type JSX } from "react";
 import type { PurchaseOrder } from "../../../services/purchaseOrderServices";
 
 interface OrderDetailModalProps {
@@ -19,7 +19,10 @@ export const OrderDetailModal = ({
   onApprove, 
   onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
-  
+useEffect(() => {
+    console.log(order);
+  }, []);
+
   if (!isOpen || !order) return null;
 
   const formatDate = (dateString?: string) => {

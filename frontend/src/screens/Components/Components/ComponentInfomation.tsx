@@ -103,17 +103,6 @@ export const ComponentInformation = (): JSX.Element => {
             </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-             <div className="flex justify-between items-start mb-2">
-                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Top Supplier</p>
-                 <TrendingUp className="w-4 h-4 text-green-500" />
-             </div>
-             <h3 className="text-lg font-bold text-gray-900">{topSupplier}</h3>
-             <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
-                 <div className="bg-blue-600 h-1.5 rounded-full" style={{width: '75%'}}></div>
-             </div>
-             <p className="text-xs text-gray-400 mt-2">Based on purchase volume</p>
-        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
