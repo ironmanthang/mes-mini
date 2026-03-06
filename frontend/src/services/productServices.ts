@@ -24,6 +24,14 @@ export interface UpdateProduct {
     categoryId: number;
 }
 
+export interface ProductBarcode {
+    productId: number;
+    code: string;
+    productName: string;
+    barcode: string;
+    unit: string;
+}
+
 export const ProductServices = {
     getAllProducts: async () => {
         const response = await api.get<Product[]>("/products");
@@ -51,7 +59,7 @@ export const ProductServices = {
     },
 
     getBarcodeById: async (id: number) => {
-        const response = await api.get<Product>(`products/${id}/barcode`);
+        const response = await api.get<ProductBarcode>(`products/${id}/barcode`);
         return response.data;
     }
 }

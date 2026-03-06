@@ -96,14 +96,9 @@ export const ProductDetailModal = ({ isOpen, onClose, productId }: ProductDetail
           )}
         </div>
 
-        <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-between">
-            <button 
-                onClick={() => alert("Tính năng in mã vạch (Barcode) sẽ gọi API getBarcodeById sau.")}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors shadow-sm cursor-pointer"
-            >
-                <Barcode className="w-4 h-4" /> Print Barcode
-            </button>
-            <button onClick={onClose} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 transition-colors shadow-sm cursor-pointer">
+        <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex flex-row-reverse">
+            <button onClick={onClose} className="px-6 py-2 bg-blue-600 text-white rounded-lg 
+            font-bold hover:bg-blue-500 transition-colors shadow-sm cursor-pointer">
                 Close
             </button>
         </div>

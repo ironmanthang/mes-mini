@@ -19,6 +19,7 @@ import notificationRoutes from './notifications/notificationRoutes.js';
 import dashboardRoutes from './dashboard/dashboardRoutes.js';
 import qualityRoutes from './production/quality/qualityRoutes.js';
 import productionRequestRoutes from './production/productionRequests/productionRequestRoutes.js';
+import workOrderRoutes from './production/workOrders/workOrderRoutes.js';
 
 const app: Express = express();
 
@@ -44,6 +45,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/production-requests', productionRequestRoutes);
+app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/notifications', notificationRoutes);
