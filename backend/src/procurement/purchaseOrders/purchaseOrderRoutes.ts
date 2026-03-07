@@ -84,7 +84,7 @@ router.post('/:id/receive',
  *                 properties:
  *                   purchaseOrderId: { type: integer }
  *                   code: { type: string }
- *                   status: { type: string, example: "PENDING" }
+ *                   status: { type: string, example: "PENDING_APPROVAL" }
  *                   totalAmount: { type: number }
  *                   supplier: { type: object, properties: { supplierName: { type: string } } }
  *                   employee: { type: object, properties: { fullName: { type: string } } }
@@ -216,7 +216,7 @@ router.post('/:id/receive',
  * /api/purchase-orders/{id}:
  *   put:
  *     summary: Update a Purchase Order (Edit Draft)
- *     description: Update details or change status (e.g., DRAFT -> PENDING). Can only edit if status is DRAFT or PENDING.
+ *     description: Update details or change status (e.g., DRAFT -> PENDING_APPROVAL). Can only edit if status is DRAFT or PENDING_APPROVAL.
  *     tags: [Purchase Orders]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -238,7 +238,7 @@ router.post('/:id/receive',
  *               note: { type: string }
  *               paymentTerms: { type: string, enum: ["Net 30", "Due upon receipt", "50% Advance, 50% on delivery"] }
  *               deliveryTerms: { type: string, enum: ["FOB - Free On Board", "CIF - Cost, Insurance and Freight", "EXW - Ex Works", "DDP - Delivered Duty Paid"] }
- *               status: { type: string, enum: ["DRAFT", "PENDING", "CANCELLED"], description: "Use this to Submit a draft" }
+ *               status: { type: string, enum: ["DRAFT", "PENDING_APPROVAL", "CANCELLED"], description: "Use this to Submit a draft" }
  *     responses:
  *       200:
  *         description: Updated successfully

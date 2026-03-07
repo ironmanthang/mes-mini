@@ -23,6 +23,14 @@ const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Agents', description: 'B2B Distributors & Customers' },
             { name: 'Purchase Orders', description: 'Procurement: Buying Materials' },
             { name: 'Sales Orders', description: 'Sales: Selling Products' },
+            // { name: 'Production Lines', description: 'Manufacturing line management' },
+            { name: 'Production Requests', description: 'Managing requests to produce items' },
+            // { name: 'Quality', description: 'Quality Control (QC) operations' },
+            // { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
+            // { name: 'Inventory', description: 'Stock Management and Reporting' },
+            // { name: 'Material Requests', description: 'Requesting materials for production' },
+            // { name: 'Stocktaking', description: 'Inventory counting and reconciliation' },
+            // { name: 'Notifications', description: 'System alerts and messages' },
         ],
         components: {
             securitySchemes: {
@@ -40,17 +48,61 @@ const swaggerOptions: swaggerJsDoc.Options = {
         ],
     },
     // Path to route files for swagger-jsdoc to scan
+    // To HIDE an API from Swagger, simply comment out its two lines (the .ts and the .js)
     apis: [
-        './src/core/**/*Routes.ts',
-        './src/master-data/**/*Routes.ts',
-        './src/procurement/**/*Routes.ts',
-        './src/sales/**/*Routes.ts',
-        './src/production/**/*Routes.ts',
-        './dist/core/**/*Routes.js',
-        './dist/master-data/**/*Routes.js',
-        './dist/procurement/**/*Routes.js',
-        './dist/sales/**/*Routes.js',
-        './dist/production/**/*Routes.js'
+        // --- CORE: Auth & Identity ---
+        './src/core/auth/authRoutes.ts',
+        './dist/core/auth/authRoutes.js',
+        './src/core/employees/employeeRoutes.ts',
+        './dist/core/employees/employeeRoutes.js',
+        './src/core/roles/roleRoutes.ts',
+        './dist/core/roles/roleRoutes.js',
+
+        // --- MASTER DATA ---
+        './src/master-data/agents/agentRoutes.ts',
+        './dist/master-data/agents/agentRoutes.js',
+        './src/master-data/components/componentRoutes.ts',
+        './dist/master-data/components/componentRoutes.js',
+        './src/master-data/products/productRoutes.ts',
+        './dist/master-data/products/productRoutes.js',
+        './src/master-data/suppliers/supplierRoutes.ts',
+        './dist/master-data/suppliers/supplierRoutes.js',
+
+        // --- DASHBOARD & NOTIFICATIONS ---
+        // './src/dashboard/dashboardRoutes.ts',
+        // './dist/dashboard/dashboardRoutes.js',
+        // './src/notifications/notificationRoutes.ts',
+        // './dist/notifications/notificationRoutes.js',
+
+        // --- PROCUREMENT ---
+        './src/procurement/purchaseOrders/purchaseOrderRoutes.ts',
+        './dist/procurement/purchaseOrders/purchaseOrderRoutes.js',
+
+        // --- SALES ---
+        './src/sales/salesOrders/salesOrderRoutes.ts',
+        './dist/sales/salesOrders/salesOrderRoutes.js',
+
+        // --- PRODUCTION ---
+        // './src/production/productionLines/productionLineRoutes.ts',
+        // './dist/production/productionLines/productionLineRoutes.js',
+        './src/production/productionRequests/productionRequestRoutes.ts',
+        './dist/production/productionRequests/productionRequestRoutes.js',
+        './src/production/productionRoutes.ts',
+        './dist/production/productionRoutes.js',
+        // './src/production/quality/qualityRoutes.ts',
+        // './dist/production/quality/qualityRoutes.js',
+        // './src/production/workOrders/workOrderRoutes.ts',
+        // './dist/production/workOrders/workOrderRoutes.js',
+
+        // --- WAREHOUSE ---
+        './src/warehouse/inventory/inventoryRoutes.ts',
+        './dist/warehouse/inventory/inventoryRoutes.js',
+        // './src/warehouse/material-request/materialRequestRoutes.ts',
+        // './dist/warehouse/material-request/materialRequestRoutes.js',
+        // './src/warehouse/stocktaking/stocktakeRoutes.ts',
+        // './dist/warehouse/stocktaking/stocktakeRoutes.js',
+        './src/warehouse/warehouseRoutes.ts',
+        './dist/warehouse/warehouseRoutes.js',
     ],
 };
 

@@ -64,7 +64,9 @@ router.put('/:id/cancel',
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string }
+ *         schema: 
+ *           type: string
+ *           enum: [PLANNED, IN_PROGRESS, COMPLETED, CANCELLED]
  *     responses:
  *       200:
  *         description: List of WOs

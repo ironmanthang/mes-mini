@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import EmployeeService from './employeeService.js';
+import { EmployeeStatus } from '../../generated/prisma/index.js';
 
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -44,11 +45,11 @@ export const updateEmployee = async (req: Request, res: Response): Promise<void>
 export const updateEmployeeStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const { status } = req.body;
-        if (!['ACTIVE', 'INACTIVE', 'TERMINATED'].includes(status)) {
+        if (!Object.values(EmployeeStatus).includes(status)) {
             res.status(400).json({ message: 'Invalid status' });
             return;
         }
-        const employee = await EmployeeService.updateStatus(req.params.id as string, status);
+        const employee = await EmployeeService.updateStatus(req.params.id as string, status as EmployeeStatus);
         res.status(200).json(employee);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
