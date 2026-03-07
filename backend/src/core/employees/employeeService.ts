@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../../common/lib/prisma.js';
 import type { AuthUser } from '../../common/types/express.js';
+import { EmployeeStatus } from '../../generated/prisma/index.js';
 
 interface EmployeeCreateData {
     fullName: string;
@@ -12,7 +13,7 @@ interface EmployeeCreateData {
     address?: string;
     dateOfBirth?: Date;
     hireDate: Date;
-    status?: string;
+    status?: EmployeeStatus;
 }
 
 interface EmployeeUpdateData {
@@ -25,7 +26,7 @@ interface EmployeeUpdateData {
     dateOfBirth?: Date;
     hireDate?: Date;
     terminationDate?: Date;
-    status?: string;
+    status?: EmployeeStatus;
     roleIds?: number[];
 }
 
@@ -85,7 +86,7 @@ class EmployeeService {
         const newEmployee = await prisma.employee.create({
             data: {
                 fullName, username, password: hashedPassword, email, phoneNumber,
-                address, dateOfBirth, hireDate, status: (status as any) || 'ACTIVE',
+                address, dateOfBirth, hireDate, status: status || EmployeeStatus.ACTIVE,
                 roles: {
                     create: roleIds.map(id => ({ role: { connect: { roleId: id } } })),
                 },
@@ -164,11 +165,11 @@ class EmployeeService {
         return this._formatEmployee(updatedEmployee);
     }
 
-    async updateStatus(id: string | number, status: string) {
+    async updateStatus(id: string | number, status: EmployeeStatus) {
         const employeeId = typeof id === 'string' ? parseInt(id) : id;
         return prisma.employee.update({
             where: { employeeId },
-            data: { status: status as any }
+            data: { status }
         });
     }
 

@@ -1,4 +1,5 @@
 import { Joi } from '../../common/validators/common.js';
+import { PurchaseOrderStatus } from '../../generated/prisma/index.js';
 
 export const createPOSchema = Joi.object({
     code: Joi.string().required().uppercase().trim().messages({
@@ -6,7 +7,10 @@ export const createPOSchema = Joi.object({
     }),
     supplierId: Joi.number().integer().required(),
     orderDate: Joi.date().iso().default(() => new Date()),
-    status: Joi.string().valid('DRAFT', 'PENDING').default('DRAFT'),
+    status: Joi.string().valid(
+        PurchaseOrderStatus.DRAFT,
+        PurchaseOrderStatus.PENDING_APPROVAL
+    ).default(PurchaseOrderStatus.DRAFT),
     expectedDeliveryDate: Joi.date().iso().min('now').optional().allow(null),
 
     // Financials
@@ -58,6 +62,10 @@ export const updatePOSchema = Joi.object({
 
     note: Joi.string().optional().allow(null, ''),
 
-    // They can change status from DRAFT -> PENDING here
-    status: Joi.string().valid('DRAFT', 'PENDING', 'CANCELLED').optional(),
+    // Status can be changed: DRAFT -> PENDING_APPROVAL
+    status: Joi.string().valid(
+        PurchaseOrderStatus.DRAFT,
+        PurchaseOrderStatus.PENDING_APPROVAL,
+        PurchaseOrderStatus.CANCELLED
+    ).optional(),
 });
