@@ -10,7 +10,7 @@ interface PODetailItem {
 
 interface POCreateData {
     code: string;
-    status?: string;
+    status?: PurchaseOrderStatus;
     supplierId: number;
     orderDate?: Date;
     expectedDeliveryDate?: Date;
@@ -29,7 +29,7 @@ interface POUpdateData {
     tax?: number;
     paymentTerms?: string;
     deliveryTerms?: string;
-    status?: string;
+    status?: PurchaseOrderStatus;
 }
 
 class PurchaseOrderService {
@@ -82,7 +82,7 @@ class PurchaseOrderService {
                     employeeId: creatorId,
                     orderDate,
                     expectedDeliveryDate,
-                    status: (status as any) || PurchaseOrderStatus.DRAFT,
+                    status: status || PurchaseOrderStatus.DRAFT,
                     discount,
                     shippingCost,
                     tax,
@@ -142,7 +142,7 @@ class PurchaseOrderService {
                 tax: data.tax,
                 paymentTerms: data.paymentTerms,
                 deliveryTerms: data.deliveryTerms,
-                status: data.status as any // Allow status update (DRAFT -> PENDING_APPROVAL)
+                status: data.status,
             }
         });
     }

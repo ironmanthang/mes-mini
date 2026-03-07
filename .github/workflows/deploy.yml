@@ -47,5 +47,12 @@ jobs:
           service: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
           image: gcr.io/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}:${{ github.sha }}
+          # Equivalent to --allow-unauthenticated
+          flags: '--allow-unauthenticated'
+          # Passing all the secrets we set in Github to our Cloud Run service
           env_vars: |
              NODE_ENV=production
+             DATABASE_URL=${{ secrets.DATABASE_URL }}
+             DIRECT_URL=${{ secrets.DIRECT_URL }}
+             JWT_SECRET=${{ secrets.JWT_SECRET }}
+             CONTAINER_PORT=${{ secrets.CONTAINER_PORT }}

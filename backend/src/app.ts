@@ -57,7 +57,7 @@ const swaggerUiOptions = {
     customCss: '.swagger-ui .response .response-col_links { display: none !important; }',
     swaggerOptions: {
         tryItOutEnabled: true,
-        docExpansion: 'list',
+        docExpansion: 'none',
         displayRequestDuration: true,
     }
 };
