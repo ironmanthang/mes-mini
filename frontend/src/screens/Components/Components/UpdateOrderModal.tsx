@@ -17,7 +17,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
   const [deliveryTerms, setDeliveryTerms] = useState("FOB - Free On Board");
   const [note, setNote] = useState("");
-  const [status, setStatus] = useState<'DRAFT' | 'PENDING' | 'CANCELLED'>('DRAFT');
+  const [status, setStatus] = useState<'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED'>('DRAFT');
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,8 +36,8 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
           setDeliveryTerms(data.deliveryTerms || "FOB - Free On Board");
           setNote(data.note || "");
           
-          if (['DRAFT', 'PENDING', 'CANCELLED'].includes(data.status)) {
-              setStatus(data.status as 'DRAFT' | 'PENDING' | 'CANCELLED');
+          if (['DRAFT', 'PENDING_APPROVAL', 'CANCELLED'].includes(data.status)) {
+              setStatus(data.status as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED');
           }
         })
         .catch(err => console.error("Failed to load PO details", err))
@@ -106,12 +106,12 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                     <label className="text-sm font-bold text-gray-700">Trạng thái</label>
                     <select 
                         value={status} 
-                        onChange={e => setStatus(e.target.value as 'DRAFT' | 'PENDING' | 'CANCELLED')}
+                        onChange={e => setStatus(e.target.value as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED')}
                         disabled={isSubmitting}
                         className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
                         <option value="DRAFT">Draft</option>
-                        <option value="PENDING">Pending</option>
+                        <option value="PENDING_APPROVAL">Pending Approval</option>
                         <option value="CANCELLED">Cancelled</option>
                     </select>
                 </div>

@@ -1,7 +1,6 @@
 import { 
   Cpu, 
   AlertTriangle, 
-  TrendingUp, 
   Search, 
   Filter, 
   Plus, 
@@ -14,6 +13,7 @@ import {
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { AddComponentModal } from "./AddComponentModel";
 import { componentService, type Component } from "../../../services/componentServices";
+import { InventoryServices } from "../../../services/inventoryServices";
 
 
 export const ComponentInformation = (): JSX.Element => {
@@ -28,8 +28,22 @@ export const ComponentInformation = (): JSX.Element => {
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await componentService.getAllComponents(searchTerm);
-      setComponents(response.data);
+      const [compResponse, invResponse] = await Promise.all([
+        componentService.getAllComponents(searchTerm),
+        InventoryServices.getInventoryReport(),
+      ])
+      const compData = Array.isArray(compResponse) ? compResponse : (compResponse as any).data || [];
+      const invData = Array.isArray(invResponse) ? invResponse : (invResponse as any).data || [];
+
+      const mergedComponents = compData.map((comp: Component) => {
+        const stockInfo = invData.find((inv: any) => inv.componentId === comp.componentId);
+        return {
+          ...comp,
+          currentStock: stockInfo ? stockInfo.availableQuantity : 0 
+        };
+      });
+
+      setComponents(mergedComponents);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
@@ -71,7 +85,6 @@ export const ComponentInformation = (): JSX.Element => {
 
   const activeCount = components.length; 
   const lowStockCount = components.filter(c => (c.currentStock || 0) < c.minStockLevel).length;
-  const topSupplier = "Intel Corporation";
 
   return (
     <div className="space-y-8 pb-12">
@@ -159,7 +172,7 @@ export const ComponentInformation = (): JSX.Element => {
                             <th className="p-4">Component Name</th>
                             <th className="p-4">Unit</th>
                             <th className="p-4 text-right">Standard Cost</th>
-                            <th className="p-4 text-center">Stock / Min</th>
+                            <th className="p-4 text-center">Available / Min</th>
                             <th className="p-4 text-center">Status</th>
                             <th className="p-4 text-center">Actions</th>
                         </tr>

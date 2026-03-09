@@ -1,50 +1,62 @@
 import api from "./api";
 
 export interface PurchaseOrderDetail {
-  poDetailId: number;
   purchaseOrderId: number;
   componentId: number;
-  componentName?: string;
+  unitPrice: string;
+  poDetailId: number;
   quantityOrdered: number;
   quantityReceived: number;
-  unitPrice: number;
-  code: number,
+  productionRequestId: number | null;
+  component: {
+    componentId: number;
+    componentName: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+    code: string;
+    minStockLevel: number;
+    standardCost: string;
+    unit: string;
+  }
 }
 
 export interface PurchaseOrder {
   purchaseOrderId: number;
-  code: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RECEIVED';
-  priority?: string;
-  
-  totalAmount: number; 
-  tax: number;
-  discount: number;
-  shippingCost: number;
-  
-  expectedDeliveryDate?: string;
   orderDate: string;
-  
+  employeeId: number;
   supplierId: number;
-  supplier?: {
+  createdAt: string;
+  updatedAt: string;
+  deliveryTerms: string;
+  expectedDeliveryDate: string;
+  paymentTerms: string;
+  priority: string;
+  shippingCost: string;
+  tax: string;
+  code: string;
+  totalAmount: string;
+  discount: string;
+  approvedAt: string | null;
+  approverId: number | null;
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RECEIVED';
+
+  supplier: {
     supplierId: number;
     supplierName: string;
+    phoneNumber: string;
+    email: string;
+    address: string;
     code: string;
-    email?: string;
-    phone?: string;
+    createdAt: string;
+    updatedAt: string;
   };
   
-  employeeId: number;
-  employee?: {
-    employeeId: number;
+  employee: {
     fullName: string;
   };
   
   details: PurchaseOrderDetail[];
-  
-  paymentTerms?: string;
-  deliveryTerms?: string;
-  note?: string;
 }
 
 export interface CreatePORequest {
@@ -72,7 +84,7 @@ export interface UpdatePORequest {
   paymentTerms?: string;
   deliveryTerms?: string;
   note?: string;
-  status?: 'DRAFT' | 'PENDING' | 'CANCELLED';
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED';
 }
 
 

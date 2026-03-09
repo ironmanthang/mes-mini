@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Cpu, ShoppingCart, ScanBarcode } from "lucide-react";
 
-import { ComponentInformation } from "./Components/ComponentInfomation";
+import { ComponentInformation } from "./Components/ComponentInformation";
 import { ComponentOrders } from "./Components/ComponentOrders";
 import { ComponentBarcodes } from "./Components/ComponentBarcodes";
 
