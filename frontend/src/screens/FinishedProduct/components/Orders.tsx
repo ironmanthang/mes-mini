@@ -7,8 +7,8 @@ import {
   PlayCircle
 } from "lucide-react";
 import { useState, useMemo, type JSX, useEffect } from "react";
-import { NewSalesOrderModal } from "./NewSalesOrderModel";
-import { SalesOrderDetailModal } from "./SalesOrderDetailModel";
+import { NewSalesOrderModal } from "./NewSalesOrderModal";
+import { SalesOrderDetailModal } from "./SalesOrderDetailModal";
 import { SalesOrdersServices, type SalesOrder, type SalesOrderDetail } from "../../../services/salesOrdersServices";
 
 export const Orders = (): JSX.Element => {

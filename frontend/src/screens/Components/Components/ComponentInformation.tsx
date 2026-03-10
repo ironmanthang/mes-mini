@@ -11,10 +11,11 @@ import {
   Trash2
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
-import { AddComponentModal } from "./AddComponentModel";
+import { AddComponentModal } from "./AddComponentModal";
 import { componentService, type Component } from "../../../services/componentServices";
 import { InventoryServices } from "../../../services/inventoryServices";
-
+import { DeleteComponentModal } from "./DeleteComponentModal";
+import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
 
 export const ComponentInformation = (): JSX.Element => {
   const [components, setComponents] = useState<Component[]>([]);
@@ -24,6 +25,8 @@ export const ComponentInformation = (): JSX.Element => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const [componentToDelete, setComponentToDelete] = useState<{id: number, name: string} | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
@@ -68,15 +71,8 @@ export const ComponentInformation = (): JSX.Element => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this component?")) {
-      try {
-        await componentService.deleteComponent(id);
-        fetchComponents();
-      } catch (error) {
-        console.error("Failed to delete component. It might be used in existing orders.", error);
-      }
-    }
+  const handleDelete = (id: number, name: string) => {
+    setComponentToDelete({ id, name });
   };
 
   const handleSaveSuccess = () => {
@@ -230,7 +226,7 @@ export const ComponentInformation = (): JSX.Element => {
                                             <Edit className="w-4 h-4" />
                                         </button>
                                         <button 
-                                            onClick={() => handleDelete(item.componentId)}
+                                            onClick={() => handleDelete(item.componentId, item.componentName)}
                                             className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete Component"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -251,6 +247,21 @@ export const ComponentInformation = (): JSX.Element => {
         initialData={selectedComponent}
         onConfirm={handleSaveSuccess} 
       />
+
+      <DeleteComponentModal
+        isOpen={componentToDelete !== null}
+        onClose={() => setComponentToDelete(null)}
+        componentId={componentToDelete?.id || null}
+        componentName={componentToDelete?.name || ""}
+        onSuccess={() => {
+            setShowSuccess(true);
+            fetchComponents();
+            setComponentToDelete(null);
+            setTimeout(() => setShowSuccess(false), 3000);
+        }}
+      />
+
+      <SuccessNotification isVisible={showSuccess}/>
     </div>
   );
 };

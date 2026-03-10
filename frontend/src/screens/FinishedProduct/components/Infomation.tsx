@@ -14,6 +14,8 @@ import { ProductServices, type Product } from "../../../services/productServices
 import { CreateNewProductModal } from "./CreateNewProductModal";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { UpdateProductModal } from "./UpdateProductModal";
+import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
+import { DeleteProductModal } from "./DeleteProductModal";
 
 export const Information = (): JSX.Element => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,6 +24,8 @@ export const Information = (): JSX.Element => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedViewId, setSelectedViewId] = useState<number | null>(null);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
+  const [productToDelete, setProductToDelete] = useState<{id: number, name: string} | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -63,17 +67,8 @@ export const Information = (): JSX.Element => {
     setSelectedUpdateId(id);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này không? Thao tác này không thể hoàn tác.")) {
-      try {
-        await ProductServices.deleteProduct(id);
-        alert("Đã xóa sản phẩm thành công!");
-        fetchProducts();
-      } catch (error: any) {
-        const msg = error.response?.data?.message || "Lỗi khi xóa sản phẩm. Có thể sản phẩm này đang được sử dụng ở nơi khác.";
-        alert(msg);
-      }
-    }
+  const handleDelete = (id: number, name: string) => {
+    setProductToDelete({ id, name });
   };
 
   // --- UI Helpers ---
@@ -169,7 +164,7 @@ export const Information = (): JSX.Element => {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleDelete(product.productId)}
+                            onClick={() => handleDelete(product.productId, product.productName)}
                             className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
                             title="Delete Product"
                           >
@@ -213,6 +208,21 @@ export const Information = (): JSX.Element => {
         productId={selectedUpdateId}
         onSuccess={() => fetchProducts()} 
       />
+
+      <DeleteProductModal
+        isOpen={productToDelete !== null}
+        onClose={() => setProductToDelete(null)}
+        productId={productToDelete?.id || null}
+        productName={productToDelete?.name || ""}
+        onSuccess={() => {
+            setShowSuccess(true);
+            fetchProducts();
+            setProductToDelete(null);
+            setTimeout(() => setShowSuccess(false), 3000);
+        }}
+      />
+
+      <SuccessNotification isVisible={showSuccess}/>
     </div>
   );
 };
