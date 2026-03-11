@@ -14,6 +14,11 @@
 
 ---
 
+## CI/CD Infrastructure ⚠️
+- [ ] **Automated Database Migrations** — Currently `deploy.yml` deploys the code to Cloud Run but ignores database schema changes. We need to run `npx prisma migrate deploy` executing inside the Docker builder container *before* pushing to Cloud Run to guarantee schema sync. Note: this requires refactoring `schema.prisma` to cleanly inject `DIRECT_URL`.
+
+---
+
 ## Phase 4: The Build (Work Order Execution) ⚠️
 
 > `workOrderService.ts` is AI-generated. Review/rewrite before building on top of it.
