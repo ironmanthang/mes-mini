@@ -7,7 +7,8 @@ import {
   ArrowRight, 
   FileText
 } from "lucide-react";
-import { useState, useMemo, type JSX } from "react";
+import { useState, useMemo, useEffect, useRef, type JSX } from "react";
+import JsBarcode from "jsbarcode";
 
 const exportTransactions = [
   { 
@@ -50,6 +51,8 @@ export const ComponentBarcodes = (): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
 
+  const barcodeRef = useRef<SVGSVGElement>(null);
+
   const selectedTrx = useMemo(() => 
     exportTransactions.find(t => t.id === selectedTrxId), 
   [selectedTrxId]);
@@ -59,6 +62,22 @@ export const ComponentBarcodes = (): JSX.Element => {
     const code = `COMP_${selectedTrx.componentId}WH${selectedTrx.warehouseId}BATCH${selectedTrx.workOrderId}`;
     setGeneratedCode(code);
   };
+
+  useEffect(() => {
+    if (generatedCode && barcodeRef.current) {
+      try {
+        JsBarcode(barcodeRef.current, generatedCode, {
+          format: "CODE128",
+          lineColor: "#000",
+          width: 2,           
+          height: 80,         
+          displayValue: false 
+        });
+      } catch (error) {
+        console.error("Lỗi khi tạo mã vạch:", error);
+      }
+    }
+  }, [generatedCode]);
 
   const handlePrint = () => {
     alert(`Printing label for: ${generatedCode}`);
@@ -208,20 +227,11 @@ export const ComponentBarcodes = (): JSX.Element => {
                      
                      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 min-h-[200px]">
                         {generatedCode ? (
-                            <div className="bg-white p-6 shadow-md border border-gray-200 rounded text-center animate-in fade-in zoom-in duration-300">
-                                <div className="flex items-end justify-center h-16 gap-1 mb-2 select-none">
-                                    {[...Array(40)].map((_, i) => (
-                                        <div 
-                                            key={i} 
-                                            className="bg-black" 
-                                            style={{
-                                                width: Math.random() > 0.5 ? '4px' : '2px', 
-                                                height: '100%'
-                                            }} 
-                                        />
-                                    ))}
+                            <div className="bg-white p-6 shadow-md border border-gray-200 rounded text-center animate-in fade-in zoom-in duration-300 max-w-full overflow-x-auto">
+                                <div className="flex items-end justify-center mb-2 select-none">
+                                    <svg ref={barcodeRef} className="max-w-full h-auto"></svg>
                                 </div>
-                                <div className="font-mono text-sm font-bold text-gray-800 tracking-wider break-all max-w-md">
+                                <div className="font-mono text-sm font-bold text-gray-800 tracking-wider break-all max-w-md mx-auto">
                                     {generatedCode}
                                 </div>
                             </div>

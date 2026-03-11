@@ -32,8 +32,8 @@ export const CreateComponentOrder = (): JSX.Element => {
 
   const [rows, setRows] = useState<OrderRow[]>([]);
 
-  const [taxRate, ] = useState(10);
-  const [shippingCost, setShippingCost] = useState(0);
+  const [taxRate, setTaxRate] = useState<number>(10);
+  const [shippingCost, setShippingCost] = useState<number>(0);
   const [paymentTerm, setPaymentTerm] = useState("Net 30");
   const [deliveryTerm, setDeliveryTerm] = useState("FOB - Free On Board");
 
@@ -41,7 +41,7 @@ export const CreateComponentOrder = (): JSX.Element => {
     const fetchSuppliers = async () => {
       try {
         const suppliers = await supplierService.getAllSuppliers();
-        setSuppliersList(suppliers.data);
+        setSuppliersList(Array.isArray(suppliers) ? suppliers : (suppliers as any).data || []);
       } catch (error) {
         console.error("Failed to load suppliers", error);
       } finally {
@@ -112,13 +112,17 @@ export const CreateComponentOrder = (): JSX.Element => {
   const handleRowChange = (rowId: number, field: 'quantity' | 'unitPrice', value: number) => {
     setRows(rows.map(r => {
       if (r.id === rowId) {
-        const newVal = value < 0 ? 0 : value;
+        const newVal = Math.max(0, value); 
         const newTotal = field === 'quantity' ? newVal * r.unitPrice : r.quantity * newVal;
         return { ...r, [field]: newVal, total: newTotal };
       }
       return r;
     }));
   };
+
+  const subtotal = rows.reduce((sum, r) => sum + r.total, 0);
+  const taxAmount = subtotal * (taxRate / 100);
+  const grandTotal = subtotal + taxAmount + shippingCost;
 
   const handleSubmit = async () => {
     if (!selectedSupplierId) return alert("Please select a supplier.");
@@ -134,7 +138,7 @@ export const CreateComponentOrder = (): JSX.Element => {
         supplierId: Number(selectedSupplierId),
         expectedDeliveryDate: deliveryDate || undefined,
         discount: 0,
-        tax: taxRate,
+        tax: taxAmount,
         shippingCost: shippingCost,
         paymentTerms: paymentTerm,
         deliveryTerms: deliveryTerm,
@@ -152,15 +156,15 @@ export const CreateComponentOrder = (): JSX.Element => {
       setSupplierInfo(null);
 
     } catch (error) {
+<<<<<<< HEAD
       console.log("Failed to create order: ", error);
+=======
+      console.error("Failed to handle submit:", error);
+>>>>>>> 9eb9066ee9df47a316f08909ace9d2c9a3064e25
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const subtotal = rows.reduce((sum, r) => sum + r.total, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const grandTotal = subtotal + taxAmount + shippingCost;
 
   if (isLoadingData) {
     return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>;
@@ -175,10 +179,10 @@ export const CreateComponentOrder = (): JSX.Element => {
           <p className="text-sm text-gray-500">Create a purchase order for raw materials.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
              <Save className="w-4 h-4" /> Save Draft
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
              <Printer className="w-4 h-4" /> Print
           </button>
         </div>
@@ -206,24 +210,24 @@ export const CreateComponentOrder = (): JSX.Element => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Phone</label>
-            <input type="text" readOnly value={supplierInfo?.phoneNumber || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
+            <input type="text" readOnly value={supplierInfo?.phoneNumber || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Email</label>
-            <input type="text" readOnly value={supplierInfo?.email || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
+            <input type="text" readOnly value={supplierInfo?.email || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
           </div>
 
           <div className="md:col-span-3 space-y-2">
             <label className="text-sm font-medium text-gray-700">Address</label>
-            <input type="text" readOnly value={supplierInfo?.address || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
+            <input type="text" readOnly value={supplierInfo?.address || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
           </div>
           
           <div className="w-full h-px bg-gray-100 md:col-span-3 my-1"></div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Order Date</label>
-            <input type="date" disabled value={orderDate} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500" />
+            <input type="date" disabled value={orderDate} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
           </div>
 
           <div className="space-y-2">
@@ -232,7 +236,7 @@ export const CreateComponentOrder = (): JSX.Element => {
               type="date" 
               value={deliveryDate} 
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm cursor-pointer" 
+              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" 
             />
           </div>
 
@@ -241,7 +245,7 @@ export const CreateComponentOrder = (): JSX.Element => {
             <select 
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white cursor-pointer"
+              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="High">High</option>
               <option value="Medium">Medium</option>
@@ -259,7 +263,7 @@ export const CreateComponentOrder = (): JSX.Element => {
             </h3>
             <button 
                 onClick={addRow}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
             >
                 <Plus className="w-4 h-4" /> Add Item
             </button>
@@ -282,7 +286,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                 <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="p-3">
                     <select 
-                      className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 cursor-pointer disabled:bg-gray-100"
+                      className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:bg-gray-100"
                       value={row.componentId}
                       disabled={!selectedSupplierId || isLoadingComponents}
                       onChange={(e) => handleComponentSelect(row.id, e.target.value)}
@@ -297,7 +301,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                   <td className="p-3">
                     <input 
                       type="number" min="1"
-                      className="w-full p-2 border border-gray-300 rounded text-right text-sm"
+                      className="w-full p-2 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                       value={row.quantity}
                       onChange={(e) => handleRowChange(row.id, 'quantity', parseInt(e.target.value) || 0)}
                     />
@@ -305,7 +309,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                   <td className="p-3">
                     <input 
                         type="number" min="0"
-                        className="w-full p-2 border border-gray-300 rounded text-right text-sm"
+                        className="w-full p-2 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={row.unitPrice}
                         onChange={(e) => handleRowChange(row.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                     />
@@ -314,12 +318,19 @@ export const CreateComponentOrder = (): JSX.Element => {
                     {row.total.toLocaleString()}
                   </td>
                   <td className="p-3 text-center">
-                    <button onClick={() => removeRow(row.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded transition-colors">
+                    <button onClick={() => removeRow(row.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded transition-colors cursor-pointer">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
               ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-400 italic text-sm">
+                    No items added yet. Click "Add Item" to start.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -334,7 +345,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                         <label className="text-xs font-medium text-gray-500 block mb-1">Payment Terms</label>
                         <select 
                             value={paymentTerm} onChange={(e) => setPaymentTerm(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm cursor-pointer"
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                         >
                             <option value="Net 30">Net 30</option>
                             <option value="Due upon receipt">Due upon receipt</option>
@@ -345,7 +356,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                         <label className="text-xs font-medium text-gray-500 block mb-1">Delivery Terms</label>
                         <select 
                             value={deliveryTerm} onChange={(e) => setDeliveryTerm(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm cursor-pointer"
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                         >
                             <option value="FOB - Free On Board">FOB - Free On Board</option>
                             <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
@@ -363,16 +374,29 @@ export const CreateComponentOrder = (): JSX.Element => {
                    <span>Subtotal</span>
                    <span className="font-semibold text-gray-900">${subtotal.toLocaleString()}</span>
                  </div>
+                 
                  <div className="flex justify-between items-center text-sm text-gray-600">
-                   <span>Tax ({taxRate}%)</span>
+                   <div className="flex items-center gap-2">
+                     <span>Tax (%)</span>
+                     <input 
+                        type="number" 
+                        min="0"
+                        value={taxRate} 
+                        onChange={(e) => setTaxRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-16 p-1 border border-gray-300 rounded text-right text-sm font-medium bg-white outline-none focus:ring-1 focus:ring-blue-500"
+                     />
+                   </div>
                    <span className="font-medium text-gray-900">${taxAmount.toLocaleString()}</span>
                  </div>
+
                  <div className="flex justify-between items-center text-sm text-gray-600">
                    <span>Shipping ($)</span>
                    <input 
-                      type="number" value={shippingCost} 
-                      onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                      className="w-24 p-1 border border-gray-300 rounded text-right text-sm font-medium bg-white"
+                      type="number" 
+                      min="0"
+                      value={shippingCost} 
+                      onChange={(e) => setShippingCost(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-24 p-1 border border-gray-300 rounded text-right text-sm font-medium bg-white outline-none focus:ring-1 focus:ring-blue-500"
                    />
                  </div>
                  <div className="pt-4 border-t-2 border-gray-200 flex justify-between items-center">
@@ -385,7 +409,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                 <button 
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="flex items-center gap-2 px-8 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md disabled:opacity-70"
+                    className="flex items-center gap-2 px-8 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-colors shadow-md disabled:opacity-70 cursor-pointer"
                 >
                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />}
                    {isSubmitting ? "Submitting..." : "Submit Order"}

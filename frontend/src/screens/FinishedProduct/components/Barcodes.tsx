@@ -1,261 +1,150 @@
 import { 
-  Printer, 
-  Download, 
   Search, 
-  Filter, 
   ScanBarcode, 
-  CheckSquare, 
-  Square,
-  BoxSelect
+  Package, 
+  Loader2,
+  Box
 } from "lucide-react";
-import { useState, useMemo, type JSX } from "react";
-
-const batches = [
-  { id: "BATCH-2025-001", name: "Gaming Laptop X1 - Lot A" },
-  { id: "BATCH-2025-002", name: "Mechanical Keyboard - Lot B" },
-  { id: "BATCH-2025-003", name: "Smart Watch V2 - Lot C" },
-];
-
-const productTypes = ["Electronics", "Accessories", "Wearables"];
-
-const initialItems = [
-  { id: 1, serial: "SN-2025001-001", productId: "PROD-001", productName: "Gaming Laptop X1", type: "Electronics", batchId: "BATCH-2025-001", date: "2025-12-10" },
-  { id: 2, serial: "SN-2025001-002", productId: "PROD-001", productName: "Gaming Laptop X1", type: "Electronics", batchId: "BATCH-2025-001", date: "2025-12-10" },
-  { id: 3, serial: "SN-2025001-003", productId: "PROD-001", productName: "Gaming Laptop X1", type: "Electronics", batchId: "BATCH-2025-001", date: "2025-12-10" },
-  { id: 4, serial: "SN-2025002-001", productId: "PROD-002", productName: "Mechanical Keyboard", type: "Accessories", batchId: "BATCH-2025-002", date: "2025-12-11" },
-  { id: 5, serial: "SN-2025002-002", productId: "PROD-002", productName: "Mechanical Keyboard", type: "Accessories", batchId: "BATCH-2025-002", date: "2025-12-11" },
-  { id: 6, serial: "SN-2025003-001", productId: "PROD-004", productName: "Smart Watch V2", type: "Wearables", batchId: "BATCH-2025-003", date: "2025-12-12" },
-];
+import { useState, useEffect, useMemo, type JSX } from "react";
+import { ProductServices, type Product } from "../../../services/productServices";
+import { GetBarcodeModal } from "./GetBarcodeModal";
 
 export const Barcodes = (): JSX.Element => {
-  const [items, setItems] = useState(initialItems);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  
-  const [filterBatch, setFilterBatch] = useState("All");
-  const [filterType, setFilterType] = useState("All");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const matchBatch = filterBatch === "All" || item.batchId === filterBatch;
-      const matchType = filterType === "All" || item.type === filterType;
-      const matchSearch = 
-        item.serial.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        item.productName.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return matchBatch && matchType && matchSearch;
-    });
-  }, [items, filterBatch, filterType, searchQuery]);
-
-  const toggleSelect = (id: number) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === filteredItems.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredItems.map(i => i.id));
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await ProductServices.getAllProducts();
+      const dataArray = Array.isArray(response) ? response : (response as any).data || [];
+      setProducts(dataArray);
+    } catch (error) {
+      console.error("Failed to load products for barcodes:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handlePrintSelected = () => {
-    if (selectedIds.length === 0) return alert("Please select items to print.");
-    alert(`Sending ${selectedIds.length} labels to printer...`);
-  };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  const handlePrintBatch = () => {
-    if (filterBatch === "All") return alert("Please select a specific Batch first.");
-    alert(`Printing all items in batch ${filterBatch}...`);
-  };
+  // --- Filtering ---
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        product.productName?.toLowerCase().includes(searchLower) || 
+        product.code?.toLowerCase().includes(searchLower) ||
+        (product.category && product.category.toLowerCase().includes(searchLower))
+      );
+    });
+  }, [products, searchQuery]);
 
-  const handleExport = () => {
-    alert("Exporting barcode list to CSV/PDF...");
+  const handleGetBarcode = (id: number) => {
+    setSelectedProductId(id);
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-250px)] min-h-[600px]">
+    <div className="flex flex-col gap-6 pb-12">
       
-      <div className="w-full lg:w-1/4 space-y-6">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
         
-        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-5">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-100">
-                <Filter className="w-4 h-4 text-blue-600" />
-                Filter Options
-            </h3>
-
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Search</label>
-                <div className="relative">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Serial Number or Product Name..." 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
-                    />
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Production Batch</label>
-                <select 
-                    value={filterBatch}
-                    onChange={(e) => setFilterBatch(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-                >
-                    <option value="All">All Batches</option>
-                    {batches.map(b => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Product Type</label>
-                <select 
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-                >
-                    <option value="All">All Types</option>
-                    {productTypes.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100">
-                <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">Visible Items:</span>
-                    <span className="font-bold text-gray-900">{filteredItems.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Selected:</span>
-                    <span className="font-bold text-blue-600">{selectedIds.length}</span>
-                </div>
-            </div>
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-lg">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ScanBarcode className="w-6 h-6 text-blue-600" />
+              Product Barcodes
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Generate and print barcodes for your registered products.</p>
+          </div>
         </div>
 
-        <div className="bg-blue-50 p-5 rounded-lg border border-blue-100 space-y-3">
-            <h3 className="font-bold text-blue-900 text-sm mb-2">Printing Actions</h3>
-            
-            <button 
-                onClick={handlePrintSelected}
-                disabled={selectedIds.length === 0}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-blue-200 text-blue-700 font-medium rounded hover:bg-blue-100 transition-colors shadow-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-                <Printer className="w-4 h-4" /> Print Selected ({selectedIds.length})
-            </button>
+        <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search Product Code, Name or Category..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" 
+              />
+            </div>
+          </div>
+        </div>
 
-            <button 
-                onClick={handlePrintBatch}
-                className="w-full flex items-center justify-center gap-2 
-                px-4 py-2.5 bg-blue-600 text-white font-medium rounded hover:bg-blue-500 
-                transition-colors shadow-md text-sm cursor-pointer"
-            >
-                <BoxSelect className="w-4 h-4" /> Print Entire Batch
-            </button>
-
-            <button 
-                onClick={handleExport}
-                className="w-full flex items-center justify-center gap-2 px-4 
-                py-2.5 bg-white border border-gray-300 text-gray-700 
-                font-medium rounded hover:bg-gray-50 transition-colors text-sm cursor-pointer"
-            >
-                <Download className="w-4 h-4" /> Export List
-            </button>
+        <div className="flex-1 overflow-x-auto min-h-[400px]">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold sticky top-0">
+                <tr>
+                  <th className="p-4 border-b border-gray-200 w-16 text-center">Icon</th>
+                  <th className="p-4 border-b border-gray-200">Product Code</th>
+                  <th className="p-4 border-b border-gray-200">Product Name</th>
+                  <th className="p-4 border-b border-gray-200">Category</th>
+                  <th className="p-4 border-b border-gray-200 text-center">Unit</th>
+                  <th className="p-4 border-b border-gray-200 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm divide-y divide-gray-100">
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map((product) => (
+                    <tr key={product.productId} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 text-center">
+                        <div className="w-8 h-8 rounded bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto">
+                          <Package className="w-4 h-4 text-blue-500" />
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono font-bold text-gray-700">{product.code}</td>
+                      <td className="p-4 font-bold text-gray-900">{product.productName}</td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
+                          {product.category || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center font-medium text-gray-600">
+                        {product.unit}
+                      </td>
+                      <td className="p-4 text-center">
+                        <button 
+                          onClick={() => handleGetBarcode(product.productId)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 font-medium rounded hover:bg-blue-100 transition-colors cursor-pointer border border-blue-200"
+                        >
+                          <ScanBarcode className="w-4 h-4" /> Get Barcode
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-gray-400">
+                      <div className="flex flex-col items-center justify-center">
+                        <Box className="w-8 h-8 mb-2 opacity-20" />
+                        <p>No products found matching your search.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-        
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-lg">
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={handleSelectAll}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                    {selectedIds.length > 0 && selectedIds.length === filteredItems.length ? (
-                        <CheckSquare className="w-5 h-5 text-blue-600" />
-                    ) : (
-                        <Square className="w-5 h-5 text-gray-400" />
-                    )}
-                    Select All Visible
-                </button>
-            </div>
-            <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Preview Mode</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
-            {filteredItems.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredItems.map(item => {
-                        const isSelected = selectedIds.includes(item.id);
-                        return (
-                            <div 
-                                key={item.id}
-                                onClick={() => toggleSelect(item.id)}
-                                className={`
-                                    relative p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md
-                                    ${isSelected ? "border-blue-500 bg-blue-50/30" : "border-gray-200 bg-white hover:border-blue-200"}
-                                `}
-                            >
-                                <div className="absolute top-3 right-3">
-                                    {isSelected ? (
-                                        <CheckSquare className="w-5 h-5 text-blue-600" />
-                                    ) : (
-                                        <Square className="w-5 h-5 text-gray-300" />
-                                    )}
-                                </div>
-
-                                <div className="pr-6">
-                                    <h4 className="font-bold text-gray-900 text-sm truncate">{item.productName}</h4>
-                                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 mb-2">
-                                        {item.type}
-                                    </span>
-                                    
-                                    <div className="h-12 w-full bg-gray-100 my-2 flex items-center justify-center overflow-hidden rounded border border-gray-300">
-                                        <div className="w-[90%] h-[70%] flex gap-[2px] justify-center opacity-70">
-                                             {[...Array(40)].map((_, i) => (
-                                                 <div key={i} className="bg-black h-full" style={{width: Math.random() > 0.5 ? '2px' : '4px'}}></div>
-                                             ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] text-gray-400 uppercase">Serial No.</span>
-                                            <span className="font-mono font-bold text-sm text-gray-800">{item.serial}</span>
-                                        </div>
-                                        <div className="flex justify-between border-t border-gray-100 pt-1 mt-1">
-                                            <div className="text-[10px] text-gray-500">
-                                                ID: <span className="font-medium">{item.productId}</span>
-                                            </div>
-                                            <div className="text-[10px] text-gray-500">
-                                                Batch: <span className="font-medium">{item.batchId.split('-')[1]}-{item.batchId.split('-')[2]}</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-[10px] text-gray-400 text-right">
-                                            Date: {item.date}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
-                    <ScanBarcode className="w-16 h-16 mb-4" />
-                    <p className="text-lg font-medium">No items found matching filter</p>
-                </div>
-            )}
-        </div>
-      </div>
+      <GetBarcodeModal
+        isOpen={selectedProductId !== null}
+        onClose={() => setSelectedProductId(null)}
+        productId={selectedProductId}
+      />
     </div>
   );
 };

@@ -254,11 +254,37 @@ app.use(cors({
 
 ---
 
-## Part 5: Verify Deployment
+## Part 6: Automated CI/CD (GitHub Actions)
+
+We have automated the deployment process. Whenever you push changes to the `main` branch inside the `backend/` folder, GitHub Actions will automatically rebuild the image and deploy it.
+
+### Step 6.1: Configure GitHub Secrets
+
+Go to your GitHub Repository → **Settings → Secrets and variables → Actions** and add the following:
+
+| Secret Name | Value |
+| :--- | :--- |
+| `GCP_PROJECT_ID` | `gen-lang-client-0845792795` |
+| `GCP_SA_KEY` | Your Service Account JSON Key |
+| `DATABASE_URL` | Transaction Pooler URL (Port 6543) |
+| `DIRECT_URL` | Session Pooler URL (Port 5432) |
+| `JWT_SECRET` | Your private signing key |
+| `CONTAINER_PORT` | `3000` |
+
+### Step 6.2: How it works
+
+1. **Trigger**: Push to `main` branch (path: `backend/**`).
+2. **Build**: GitHub builds a new Docker image from your `backend/Dockerfile`.
+3. **Artifact Registry**: The image is pushed to `us-central1-docker.pkg.dev` (the modern, non-deprecated registry).
+4. **Cloud Run**: The service is updated to the new image revision with zero downtime.
+
+---
+
+## Part 7: Verify Deployment
 
 ### Checklist
 
-- [ ] Cloud Run backend responds: `https://your-backend.run.app/api-docs`
+- [ ] Cloud Run backend responds: `https://mes-mini-backend-433210406598.us-central1.run.app/api-docs/`
 - [ ] Supabase database connected: Check Cloud Run logs
 - [ ] Frontend loads: `https://mes-mini.pages.dev`
 - [ ] API calls work: Try login/signup on frontend
@@ -267,42 +293,4 @@ app.use(cors({
 
 | Issue | Solution |
 |-------|----------|
-| CORS errors | Update `server.js` with correct origins |
-| Database connection timeout | Check `DATABASE_URL` uses port 6543 |
-| Prisma errors | Run `npx prisma migrate deploy` locally first |
 | Cold start slow (~5s) | Normal for scale-to-zero; set min instances to 1 if needed |
-
----
-
-## Cost Monitoring
-
-1. Go to [GCP Billing → Budgets & Alerts](https://console.cloud.google.com/billing/budgets)
-2. Create budget: $1/month
-3. Set alert at 50%, 90%, 100%
-
----
-
-## Comparison: Current vs. Cloud Run Setup
-
-| Aspect | Tailscale Funnel (Current) | Cloud Run + Supabase |
-|--------|---------------------------|----------------------|
-| **Cost** | $0 | $0 |
-| **Uptime** | Laptop must run | 24/7 auto |
-| **Cold start** | None | ~2-5s after idle |
-| **Database** | Local Docker | Supabase cloud |
-| **Scaling** | Manual | Auto (0→N instances) |
-| **Setup effort** | Easy | Medium |
-
----
-
-## When to Use This Setup
-
-✅ **Use Cloud Run + Supabase when:**
-- You need 24/7 availability
-- You want automatic scaling
-- You're okay with occasional cold starts
-
-❌ **Stick with Tailscale Funnel when:**
-- Just developing/testing
-- Don't want data in cloud
-- Need instant response (no cold starts)

@@ -1,7 +1,6 @@
 import { 
   Cpu, 
   AlertTriangle, 
-  TrendingUp, 
   Search, 
   Filter, 
   Plus, 
@@ -12,9 +11,11 @@ import {
   Trash2
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
-import { AddComponentModal } from "./AddComponentModel";
+import { AddComponentModal } from "./AddComponentModal";
 import { componentService, type Component } from "../../../services/componentServices";
-
+import { InventoryServices } from "../../../services/inventoryServices";
+import { DeleteComponentModal } from "./DeleteComponentModal";
+import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
 
 export const ComponentInformation = (): JSX.Element => {
   const [components, setComponents] = useState<Component[]>([]);
@@ -24,12 +25,28 @@ export const ComponentInformation = (): JSX.Element => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const [componentToDelete, setComponentToDelete] = useState<{id: number, name: string} | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await componentService.getAllComponents(searchTerm);
-      setComponents(response.data);
+      const [compResponse, invResponse] = await Promise.all([
+        componentService.getAllComponents(searchTerm),
+        InventoryServices.getInventoryReport(),
+      ])
+      const compData = Array.isArray(compResponse) ? compResponse : (compResponse as any).data || [];
+      const invData = Array.isArray(invResponse) ? invResponse : (invResponse as any).data || [];
+
+      const mergedComponents = compData.map((comp: Component) => {
+        const stockInfo = invData.find((inv: any) => inv.componentId === comp.componentId);
+        return {
+          ...comp,
+          currentStock: stockInfo ? stockInfo.availableQuantity : 0 
+        };
+      });
+
+      setComponents(mergedComponents);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
@@ -54,15 +71,8 @@ export const ComponentInformation = (): JSX.Element => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this component?")) {
-      try {
-        await componentService.deleteComponent(id);
-        fetchComponents();
-      } catch (error) {
-        alert("Failed to delete component. It might be used in existing orders.");
-      }
-    }
+  const handleDelete = (id: number, name: string) => {
+    setComponentToDelete({ id, name });
   };
 
   const handleSaveSuccess = () => {
@@ -71,7 +81,6 @@ export const ComponentInformation = (): JSX.Element => {
 
   const activeCount = components.length; 
   const lowStockCount = components.filter(c => (c.currentStock || 0) < c.minStockLevel).length;
-  const topSupplier = "Intel Corporation";
 
   return (
     <div className="space-y-8 pb-12">
@@ -103,17 +112,6 @@ export const ComponentInformation = (): JSX.Element => {
             </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-             <div className="flex justify-between items-start mb-2">
-                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Top Supplier</p>
-                 <TrendingUp className="w-4 h-4 text-green-500" />
-             </div>
-             <h3 className="text-lg font-bold text-gray-900">{topSupplier}</h3>
-             <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
-                 <div className="bg-blue-600 h-1.5 rounded-full" style={{width: '75%'}}></div>
-             </div>
-             <p className="text-xs text-gray-400 mt-2">Based on purchase volume</p>
-        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -170,7 +168,7 @@ export const ComponentInformation = (): JSX.Element => {
                             <th className="p-4">Component Name</th>
                             <th className="p-4">Unit</th>
                             <th className="p-4 text-right">Standard Cost</th>
-                            <th className="p-4 text-center">Stock / Min</th>
+                            <th className="p-4 text-center">Available / Min</th>
                             <th className="p-4 text-center">Status</th>
                             <th className="p-4 text-center">Actions</th>
                         </tr>
@@ -228,7 +226,7 @@ export const ComponentInformation = (): JSX.Element => {
                                             <Edit className="w-4 h-4" />
                                         </button>
                                         <button 
-                                            onClick={() => handleDelete(item.componentId)}
+                                            onClick={() => handleDelete(item.componentId, item.componentName)}
                                             className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete Component"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -249,6 +247,21 @@ export const ComponentInformation = (): JSX.Element => {
         initialData={selectedComponent}
         onConfirm={handleSaveSuccess} 
       />
+
+      <DeleteComponentModal
+        isOpen={componentToDelete !== null}
+        onClose={() => setComponentToDelete(null)}
+        componentId={componentToDelete?.id || null}
+        componentName={componentToDelete?.name || ""}
+        onSuccess={() => {
+            setShowSuccess(true);
+            fetchComponents();
+            setComponentToDelete(null);
+            setTimeout(() => setShowSuccess(false), 3000);
+        }}
+      />
+
+      <SuccessNotification isVisible={showSuccess}/>
     </div>
   );
 };

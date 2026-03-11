@@ -1,0 +1,61 @@
+name: Cloud Run Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE: mes-mini-backend
+  REGION: us-central1
+  REPO_NAME: mes-mini-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read' # id-token: 'write' removed since we use JSON keys
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      - name: Build and Push Container
+        run: |
+          cd backend
+          docker build \
+            -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:${{ github.sha }} \
+            -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:latest .
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:${{ github.sha }}
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:${{ github.sha }}
+          # Equivalent to --allow-unauthenticated
+          flags: '--allow-unauthenticated'
+          # Passing all the secrets we set in Github to our Cloud Run service
+          env_vars: |
+             NODE_ENV=production
+             DATABASE_URL=${{ secrets.DATABASE_URL }}
+             DIRECT_URL=${{ secrets.DIRECT_URL }}
+             JWT_SECRET=${{ secrets.JWT_SECRET }}
+             CONTAINER_PORT=${{ secrets.CONTAINER_PORT }}

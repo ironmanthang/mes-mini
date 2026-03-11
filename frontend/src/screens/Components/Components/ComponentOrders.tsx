@@ -6,11 +6,13 @@ import {
   CheckCircle, 
   RefreshCw,
   Loader2,
-  FileText
+  FileText,
+  Edit
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
 import { purchaseOrderService, type PurchaseOrder } from "../../../services/purchaseOrderServices";
+import { UpdateOrderModal } from "./UpdateOrderModal";
 
 export const ComponentOrders = (): JSX.Element => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -20,6 +22,7 @@ export const ComponentOrders = (): JSX.Element => {
   
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -48,6 +51,10 @@ export const ComponentOrders = (): JSX.Element => {
     }
   };
 
+  const handleUpdate = (id: number) => {
+    setSelectedUpdateId(id);
+  }
+
   const handleApprove = async (id: number) => {
     if (window.confirm("Are you sure you want to approve this order?")) {
       try {
@@ -61,6 +68,27 @@ export const ComponentOrders = (): JSX.Element => {
     }
   };
 
+  const checkApprove = (id: number) => {
+    const userStr = localStorage.getItem("user");
+    
+    if (!userStr) {
+      alert("User not found!");
+      return;
+    }
+
+    const user = JSON.parse(userStr);
+
+    const hasPermission = user.roles.some(
+      (role: { roleId: number; roleName: string }) => role.roleName === "Production Manager"
+    );
+
+    if (hasPermission) {
+      handleApprove(id);
+    } else {
+      alert("Not aprrove");
+    }
+  }
+
   const handleUpdateStatus = async (_id: number, newStatus: string) => {
     alert(`Change status to ${newStatus}: Feature is pending Backend API support.`);
   };
@@ -72,7 +100,7 @@ export const ComponentOrders = (): JSX.Element => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'PENDING_APPROVAL': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'APPROVED': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'RECEIVED': return 'bg-green-50 text-green-700 border-green-200';
       case 'CANCELLED': return 'bg-red-50 text-red-700 border-red-200';
@@ -117,7 +145,7 @@ export const ComponentOrders = (): JSX.Element => {
               className="bg-transparent text-sm p-1 outline-none text-gray-700 font-medium cursor-pointer"
             >
               <option value="All">All Status</option>
-              <option value="PENDING">Pending</option>
+              <option value="PENDING_APPROVAL">Pending Approval</option>
               <option value="APPROVED">Approved</option>
               <option value="RECEIVED">Received</option>
               <option value="CANCELLED">Cancelled</option>
@@ -168,16 +196,26 @@ export const ComponentOrders = (): JSX.Element => {
                     <td className="p-4 flex items-center justify-center gap-2">
                       <button 
                         onClick={() => handleViewDetails(order.purchaseOrderId)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" 
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       
-                      {order.status === 'PENDING' && (
+                      {(order.status === "DRAFT" || order.status === "PENDING_APPROVAL") && (
                         <button 
-                            onClick={() => handleApprove(order.purchaseOrderId)}
-                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" 
+                          onClick={() => handleUpdate(order.purchaseOrderId)}
+                          className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
+                          title="Update Product"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      
+                      {order.status === 'PENDING_APPROVAL' && (
+                        <button 
+                            onClick={() => checkApprove(order.purchaseOrderId)}
+                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
                             title="Approve Order"
                         >
                             <CheckCircle className="w-4 h-4" />
@@ -187,7 +225,7 @@ export const ComponentOrders = (): JSX.Element => {
                       {order.status === 'APPROVED' && (
                         <button 
                             onClick={() => handleUpdateStatus(order.purchaseOrderId, "RECEIVED")}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" 
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
                             title="Mark as Received"
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -220,6 +258,13 @@ export const ComponentOrders = (): JSX.Element => {
             onUpdateStatus={() => handleUpdateStatus(selectedOrder.purchaseOrderId, "RECEIVED")}
           />
         )}
+
+        <UpdateOrderModal
+          isOpen={selectedUpdateId !== null}
+          onClose={() => setSelectedUpdateId(null)}
+          orderId={selectedUpdateId}
+          onSuccess={() => fetchOrders()}
+      />
     </div>
   );
 };

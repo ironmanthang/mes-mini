@@ -1,7 +1,7 @@
 import { 
   X, CheckCircle, RefreshCw, Printer, User, Package
 } from "lucide-react";
-import { type JSX } from "react";
+import { useEffect, type JSX } from "react";
 import type { PurchaseOrder } from "../../../services/purchaseOrderServices";
 
 interface OrderDetailModalProps {
@@ -19,7 +19,8 @@ export const OrderDetailModal = ({
   onApprove, 
   onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
-  
+
+
   if (!isOpen || !order) return null;
 
   const formatDate = (dateString?: string) => {
@@ -33,7 +34,7 @@ export const OrderDetailModal = ({
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "PENDING": return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "PENDING_APPROVAL": return "bg-yellow-100 text-yellow-700 border-yellow-200";
       case "APPROVED": return "bg-blue-100 text-blue-700 border-blue-200";
       case "RECEIVED": return "bg-green-100 text-green-700 border-green-200";
       case "CANCELLED": return "bg-red-100 text-red-700 border-red-200";
@@ -139,10 +140,7 @@ export const OrderDetailModal = ({
                                       return (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="p-3 font-medium text-gray-900">
-                                                {detail.componentName || `Item #${detail.componentId}`}
-                                                <div className="text-xs text-gray-400 font-normal">
-                                                    {detail.code}
-                                                </div>
+                                                {detail.component.componentName || `Item #${detail.componentId}`}
                                             </td>
                                             <td className="p-3 text-right">{qty}</td>
                                             <td className="p-3 text-right">{price.toLocaleString('vi-VN')}</td>
@@ -182,7 +180,7 @@ export const OrderDetailModal = ({
             <Printer className="w-4 h-4" /> Print
           </button>
           
-          {order.status === 'PENDING' && (
+          {order.status === 'PENDING_APPROVAL' && (
             <button 
               onClick={onApprove}
               className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
