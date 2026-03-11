@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductionRequestServices, type ProductionRequest } from "../../../services/productionRequestServices";
-import { ProductionLineServices, type ProductionLine } from "../../../services/productionLineServices"; // THÊM IMPORT API
+import { ProductionLineServices, type ProductionLine } from "../../../services/productionLineServices";
+import { ConfirmCreateWOModal } from "./ConfirmCreateWOModal";
+import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
 
 export const CreateWorkOrder = (): JSX.Element => {
   const [approvedRequests, setApprovedRequests] = useState<ProductionRequest[]>([]);
@@ -22,6 +24,8 @@ export const CreateWorkOrder = (): JSX.Element => {
 
   const [selectedRequestId, setSelectedRequestId] = useState<number | "">("");
   const [selectedLineId, setSelectedLineId] = useState<number | "">("");
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const fetchApprovedRequests = async () => {
     setIsLoadingRequests(true);
@@ -55,13 +59,9 @@ export const CreateWorkOrder = (): JSX.Element => {
   }, []);
 
   const selectedRequest = approvedRequests.find(r => r.productionRequestId === selectedRequestId);
+  const selectedLine = productionLines.find(l => l.productionLineId === selectedLineId);
 
-  const handleCreateWorkOrder = async () => {
-    if (!selectedRequestId || !selectedLineId) {
-      alert("Please select both a Production Request and a Production Line.");
-      return;
-    }
-
+  const executeCreateWorkOrder = async () => {
     setIsSubmitting(true);
     try {
       await ProductionRequestServices.convertToWorkOrder(
@@ -70,16 +70,27 @@ export const CreateWorkOrder = (): JSX.Element => {
       );
       
       alert("✅ Work Order Created Successfully!");
+      setShowSuccess(true);
       setSelectedRequestId("");
       setSelectedLineId("");
+      setIsConfirmModalOpen(false);
       fetchApprovedRequests();
       fetchProductionLines();
+      setTimeout(() => setShowSuccess(false), 3000);
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to create Work Order.";
       alert(msg);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleOpenConfirmModal = () => {
+    if (!selectedRequestId || !selectedLineId) {
+      alert("Please select both a Production Request and a Production Line.");
+      return;
+    }
+    setIsConfirmModalOpen(true);
   };
 
   return (
@@ -184,7 +195,7 @@ export const CreateWorkOrder = (): JSX.Element => {
                 {/* Nút Submit */}
                 <div className="pt-4 border-t border-gray-100">
                     <button
-                        onClick={handleCreateWorkOrder}
+                        onClick={handleOpenConfirmModal}
                         disabled={isSubmitting || !selectedRequestId || !selectedLineId}
                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#2EE59D] text-white font-bold rounded-lg hover:bg-[#25D390] transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     >
@@ -257,6 +268,21 @@ export const CreateWorkOrder = (): JSX.Element => {
           </div>
 
       </div>
+
+      <ConfirmCreateWOModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={executeCreateWorkOrder}
+        isSubmitting={isSubmitting}
+        requestDetails={selectedRequest ? {
+            code: selectedRequest.code,
+            productName: selectedRequest.product?.productName || "Unknown Product",
+            quantity: selectedRequest.quantity
+        } : null}
+        lineName={selectedLine?.lineName || "Unknown Line"}
+      />
+
+      <SuccessNotification isVisible={showSuccess}/>
     </div>
   );
 };
