@@ -31,6 +31,7 @@ export const CreateWorkOrder = (): JSX.Element => {
     setIsLoadingRequests(true);
     try {
       const response = await ProductionRequestServices.getAllProductionRequests({ status: 'APPROVED' });
+      //@ts-expect-error have data
       const data = Array.isArray(response) ? response : response.data || [];
       setApprovedRequests(data);
     } catch (error) {

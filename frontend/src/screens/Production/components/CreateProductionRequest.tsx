@@ -31,6 +31,7 @@ export const CreateProductionRequest = (): JSX.Element => {
     setIsLoading(true);
     try {
       const response = await ProductionRequestServices.getAllProductionRequests();
+      //@ts-expect-error have data
       const dataArray = Array.isArray(response) ? response : response.data || [];
       setRequests(dataArray);
     } catch (error) {

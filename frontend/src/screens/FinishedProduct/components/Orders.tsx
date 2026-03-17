@@ -2,9 +2,7 @@ import {
   Search, 
   Filter, 
   Plus, 
-  Eye,
-  FileText,
-  PlayCircle
+  Eye
 } from "lucide-react";
 import { useState, useMemo, type JSX, useEffect } from "react";
 import { NewSalesOrderModal } from "./NewSalesOrderModal";
@@ -22,6 +20,7 @@ export const Orders = (): JSX.Element => {
   const fetchSalesOrders = async () => {
     try {
         const response = await SalesOrdersServices.getAllSalesOrders();
+        //@ts-expect-error have data
         setOrders(response.data);
     } catch (error) {
         console.error("Failed to get sales order: ", error);

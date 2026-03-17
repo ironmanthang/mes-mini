@@ -156,11 +156,7 @@ export const CreateComponentOrder = (): JSX.Element => {
       setSupplierInfo(null);
 
     } catch (error) {
-<<<<<<< HEAD
-      console.log("Failed to create order: ", error);
-=======
       console.error("Failed to handle submit:", error);
->>>>>>> 9eb9066ee9df47a316f08909ace9d2c9a3064e25
     } finally {
       setIsSubmitting(false);
     }

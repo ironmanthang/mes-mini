@@ -12,7 +12,7 @@ export interface ProductionRequest {
     createdAt: string;
     updatedAt: string;
     code: string;
-    soDetailId: number;
+    soDetailId: number | null;
     priority: PRPriority;
     status: PRStatus;
     dueDate: string | null;

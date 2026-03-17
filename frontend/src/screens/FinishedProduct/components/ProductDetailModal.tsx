@@ -1,4 +1,4 @@
-import { X, Package, Calendar, Tag, Barcode, Loader2 } from "lucide-react";
+import { X, Package, Calendar, Tag, Loader2 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductServices, type Product } from "../../../services/productServices";
 

@@ -28,6 +28,7 @@ export const ComponentOrders = (): JSX.Element => {
     setIsLoading(true);
     try {
       const response = await purchaseOrderService.getAllPOs();
+      //@ts-expect-error have data
       setOrders(response.data);
     } catch (error) {
       console.error("Failed to fetch POs:", error);

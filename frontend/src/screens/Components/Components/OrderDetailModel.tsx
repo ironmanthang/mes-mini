@@ -1,7 +1,7 @@
 import { 
   X, CheckCircle, RefreshCw, Printer, User, Package
 } from "lucide-react";
-import { useEffect, type JSX } from "react";
+import { type JSX } from "react";
 import type { PurchaseOrder } from "../../../services/purchaseOrderServices";
 
 interface OrderDetailModalProps {
@@ -76,10 +76,6 @@ export const OrderDetailModal = ({
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Email:</span> 
                                 <span className="font-medium text-gray-900">{order.supplier?.email || "N/A"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-500">Phone:</span> 
-                                <span className="font-medium text-gray-900">{order.supplier?.phone || "N/A"}</span>
                             </div>
                         </div>
                     </div>
@@ -163,10 +159,6 @@ export const OrderDetailModal = ({
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600 grid grid-cols-2 gap-4">
-                    <div>
-                        <span className="block font-bold text-gray-700 text-xs uppercase mb-1">Note</span>
-                        {order.note || "No notes provided."}
-                    </div>
                     <div className="space-y-1">
                         <p><span className="font-bold text-gray-700">Payment Terms:</span> {order.paymentTerms || "N/A"}</p>
                         <p><span className="font-bold text-gray-700">Delivery Terms:</span> {order.deliveryTerms || "N/A"}</p>

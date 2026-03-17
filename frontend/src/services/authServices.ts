@@ -37,6 +37,8 @@ export const authService = {
     if (response.data.token) {
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
+      const roleName = response.data.user.roles.map(r => r.roleName);
+      localStorage.setItem("userRole", JSON.stringify(roleName));
     }
     return response.data;
   },
@@ -63,5 +65,6 @@ export const authService = {
   logout: () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("userRole");
   },
 };

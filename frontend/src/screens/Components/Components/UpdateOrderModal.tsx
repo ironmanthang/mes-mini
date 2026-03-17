@@ -16,7 +16,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
   const [deliveryTerms, setDeliveryTerms] = useState("FOB - Free On Board");
-  const [note, setNote] = useState("");
   const [status, setStatus] = useState<'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED'>('DRAFT');
 
   const [isLoading, setIsLoading] = useState(false);
@@ -29,12 +28,11 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
         .then((data) => {
           const dateStr = data.expectedDeliveryDate ? data.expectedDeliveryDate.split('T')[0] : "";
           setExpectedDeliveryDate(dateStr);
-          setDiscount(data.discount || 0);
-          setTax(data.tax || 0);
-          setShippingCost(data.shippingCost || 0);
+          setDiscount(Number(data.discount) || 0);
+          setTax(Number(data.tax) || 0);
+          setShippingCost(Number(data.shippingCost) || 0);
           setPaymentTerms(data.paymentTerms || "Net 30");
           setDeliveryTerms(data.deliveryTerms || "FOB - Free On Board");
-          setNote(data.note || "");
           
           if (['DRAFT', 'PENDING_APPROVAL', 'CANCELLED'].includes(data.status)) {
               setStatus(data.status as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED');
@@ -57,7 +55,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
         shippingCost,
         paymentTerms,
         deliveryTerms,
-        note,
         status
       };
 
@@ -187,17 +184,6 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                         <option value="EXW - Ex Works">EXW - Ex Works</option>
                     </select>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Ghi chú (Note)</label>
-                  <textarea 
-                      rows={2} 
-                      value={note} 
-                      onChange={e => setNote(e.target.value)}
-                      disabled={isSubmitting}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none" 
-                  />
               </div>
             </>
           )}

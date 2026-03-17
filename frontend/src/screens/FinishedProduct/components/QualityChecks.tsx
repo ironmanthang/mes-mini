@@ -32,7 +32,7 @@ export const QualityChecks = (): JSX.Element => {
   
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
-  const [finalDecision, setFinalDecision] = useState<"PASS" | "FAIL" | null>(null);
+  const [, setFinalDecision] = useState<"PASS" | "FAIL" | null>(null);
 
   
   const handleSelectItem = (item: any) => {

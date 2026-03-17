@@ -35,14 +35,15 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
   useEffect(() => {
     if (isOpen) {
       AgentServices.getAllAgents()
+      //@ts-expect-error have data
         .then(response => setAgentsList(response.data))
         .catch(err => console.error("Failed to load agents", err));
       
       ProductServices.getAllProducts()
+      //@ts-expect-error have data
         .then(response => setProductList(response.data))
         .catch(err => console.error("Failed to load products", err));
     } else {
-        // Reset form khi đóng modal
         setAgentId("");
         setExpectedShipDate("");
         setRows([{ productId: 0, quantity: 1, salePrice: 0 }]);
