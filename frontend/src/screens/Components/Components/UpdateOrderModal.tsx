@@ -60,11 +60,11 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
 
       await purchaseOrderService.updatePO(orderId, payload);
       
-      alert("✅ Cập nhật Purchase Order thành công!");
+      alert("✅ Purchase Order updated successfully!");
       onSuccess(); 
       onClose();   
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Lỗi khi cập nhật Purchase Order.";
+      const msg = error.response?.data?.message || "Error updating Purchase Order.";
       alert(msg);
     } finally {
       setIsSubmitting(false);
@@ -81,11 +81,12 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Edit className="w-5 h-5 text-blue-600" /> Cập nhật Purchase Order
+              <Edit className="w-5 h-5 text-blue-600" /> Update Purchase Order
             </h2>
             <p className="text-sm font-mono text-gray-500 mt-1">Order ID: {orderId}</p>
           </div>
-          <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 transition-colors">
+          <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-full 
+          hover:bg-gray-200 text-gray-400 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -100,7 +101,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Trạng thái</label>
+                    <label className="text-sm font-bold text-gray-700">Status</label>
                     <select 
                         value={status} 
                         onChange={e => setStatus(e.target.value as 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED')}
@@ -114,7 +115,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Ngày dự kiến giao</label>
+                    <label className="text-sm font-bold text-gray-700">Expected Delivery Date</label>
                     <input 
                         type="date" 
                         value={expectedDeliveryDate} 
@@ -127,7 +128,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Chiết khấu ($)</label>
+                    <label className="text-sm font-bold text-gray-700">Discount ($)</label>
                     <input 
                         type="number" min="0"
                         value={discount} 
@@ -137,7 +138,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                     />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Thuế ($)</label>
+                    <label className="text-sm font-bold text-gray-700">Tax ($)</label>
                     <input 
                         type="number" min="0"
                         value={tax} 
@@ -147,7 +148,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                     />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Vận chuyển ($)</label>
+                    <label className="text-sm font-bold text-gray-700">Shipping Cost ($)</label>
                     <input 
                         type="number" min="0"
                         value={shippingCost} 
@@ -160,7 +161,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Điều khoản TT (Payment)</label>
+                    <label className="text-sm font-bold text-gray-700">Payment Terms</label>
                     <select 
                         value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)}
                         disabled={isSubmitting}
@@ -173,14 +174,14 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Điều khoản GH (Delivery)</label>
+                    <label className="text-sm font-bold text-gray-700">Delivery Terms</label>
                     <select 
                         value={deliveryTerms} onChange={e => setDeliveryTerms(e.target.value)}
                         disabled={isSubmitting}
                         className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
                         <option value="FOB - Free On Board">FOB - Free On Board</option>
-                        <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance...</option>
+                        <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
                         <option value="EXW - Ex Works">EXW - Ex Works</option>
                     </select>
                 </div>
@@ -196,7 +197,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
             disabled={isSubmitting || isLoading} 
             className="px-5 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            Cancel
           </button>
           <button 
             onClick={handleSubmit} 
@@ -204,7 +205,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
             className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} 
-            {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+            {isSubmitting ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>

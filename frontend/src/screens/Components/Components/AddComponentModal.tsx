@@ -1,12 +1,12 @@
 import { X, Save, Package, DollarSign, Loader2, AlertCircle } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
-import { componentService, type CreateComponentRequest } from "../../../services/componentServices";
+import { componentService, type Component, type CreateComponentRequest } from "../../../services/componentServices";
 
 interface AddComponentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  initialData?: any;
+  initialData?: Component | null;
 }
 
 export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: AddComponentModalProps): JSX.Element | null => {
@@ -31,10 +31,10 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
       if (initialData) {
         setFormData({
           code: initialData.code || "",
-          componentName: initialData.componentName || initialData.name || "",
+          componentName: initialData.componentName || "",
           unit: initialData.unit || "pcs",
-          minStockLevel: initialData.minStockLevel || initialData.minStock || 0,
-          standardCost: initialData.standardCost || initialData.cost || 0,
+          minStockLevel: initialData.minStockLevel || 0,
+          standardCost: initialData.standardCost || 0,
           description: initialData.description || "",
         });
       } else {
@@ -206,14 +206,18 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 bg-white border border-gray-300 
+              text-gray-700 font-medium rounded-lg hover:bg-gray-100 
+              transition-colors disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isLoading}
-              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 
+              text-white font-medium rounded-lg hover:bg-blue-500 
+              transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {isLoading ? "Saving..." : buttonLabel}

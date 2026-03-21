@@ -76,7 +76,8 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
             </h2>
             <p className="text-sm font-mono text-gray-500 mt-1">ID: {productId}</p>
           </div>
-          <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 transition-colors">
+          <button onClick={onClose} disabled={isSubmitting} className="p-1 
+          rounded-full hover:bg-gray-200 text-gray-400 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>

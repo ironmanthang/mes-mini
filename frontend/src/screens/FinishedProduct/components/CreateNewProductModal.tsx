@@ -14,7 +14,6 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
   const [unit, setUnit] = useState("pcs");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form mỗi khi mở lại
   useEffect(() => {
     if (isOpen) {
       setCode("");
@@ -59,7 +58,8 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Package className="w-5 h-5 text-blue-600" /> New Product
           </h2>
-          <button onClick={onClose} disabled={isSubmitting} className="p-1 rounded-full hover:bg-gray-200 text-gray-400 transition-colors">
+          <button onClick={onClose} disabled={isSubmitting} className="p-1 
+          rounded-full hover:bg-gray-200 text-gray-400 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>

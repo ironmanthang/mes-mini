@@ -6,7 +6,6 @@ import {
   Plus, 
   Edit, 
   History, 
-  BarChart,
   Loader2,
   Trash2
 } from "lucide-react";
@@ -148,7 +147,9 @@ export const ComponentInformation = (): JSX.Element => {
                 </button>
                 <button 
                     onClick={handleOpenAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm"
+                    className="flex items-center gap-2 px-4 
+                    py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 
+                    transition-colors text-sm font-medium shadow-sm cursor-pointer"
                 >
                     <Plus className="w-4 h-4" /> Add Component
                 </button>
@@ -216,18 +217,17 @@ export const ComponentInformation = (): JSX.Element => {
                                         </span>
                                     </td>
                                     <td className="p-4 flex items-center justify-center gap-2">
-                                        <button className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="View Stock Details">
-                                            <BarChart className="w-4 h-4" />
-                                        </button>
                                         <button 
                                             onClick={() => handleOpenEdit(item)}
-                                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded" title="Edit Component"
+                                            className="p-1.5 text-gray-500 
+                                            hover:text-gray-900 hover:bg-gray-100 rounded cursor-pointer" title="Edit Component"
                                         >
                                             <Edit className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleDelete(item.componentId, item.componentName)}
-                                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete Component"
+                                            className="p-1.5 text-gray-500 
+                                            hover:text-red-600 hover:bg-red-50 rounded cursor-pointer" title="Delete Component"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>

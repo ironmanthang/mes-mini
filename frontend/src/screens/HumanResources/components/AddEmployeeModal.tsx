@@ -28,46 +28,93 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   const [error, setError] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
 
+  // --- Address States ---
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [wards, setWards] = useState<any[]>([]);
+
+  const [selectedProvince, setSelectedProvince] = useState<{code: number, name: string} | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<{code: number, name: string} | null>(null);
+  const [selectedWard, setSelectedWard] = useState<{code: number, name: string} | null>(null);
+  const [street, setStreet] = useState("");
+
   useEffect(() => {
-    const fetchRoles = async () => {
+    const fetchData = async () => {
       try {
-        const data = await roleService.getAllRoles();
-        setRoles(data);
-        if (data.length > 0 && formData.roleIds.length === 0) {
-            setFormData(prev => ({ ...prev, roleIds: [data[0].roleId] }));
+        const roleData = await roleService.getAllRoles();
+        setRoles(roleData);
+        if (roleData.length > 0 && formData.roleIds.length === 0) {
+            setFormData(prev => ({ ...prev, roleIds: [roleData[0].roleId] }));
         }
       } catch (error) {
         console.error("Failed to fetch roles", error);
       }
+
+      try {
+        const res = await fetch("https://provinces.open-api.vn/api/?depth=3");
+        const provData = await res.json();
+        setProvinces(provData);
+      } catch (error) {
+        console.error("Failed to fetch provinces API", error);
+      }
     };
+
     if (isOpen) {
-        fetchRoles();
+        fetchData();
     }
   }, [isOpen]);
-  
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  useEffect(() => {
+    if (selectedProvince) {
+      const prov = provinces.find(p => p.code === selectedProvince.code);
+      setDistricts(prov?.districts || []);
+      setSelectedDistrict(null);
+      setWards([]);
+      setSelectedWard(null);
+    } else {
+      setDistricts([]);
+    }
+  }, [selectedProvince, provinces]);
+
+  useEffect(() => {
+    if (selectedDistrict) {
+      const dist = districts.find(d => d.code === selectedDistrict.code);
+      setWards(dist?.wards || []);
+      setSelectedWard(null);
+    } else {
+      setWards([]);
+    }
+  }, [selectedDistrict, districts]);
+
+  useEffect(() => {
+    const parts = [
+      street.trim(),
+      selectedWard?.name,
+      selectedDistrict?.name,
+      selectedProvince?.name
+    ].filter(Boolean);
+
+    setFormData(prev => ({ ...prev, address: parts.join(", ") }));
+  }, [street, selectedWard, selectedDistrict, selectedProvince]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedRoleId = Number(e.target.value);
-    setFormData(prev => ({
-        ...prev,
-        roleIds: [selectedRoleId]
-    }));
+    setFormData(prev => ({ ...prev, roleIds: [selectedRoleId] }));
   };
 
   const handleAdd = async () => {
-    // Validate cơ bản
     if (!formData.fullName || !formData.username || !formData.password || !formData.email) {
-      setError("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
+      setError("Please fill in all required fields (*)");
       return;
     }
 
     if (formData.roleIds.length === 0) {
-        setError("Vui lòng chọn vai trò cho nhân viên.");
+        setError("Please select a role for the employee.");
         return;
     }
 
@@ -80,6 +127,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       onConfirm(); 
       onClose();  
       
+      // Reset States
       setFormData({
         fullName: "", username: "", password: "", email: "", 
         phoneNumber: "", address: "", dateOfBirth: "", 
@@ -87,9 +135,13 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
         roleIds: roles.length > 0 ? [roles[0].roleId] : [], 
         status: "ACTIVE"
       });
+      setStreet("");
+      setSelectedProvince(null);
+      setSelectedDistrict(null);
+      setSelectedWard(null);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || "Lỗi khi tạo nhân viên.");
+      setError(err.response?.data?.message || "Error creating employee.");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +154,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       <div className="bg-white w-[700px] rounded-lg shadow-xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
         
         <div className="relative p-6 text-center border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">THÊM THÔNG TIN NHÂN VIÊN</h2>
+          <h2 className="text-xl font-bold text-gray-900">ADD EMPLOYEE</h2>
           <button onClick={onClose} className="absolute right-4 top-4 p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
@@ -118,33 +170,33 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Họ và Tên<span className="text-red-500">*</span></label>
-                <input name="fullName" value={formData.fullName} onChange={handleChange} type="text" placeholder="Nguyễn Văn A" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
+                <label className="text-sm font-bold text-gray-800">Full Name<span className="text-red-500">*</span></label>
+                <input name="fullName" value={formData.fullName} onChange={handleChange} type="text" placeholder="John Doe" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-800">Email<span className="text-red-500">*</span></label>
                 <input name="email" value={formData.email} onChange={handleChange} type="email" placeholder="user@example.com" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Tên đăng nhập<span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Username<span className="text-red-500">*</span></label>
                 <input name="username" value={formData.username} onChange={handleChange} type="text" placeholder="user123" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Mật khẩu<span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Password<span className="text-red-500">*</span></label>
                 <input name="password" value={formData.password} onChange={handleChange} type="password" placeholder="••••••" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Vai trò<span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Role<span className="text-red-500">*</span></label>
                 <select 
                   name="roleIds"
                   value={formData.roleIds[0] || ""}
                   onChange={handleRoleChange}
                   className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer"
                 >
-                  <option value="">-- Chọn vai trò --</option>
+                  <option value="">-- Select a role --</option>
                   {roles.map((role) => (
                     <option key={role.roleId} value={role.roleId}>
                       {role.roleName}
@@ -154,24 +206,80 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Ngày sinh</label>
+                <label className="text-sm font-bold text-gray-800">Date of Birth</label>
                 <input name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Ngày vào làm<span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Hire Date<span className="text-red-500">*</span></label>
                 <input name="hireDate" value={formData.hireDate} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Số điện thoại</label>
-                <input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} type="text" placeholder="0901234567" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
+                <label className="text-sm font-bold text-gray-800">Phone Number</label>
+                <input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} type="text" placeholder="1234567890" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
             </div>
           </div>
           
-          <div className="mt-4 space-y-2">
-            <label className="text-sm font-bold text-gray-800">Địa chỉ</label>
-            <textarea name="address" value={formData.address} onChange={handleChange} rows={3} placeholder="123 Đường, Quận..." className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none resize-none" />
+          <div className="mt-6 space-y-3">
+            <label className="text-sm font-bold text-gray-800">Address Details</label>
+            <div className="grid grid-cols-3 gap-4">
+              <select 
+                value={selectedProvince?.code || ""}
+                onChange={(e) => {
+                  const code = Number(e.target.value);
+                  const name = e.target.options[e.target.selectedIndex].text;
+                  setSelectedProvince(code ? { code, name } : null);
+                }}
+                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer"
+              >
+                <option value="">-- Province / City --</option>
+                {provinces.map(p => (
+                  <option key={p.code} value={p.code}>{p.name}</option>
+                ))}
+              </select>
+
+              <select 
+                value={selectedDistrict?.code || ""}
+                onChange={(e) => {
+                  const code = Number(e.target.value);
+                  const name = e.target.options[e.target.selectedIndex].text;
+                  setSelectedDistrict(code ? { code, name } : null);
+                }}
+                disabled={!selectedProvince}
+                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer disabled:opacity-50"
+              >
+                <option value="">-- District --</option>
+                {districts.map(d => (
+                  <option key={d.code} value={d.code}>{d.name}</option>
+                ))}
+              </select>
+
+              <select 
+                value={selectedWard?.code || ""}
+                onChange={(e) => {
+                  const code = Number(e.target.value);
+                  const name = e.target.options[e.target.selectedIndex].text;
+                  setSelectedWard(code ? { code, name } : null);
+                }}
+                disabled={!selectedDistrict}
+                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer disabled:opacity-50"
+              >
+                <option value="">-- Ward / Commune --</option>
+                {wards.map(w => (
+                  <option key={w.code} value={w.code}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <input 
+              type="text" 
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Street name, building, house number..." 
+              className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
+            />
           </div>
+
         </div>
 
         <div className="flex items-center justify-center gap-4 pb-8 pt-2">
@@ -180,7 +288,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
             disabled={isLoading}
             className="px-8 py-2.5 bg-[#111111] text-white text-sm font-semibold rounded hover:bg-gray-900 transition-colors cursor-pointer disabled:opacity-50"
           >
-            HỦY
+            CANCEL
           </button>
           <button 
             onClick={handleAdd}
@@ -188,7 +296,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
             className="px-8 py-2.5 bg-[#2EE59D] text-white text-sm font-semibold rounded hover:bg-[#25D390] transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isLoading ? "ĐANG THÊM..." : "THÊM"}
+            {isLoading ? "ADDING..." : "ADD"}
           </button>
         </div>
       </div>

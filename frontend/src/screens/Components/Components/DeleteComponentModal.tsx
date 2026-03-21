@@ -22,8 +22,8 @@ export const DeleteComponentModal = ({ isOpen, onClose, componentId, componentNa
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Lỗi khi xóa:", error);
-      alert(error?.response?.data?.message || "Không thể xóa component này. Có thể nó đang được sử dụng trong BOM hoặc Purchase Order.");
+      console.error("Error deleting:", error);
+      alert(error?.response?.data?.message || "Cannot delete this component. It might be used in an existing BOM or Purchase Order.");
     } finally {
       setIsDeleting(false);
     }
@@ -41,12 +41,12 @@ export const DeleteComponentModal = ({ isOpen, onClose, componentId, componentNa
                 <div className="p-2 bg-red-50 rounded-full">
                     <AlertTriangle className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Xóa Linh kiện</h2>
+                <h2 className="text-xl font-bold text-gray-900">Delete Component</h2>
             </div>
             <button 
                 onClick={onClose} 
                 disabled={isDeleting}
-                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors cursor-pointer"
             >
                 <X className="w-5 h-5" />
             </button>
@@ -55,14 +55,14 @@ export const DeleteComponentModal = ({ isOpen, onClose, componentId, componentNa
         {/* Body */}
         <div className="p-6">
             <p className="text-sm text-gray-600 mb-4">
-                Bạn có chắc chắn muốn xóa linh kiện này không? Hành động này không thể hoàn tác.
+                Are you sure you want to delete this component? This action cannot be undone.
             </p>
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
                 <span className="font-bold text-gray-900 text-base">{componentName}</span>
                 <span className="block text-xs text-gray-500 mt-1 font-mono">ID: {componentId}</span>
             </div>
             <p className="text-xs text-red-500 mt-4 flex items-center gap-1.5 font-medium">
-                <AlertTriangle className="w-4 h-4" /> Lưu ý: Hệ thống sẽ chặn xóa nếu linh kiện đã có dữ liệu tồn kho hoặc nằm trong lệnh sản xuất.
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" /> Note: The system will block deletion if this component has existing inventory data or is used in a production order.
             </p>
         </div>
 
@@ -71,17 +71,19 @@ export const DeleteComponentModal = ({ isOpen, onClose, componentId, componentNa
             <button 
                 onClick={onClose} 
                 disabled={isDeleting}
-                className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors"
+                className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 
+                font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
             >
-                Hủy bỏ
+                Cancel
             </button>
             <button 
                 onClick={handleDelete} 
                 disabled={isDeleting}
-                className="px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm flex items-center gap-2"
+                className="px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 
+                transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
             >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                {isDeleting ? "Đang xóa..." : "Xóa Linh kiện"}
+                {isDeleting ? "Deleting..." : "Delete Component"}
             </button>
         </div>
       </div>
