@@ -29,6 +29,7 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
   
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -68,7 +69,8 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
     );
   });
 
-  const handleSuccess = () => {
+  const handleSuccess = (message: string) => {
+    setSuccessMessage(message);
     setShowSuccess(true);
     fetchEmployees();
     setSelectedRowId(null);
@@ -243,25 +245,28 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
 
             <AddEmployeeModal 
               isOpen={isAddOpen} 
+              onConfirm={() => handleSuccess("Employee created successfully. An email with login credentials has been sent.")} 
               onClose={() => setIsAddOpen(false)} 
-              onConfirm={handleSuccess} 
             />
             
             <EditEmployeeModal 
               isOpen={isEditOpen} 
-              onClose={() => setIsEditOpen(false)} 
               userData={selectedEmployee} 
-              onConfirm={handleSuccess} 
+              onConfirm={() => handleSuccess("Employee details updated successfully.")} 
+              onClose={() => setIsEditOpen(false)} 
             />
             
             <DeleteEmployeeModal 
               isOpen={isDeleteOpen} 
-              onClose={() => setIsDeleteOpen(false)} 
               employeeId={selectedRowId}
-              onConfirm={handleSuccess}
+              onConfirm={() => handleSuccess("Employee removed successfully.")}
+              onClose={() => setIsDeleteOpen(false)} 
             />
             
-            <SuccessNotification isVisible={showSuccess} />
+            <SuccessNotification 
+                isVisible={showSuccess} 
+                message={successMessage}
+            />
           </>
         ) : (
           <Roles/>

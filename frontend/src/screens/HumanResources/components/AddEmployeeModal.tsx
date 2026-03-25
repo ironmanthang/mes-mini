@@ -13,8 +13,8 @@ interface AddEmployeeModalProps {
 export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModalProps): JSX.Element | null => {
   const [formData, setFormData] = useState<CreateEmployeeRequest>({
     fullName: "",
-    username: "",
-    password: "",
+    username: "thinh",
+    password: "123987",
     email: "",
     phoneNumber: "",
     address: "",
@@ -28,14 +28,11 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   const [error, setError] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
 
-  // --- Address States ---
   const [provinces, setProvinces] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
-  const [wards, setWards] = useState<any[]>([]);
 
   const [selectedProvince, setSelectedProvince] = useState<{code: number, name: string} | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<{code: number, name: string} | null>(null);
-  const [selectedWard, setSelectedWard] = useState<{code: number, name: string} | null>(null);
   const [street, setStreet] = useState("");
 
   useEffect(() => {
@@ -51,7 +48,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       }
 
       try {
-        const res = await fetch("https://provinces.open-api.vn/api/?depth=3");
+        const res = await fetch("https://provinces.open-api.vn/api/v2/p/");
         const provData = await res.json();
         setProvinces(provData);
       } catch (error) {
@@ -67,35 +64,36 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   useEffect(() => {
     if (selectedProvince) {
       const prov = provinces.find(p => p.code === selectedProvince.code);
-      setDistricts(prov?.districts || []);
-      setSelectedDistrict(null);
-      setWards([]);
-      setSelectedWard(null);
+
+      const fetchData = async () => {
+        try {
+          const res = await fetch(`https://provinces.open-api.vn/api/v2/w/?province=${prov.code}`);
+          const ward = await res.json();
+          setDistricts(ward);
+          setSelectedDistrict(null);
+        } catch (err) {
+          console.error("Failed to fetch ward", err);
+        }
+      }
+
+      if (prov) {
+        fetchData();
+      }
+      
     } else {
       setDistricts([]);
     }
   }, [selectedProvince, provinces]);
 
   useEffect(() => {
-    if (selectedDistrict) {
-      const dist = districts.find(d => d.code === selectedDistrict.code);
-      setWards(dist?.wards || []);
-      setSelectedWard(null);
-    } else {
-      setWards([]);
-    }
-  }, [selectedDistrict, districts]);
-
-  useEffect(() => {
     const parts = [
       street.trim(),
-      selectedWard?.name,
       selectedDistrict?.name,
       selectedProvince?.name
     ].filter(Boolean);
 
     setFormData(prev => ({ ...prev, address: parts.join(", ") }));
-  }, [street, selectedWard, selectedDistrict, selectedProvince]);
+  }, [street, selectedDistrict, selectedProvince]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -108,7 +106,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   };
 
   const handleAdd = async () => {
-    if (!formData.fullName || !formData.username || !formData.password || !formData.email) {
+    if (!formData.fullName ||  !formData.email) {
       setError("Please fill in all required fields (*)");
       return;
     }
@@ -127,9 +125,8 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       onConfirm(); 
       onClose();  
       
-      // Reset States
       setFormData({
-        fullName: "", username: "", password: "", email: "", 
+        fullName: "", username: "thinh", password: "123987", email: "", 
         phoneNumber: "", address: "", dateOfBirth: "", 
         hireDate: new Date().toISOString().split('T')[0], 
         roleIds: roles.length > 0 ? [roles[0].roleId] : [], 
@@ -138,7 +135,6 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
       setStreet("");
       setSelectedProvince(null);
       setSelectedDistrict(null);
-      setSelectedWard(null);
 
     } catch (err: any) {
       setError(err.response?.data?.message || "Error creating employee.");
@@ -177,14 +173,12 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
                 <label className="text-sm font-bold text-gray-800">Email<span className="text-red-500">*</span></label>
                 <input name="email" value={formData.email} onChange={handleChange} type="email" placeholder="user@example.com" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Username<span className="text-red-500">*</span></label>
-                <input name="username" value={formData.username} onChange={handleChange} type="text" placeholder="user123" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
+                <label className="text-sm font-bold text-gray-800">Hire Date<span className="text-red-500">*</span></label>
+                <input name="hireDate" value={formData.hireDate} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Password<span className="text-red-500">*</span></label>
-                <input name="password" value={formData.password} onChange={handleChange} type="password" placeholder="••••••" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
-              </div>
+              
             </div>
 
             <div className="space-y-4">
@@ -196,7 +190,6 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
                   onChange={handleRoleChange}
                   className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer"
                 >
-                  <option value="">-- Select a role --</option>
                   {roles.map((role) => (
                     <option key={role.roleId} value={role.roleId}>
                       {role.roleName}
@@ -209,10 +202,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
                 <label className="text-sm font-bold text-gray-800">Date of Birth</label>
                 <input name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Hire Date<span className="text-red-500">*</span></label>
-                <input name="hireDate" value={formData.hireDate} onChange={handleChange} type="date" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" />
-              </div>
+              
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-800">Phone Number</label>
                 <input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} type="text" placeholder="1234567890" className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" />
@@ -222,7 +212,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
           
           <div className="mt-6 space-y-3">
             <label className="text-sm font-bold text-gray-800">Address Details</label>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <select 
                 value={selectedProvince?.code || ""}
                 onChange={(e) => {
@@ -251,22 +241,6 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
                 <option value="">-- District --</option>
                 {districts.map(d => (
                   <option key={d.code} value={d.code}>{d.name}</option>
-                ))}
-              </select>
-
-              <select 
-                value={selectedWard?.code || ""}
-                onChange={(e) => {
-                  const code = Number(e.target.value);
-                  const name = e.target.options[e.target.selectedIndex].text;
-                  setSelectedWard(code ? { code, name } : null);
-                }}
-                disabled={!selectedDistrict}
-                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer disabled:opacity-50"
-              >
-                <option value="">-- Ward / Commune --</option>
-                {wards.map(w => (
-                  <option key={w.code} value={w.code}>{w.name}</option>
                 ))}
               </select>
             </div>

@@ -24,11 +24,9 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
 
   const [provinces, setProvinces] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
-  const [wards, setWards] = useState<any[]>([]);
 
   const [selectedProvince, setSelectedProvince] = useState<{code: number, name: string} | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<{code: number, name: string} | null>(null);
-  const [selectedWard, setSelectedWard] = useState<{code: number, name: string} | null>(null);
   const [street, setStreet] = useState("");
 
   useEffect(() => {
@@ -44,58 +42,59 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
       setStreet("");
       setSelectedProvince(null);
       setSelectedDistrict(null);
-      setSelectedWard(null);
       setError(null);
     }
   }, [isOpen, userData]);
 
   useEffect(() => {
-    const fetchProvinces = async () => {
-      try {
-        const res = await fetch("https://provinces.open-api.vn/api/?depth=3");
-        const provData = await res.json();
-        setProvinces(provData);
-      } catch (error) {
-        console.error("Failed to fetch provinces API", error);
+      const fetchData = async () => {  
+        try {
+          const res = await fetch("https://provinces.open-api.vn/api/v2/p/");
+          const provData = await res.json();
+          setProvinces(provData);
+        } catch (error) {
+          console.error("Failed to fetch provinces API", error);
+        }
+      };
+  
+      if (isOpen) {
+          fetchData();
       }
-    };
-    if (isOpen) {
-        fetchProvinces();
-    }
-  }, [isOpen]);
+    }, [isOpen]);
 
   useEffect(() => {
     if (selectedProvince) {
       const prov = provinces.find(p => p.code === selectedProvince.code);
-      setDistricts(prov?.districts || []);
-      setSelectedDistrict(null);
-      setWards([]);
-      setSelectedWard(null);
+
+      const fetchData = async () => {
+        try {
+          const res = await fetch(`https://provinces.open-api.vn/api/v2/w/?province=${prov.code}`);
+          const ward = await res.json();
+          setDistricts(ward);
+          setSelectedDistrict(null);
+        } catch (err) {
+          console.error("Failed to fetch ward", err);
+        }
+      }
+
+      if (prov) {
+        fetchData();
+      }
+      
     } else {
       setDistricts([]);
     }
   }, [selectedProvince, provinces]);
 
   useEffect(() => {
-    if (selectedDistrict) {
-      const dist = districts.find(d => d.code === selectedDistrict.code);
-      setWards(dist?.wards || []);
-      setSelectedWard(null);
-    } else {
-      setWards([]);
-    }
-  }, [selectedDistrict, districts]);
-
-  useEffect(() => {
     const parts = [
       street.trim(),
-      selectedWard?.name,
       selectedDistrict?.name,
       selectedProvince?.name
     ].filter(Boolean);
 
     setFormData(prev => ({ ...prev, address: parts.join(", ") }));
-  }, [street, selectedWard, selectedDistrict, selectedProvince]);
+  }, [street, selectedDistrict, selectedProvince]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -169,11 +168,12 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-800">Username</label>
                 <input 
+                  readOnly
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
                   type="text" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
+                  className="w-full bg-gray-50 border-none rounded p-3 text-sm text-gray-500 cursor-not-allowed outline-none" 
                 />
               </div>
             </div>
@@ -211,10 +211,9 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
             </div>
           </div>
 
-          {/* --- Address Section --- */}
           <div className="mt-6 space-y-3">
             <label className="text-sm font-bold text-gray-800">Address Details</label>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <select 
                 value={selectedProvince?.code || ""}
                 onChange={(e) => {
@@ -243,22 +242,6 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
                 <option value="">-- District --</option>
                 {districts.map(d => (
                   <option key={d.code} value={d.code}>{d.name}</option>
-                ))}
-              </select>
-
-              <select 
-                value={selectedWard?.code || ""}
-                onChange={(e) => {
-                  const code = Number(e.target.value);
-                  const name = e.target.options[e.target.selectedIndex].text;
-                  setSelectedWard(code ? { code, name } : null);
-                }}
-                disabled={!selectedDistrict}
-                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer disabled:opacity-50"
-              >
-                <option value="">-- Ward / Commune --</option>
-                {wards.map(w => (
-                  <option key={w.code} value={w.code}>{w.name}</option>
                 ))}
               </select>
             </div>
