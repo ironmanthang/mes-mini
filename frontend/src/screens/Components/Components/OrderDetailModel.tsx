@@ -20,7 +20,6 @@ export const OrderDetailModal = ({
   onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
 
-
   if (!isOpen || !order) return null;
 
   const formatDate = (dateString?: string) => {
@@ -42,6 +41,56 @@ export const OrderDetailModal = ({
     }
   };
 
+  const handlePrint = () => {
+    const printContent = document.getElementById("printable-order-content");
+    if (!printContent) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=800");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Purchase_Order_${order.code}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            /* Ép trình duyệt in cả background colors (màu nền của badge, table header) */
+            body { 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+            @media print {
+              @page { margin: 15mm; }
+            }
+          </style>
+        </head>
+        <body class="p-8 bg-white text-black">
+          <div class="mb-8 pb-4 border-b-2 border-gray-800 flex justify-between items-end">
+             <div>
+               <h1 class="text-3xl font-bold text-gray-900">PURCHASE ORDER</h1>
+               <p class="text-gray-500 mt-1">Code: <span class="text-black font-bold">${order.code}</span></p>
+             </div>
+             <div class="text-right text-sm text-gray-500">
+               <p>Date Printed: ${new Date().toLocaleDateString('vi-VN')}</p>
+             </div>
+          </div>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 0);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div className="bg-white w-[900px] h-[90vh] flex flex-col rounded-lg shadow-xl animate-in fade-in zoom-in duration-200">
@@ -59,7 +108,7 @@ export const OrderDetailModal = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-8" id="printable-order-content">
             <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-8">
                     <div className="space-y-4">
@@ -136,7 +185,7 @@ export const OrderDetailModal = ({
                                       return (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="p-3 font-medium text-gray-900">
-                                                {detail.component.componentName || `Item #${detail.componentId}`}
+                                                {detail.component?.componentName || `Item #${detail.componentId}`}
                                             </td>
                                             <td className="p-3 text-right">{qty}</td>
                                             <td className="p-3 text-right">{price.toLocaleString('vi-VN')}</td>
@@ -168,7 +217,10 @@ export const OrderDetailModal = ({
         </div>
 
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-lg">
-          <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 flex items-center gap-2 cursor-pointer transition-colors">
+          <button 
+            onClick={handlePrint} 
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 flex items-center gap-2 cursor-pointer transition-colors"
+          >
             <Printer className="w-4 h-4" /> Print
           </button>
           

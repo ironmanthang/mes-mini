@@ -1,23 +1,16 @@
 import { useState } from "react";
-import { PackagePlus, ClipboardList, Settings, Factory } from "lucide-react";
+import { ClipboardList, Settings, Factory } from "lucide-react";
 
-import { CreateComponentOrder } from "./components/CreateComponentOrder";
 import { CreateProductionRequest } from "./components/CreateProductionRequest";
 import { CreateWorkOrder } from "./components/CreateWorkOrder";
 import { ConfigureProductionLots } from "./components/ConfigureProductionLots";
 
-type ProductionTab = "create-order" | "production-requests" | "work-orders" | "configure-lots";
+type ProductionTab = "production-requests" | "work-orders" | "configure-lots";
 
 export const Production = () => {
-  const [activeTab, setActiveTab] = useState<ProductionTab>("create-order");
+  const [activeTab, setActiveTab] = useState<ProductionTab>("production-requests");
 
   const tabs = [
-    { 
-      id: "create-order", 
-      label: "Create Component Orders", 
-      icon: PackagePlus,
-      description: "Import materials & components"
-    },
     { 
       id: "production-requests",
       label: "Production Requests", 
@@ -74,9 +67,7 @@ export const Production = () => {
         })}
       </div>
 
-      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {activeTab === "create-order" && <CreateComponentOrder />}
-        
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">        
         {activeTab === "production-requests" && <CreateProductionRequest/>}
 
         {activeTab === "work-orders" && <CreateWorkOrder/>}

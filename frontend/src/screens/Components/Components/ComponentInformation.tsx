@@ -81,6 +81,16 @@ export const ComponentInformation = (): JSX.Element => {
   const activeCount = components.length; 
   const lowStockCount = components.filter(c => (c.currentStock || 0) < c.minStockLevel).length;
 
+  const formatNumberVN = (numberString: string) => {
+    const number = Number(numberString);
+
+    if (isNaN(number)) {
+        return numberString;
+    }
+
+    return number.toLocaleString('vi-VN');
+  }
+
   return (
     <div className="space-y-8 pb-12">
       
@@ -194,7 +204,7 @@ export const ComponentInformation = (): JSX.Element => {
                                     </td>
                                     <td className="p-4 text-gray-700">{item.unit}</td>
                                     <td className="p-4 text-right font-mono text-gray-700">
-                                        ${item.standardCost.toLocaleString()}
+                                        ${formatNumberVN(item.standardCost.toLocaleString())}
                                     </td>
                                     <td className="p-4 text-center">
                                         <div className="flex flex-col items-center">

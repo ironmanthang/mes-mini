@@ -1,11 +1,12 @@
 import { 
   Plus, Trash2, 
-  Save, Send, Printer, FileText, Loader2
+  Save, Send, FileText, Loader2, Paperclip, X
 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, type JSX, useRef } from "react";
 
 import { supplierService, type Supplier, type SupplierComponent } from "../../../services/supplierServices";
 import { purchaseOrderService } from "../../../services/purchaseOrderServices";
+import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
 
 interface OrderRow {
   id: number;
@@ -26,7 +27,7 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | "">("");
   const [supplierInfo, setSupplierInfo] = useState<Supplier | null>(null);
   
-  const [orderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [orderDate, setOrderDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [priority, setPriority] = useState("Medium");
 
@@ -36,6 +37,12 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [shippingCost, setShippingCost] = useState<number>(0);
   const [paymentTerm, setPaymentTerm] = useState("Net 30");
   const [deliveryTerm, setDeliveryTerm] = useState("FOB - Free On Board");
+
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     const fetchSuppliers = async () => {
@@ -124,6 +131,27 @@ export const CreateComponentOrder = (): JSX.Element => {
   const taxAmount = subtotal * (taxRate / 100);
   const grandTotal = subtotal + taxAmount + shippingCost;
 
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const newFiles = Array.from(event.target.files);
+      const uniqueNewFiles = newFiles.filter(newFile => 
+        !attachedFiles.some(existingFile => existingFile.name === newFile.name && existingFile.size === newFile.size)
+      );
+      
+      setAttachedFiles(prev => [...prev, ...uniqueNewFiles]);
+      
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveFile = (indexToRemove: number) => {
+    setAttachedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   const handleSubmit = async () => {
     if (!selectedSupplierId) return alert("Please select a supplier.");
     if (rows.length === 0) return alert("Please add at least one component.");
@@ -150,10 +178,17 @@ export const CreateComponentOrder = (): JSX.Element => {
         }))
       });
 
-      alert("Purchase Order Created Successfully!");
+      setMessage("Purchase Order Created Successfully!");
+      setShowSuccess(true);
+      setOrderDate("");
+      setDeliveryDate("");
       setRows([]);
       setSelectedSupplierId("");
       setSupplierInfo(null);
+      setTimeout(() => {
+        setMessage("");
+        setShowSuccess(false);
+      }, 3000);
 
     } catch (error) {
       console.error("Failed to handle submit:", error);
@@ -174,14 +209,7 @@ export const CreateComponentOrder = (): JSX.Element => {
           <h2 className="text-xl font-bold text-gray-900">New Component Order</h2>
           <p className="text-sm text-gray-500">Create a purchase order for raw materials.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
-             <Save className="w-4 h-4" /> Save Draft
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
-             <Printer className="w-4 h-4" /> Print
-          </button>
-        </div>
+
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
@@ -216,14 +244,16 @@ export const CreateComponentOrder = (): JSX.Element => {
 
           <div className="md:col-span-3 space-y-2">
             <label className="text-sm font-medium text-gray-700">Address</label>
-            <input type="text" readOnly value={supplierInfo?.address || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
+            <input type="text" readOnly value={supplierInfo?.address || ''} 
+            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
           </div>
           
           <div className="w-full h-px bg-gray-100 md:col-span-3 my-1"></div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Order Date</label>
-            <input type="date" disabled value={orderDate} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
+            <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)}
+            className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none" />
           </div>
 
           <div className="space-y-2">
@@ -360,6 +390,55 @@ export const CreateComponentOrder = (): JSX.Element => {
                             <option value="EXW - Ex Works">EXW - Ex Works</option>
                         </select>
                     </div>
+
+                    <div className="pt-3 border-t border-gray-100 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                                    <Paperclip className="w-4 h-4 text-gray-400" /> Attached Documents
+                                </label>
+                                <p className="text-xs text-gray-500 mt-0.5">Upload supporting files like contracts, receipts, evidence (Multiple allowed)</p>
+                            </div>
+                            <input 
+                                type="file" 
+                                multiple 
+                                ref={fileInputRef} 
+                                onChange={handleFileChange}
+                                className="hidden" 
+                            />
+                            <button 
+                                type="button"
+                                onClick={triggerFileUpload}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                                <Plus className="w-4 h-4" /> Upload Files
+                            </button>
+                        </div>
+
+                        {attachedFiles.length > 0 && (
+                            <div className="grid grid-cols-1 gap-2 pt-2">
+                                {attachedFiles.map((file, index) => (
+                                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 bg-gray-50 p-2 rounded border border-gray-200 group">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-sm text-gray-700 font-medium truncate" title={file.name}>{file.name}</span>
+                                                <span className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleRemoveFile(index)}
+                                            className="p-1 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                            title="Remove file"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
              </div>
           </div>
@@ -402,6 +481,10 @@ export const CreateComponentOrder = (): JSX.Element => {
              </div>
 
              <div className="mt-8 flex justify-end gap-3">
+                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm cursor-pointer">
+                  <Save className="w-4 h-4" /> Save Draft
+                </button>
+
                 <button 
                     onClick={handleSubmit}
                     disabled={isSubmitting}
@@ -413,6 +496,8 @@ export const CreateComponentOrder = (): JSX.Element => {
              </div>
           </div>
       </div>
+
+      <SuccessNotification isVisible={showSuccess} message={message}/>
     </div>
   );
 };

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Cpu, ShoppingCart, ScanBarcode } from "lucide-react";
+import { Cpu, ShoppingCart, ScanBarcode , PackagePlus} from "lucide-react";
 
 import { ComponentInformation } from "./Components/ComponentInformation";
 import { ComponentOrders } from "./Components/ComponentOrders";
 import { ComponentBarcodes } from "./Components/ComponentBarcodes";
+import { CreateComponentOrder } from "./Components/CreateComponentOrder";
 
-type ComponentTab = "info" | "orders" | "barcodes";
+type ComponentTab = "info" | "orders" | "barcodes" | "create-order";
 
 export const Components = () => {
   const [activeTab, setActiveTab] = useState<ComponentTab>("info");
@@ -16,6 +17,12 @@ export const Components = () => {
       label: "Component Information", 
       icon: Cpu,
       description: "Manage items, stock & specs"
+    },
+    { 
+      id: "create-order", 
+      label: "Create Component Orders", 
+      icon: PackagePlus,
+      description: "Import materials & components"
     },
     { 
       id: "orders",
@@ -40,7 +47,7 @@ export const Components = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 mb-8 max-w-5xl">
+      <div className="grid grid-cols-4 gap-6 mb-8 max-w-7xl">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -68,6 +75,7 @@ export const Components = () => {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {activeTab === "create-order" && <CreateComponentOrder/>}
         
         {activeTab === "info" && <ComponentInformation />}
 
