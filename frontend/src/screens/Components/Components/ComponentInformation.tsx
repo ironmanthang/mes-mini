@@ -26,6 +26,7 @@ export const ComponentInformation = (): JSX.Element => {
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [componentToDelete, setComponentToDelete] = useState<{id: number, name: string} | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [message, setMessage] = useState("");
 
   const fetchComponents = useCallback(async () => {
     setIsLoading(true);
@@ -74,8 +75,14 @@ export const ComponentInformation = (): JSX.Element => {
     setComponentToDelete({ id, name });
   };
 
-  const handleSaveSuccess = () => {
+  const handleSaveSuccess = (msg: string) => {
+    setMessage(msg);
+    setShowSuccess(true);
     fetchComponents();
+    setTimeout(() => {
+        setMessage("");
+        setShowSuccess(false);
+    }, 1000);
   };
 
   const activeCount = components.length; 
@@ -264,14 +271,18 @@ export const ComponentInformation = (): JSX.Element => {
         componentId={componentToDelete?.id || null}
         componentName={componentToDelete?.name || ""}
         onSuccess={() => {
+            setMessage("Deleted Component")
             setShowSuccess(true);
             fetchComponents();
             setComponentToDelete(null);
-            setTimeout(() => setShowSuccess(false), 3000);
+            setTimeout(() => {
+                setShowSuccess(false);
+                setMessage("");
+            }, 1000);
         }}
       />
 
-      <SuccessNotification isVisible={showSuccess}/>
+      <SuccessNotification isVisible={showSuccess} message={message}/>
     </div>
   );
 };

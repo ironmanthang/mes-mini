@@ -4,11 +4,11 @@ export interface Supplier {
   supplierId: number;
   code: string;
   supplierName: string;
-  email?: string;
-  phoneNumber?: string;
-  address?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SupplierComponent {

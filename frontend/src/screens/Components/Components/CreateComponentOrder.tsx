@@ -1,6 +1,6 @@
 import { 
   Plus, Trash2, 
-  Save, Send, FileText, Loader2, Paperclip, X
+  Save, Send, FileText, Loader2, Paperclip, X, Building2, Mail, Phone, MapPin
 } from "lucide-react";
 import { useState, useEffect, type JSX, useRef } from "react";
 
@@ -213,71 +213,113 @@ export const CreateComponentOrder = (): JSX.Element => {
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-base font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
+        <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3 mb-5">
           <FileText className="w-4 h-4 text-blue-600" /> Supplier Information
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Supplier<span className="text-red-500">*</span></label>
-            <select 
-              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
-              value={selectedSupplierId}
-              onChange={handleSupplierChange}
-            >
-              <option value="">-- Select Supplier --</option>
-              {suppliersList.map(s => (
-                <option key={s.supplierId} value={s.supplierId}>{s.code} - {s.supplierName}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Phone</label>
-            <input type="text" readOnly value={supplierInfo?.phoneNumber || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Email</label>
-            <input type="text" readOnly value={supplierInfo?.email || ''} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
-          </div>
-
-          <div className="md:col-span-3 space-y-2">
-            <label className="text-sm font-medium text-gray-700">Address</label>
-            <input type="text" readOnly value={supplierInfo?.address || ''} 
-            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 outline-none" />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          <div className="w-full h-px bg-gray-100 md:col-span-3 my-1"></div>
+          <div className="space-y-4 border-r-0 lg:border-r border-gray-100 lg:pr-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Supplier<span className="text-red-500">*</span></label>
+              <select 
+                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white cursor-pointer"
+                value={selectedSupplierId}
+                onChange={handleSupplierChange}
+              >
+                <option value="">-- Select Supplier --</option>
+                {suppliersList.map(s => (
+                  <option key={s.supplierId} value={s.supplierId}>{s.code} - {s.supplierName}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Order Date</label>
-            <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)}
-            className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none" />
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Order Date</label>
+              <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)}
+              className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Expected Delivery</label>
+              <input 
+                type="date" 
+                value={deliveryDate} 
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Priority</label>
+              <select 
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Expected Delivery</label>
-            <input 
-              type="date" 
-              value={deliveryDate} 
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" 
-            />
+          <div className="lg:col-span-2 flex flex-col">
+            <label className="text-sm font-medium text-gray-700 block mb-2">Supplier Details</label>
+            
+            {supplierInfo ? (
+              <div className="bg-blue-50/40 border border-blue-100 rounded-lg p-5 flex-1 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <Building2 className="w-32 h-32" />
+                </div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-5 pb-4 border-b border-blue-100/60">
+                    <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center font-bold text-xl shadow-sm border border-blue-200">
+                      {supplierInfo.supplierName.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-xl">{supplierInfo.supplierName}</h4>
+                      <p className="text-sm text-blue-600 font-mono font-medium mt-0.5">Code: {supplierInfo.code}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 gap-x-6">
+                    <div className="flex gap-3">
+                      <Mail className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase font-semibold">Email Address</span>
+                        <span className="text-sm text-gray-900 font-medium">{supplierInfo.email || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <Phone className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase font-semibold">Phone Number</span>
+                        <span className="text-sm text-gray-900 font-medium">{supplierInfo.phoneNumber || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="md:col-span-2 flex gap-3">
+                      <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase font-semibold">Physical Address</span>
+                        <span className="text-sm text-gray-900 font-medium leading-relaxed">{supplierInfo.address || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-5 flex-1 flex flex-col items-center justify-center text-center bg-gray-50/50">
+                 <div className="w-14 h-14 bg-white border border-gray-100 shadow-sm rounded-full flex items-center justify-center mb-3">
+                   <Building2 className="w-6 h-6 text-gray-400" />
+                 </div>
+                 <p className="text-sm font-medium text-gray-600">No Supplier Selected</p>
+                 <p className="text-xs text-gray-500 mt-1 max-w-xs">Please select a supplier from the list to view their contact details and address.</p>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Priority</label>
-            <select 
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
         </div>
       </div>
 

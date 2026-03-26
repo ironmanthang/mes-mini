@@ -5,7 +5,7 @@ import { componentService, type Component, type CreateComponentRequest } from ".
 interface AddComponentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (message: string) => void;
   initialData?: Component | null;
 }
 
@@ -73,11 +73,12 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
     try {
       if (isEditMode && initialData?.componentId) {
         await componentService.updateComponent(initialData.componentId, formData);
+        onConfirm("Edit Component Completed");
       } else {
         await componentService.createComponent(formData);
+        onConfirm("Add Component Completed");
       }
       
-      onConfirm();
       onClose();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || "Failed to save component.";
@@ -164,10 +165,10 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
                       onChange={handleChange}
                       className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white"
                     >
-                        <option value="pcs">Piece</option>
-                        <option value="kg">Kilogram</option>
-                        <option value="meter">Meter</option>
-                        <option value="box">Box</option>
+                        <option value="pcs">Piece (pcs)</option>
+                        <option value="kg">Kilogram (kg)</option>
+                        <option value="m">Meter (m)</option>
+                        <option value="l">Liter (l)</option>
                         <option value="set">Set</option>
                     </select>
                 </div>
