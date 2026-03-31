@@ -97,9 +97,12 @@ export const startProcessing = async (req: Request, res: Response): Promise<void
 export const shipOrder = async (req: Request, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
-        const { shipments, courierShippingCost } = req.body;
+        const { shipments, warehouseId, courierShippingCost } = req.body;
+        if (!warehouseId) {
+            throw new Error("Source warehouseId is required for shipping.");
+        }
 
-        const result = await SOService.shipOrder(id as string, shipments, req.user!.employeeId, courierShippingCost);
+        const result = await SOService.shipOrder(id as string, shipments, req.user!.employeeId, warehouseId, courierShippingCost);
         res.status(200).json({ message: 'Shipment Processed Successfully', result });
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });

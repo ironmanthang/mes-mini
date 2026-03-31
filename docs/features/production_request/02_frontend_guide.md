@@ -1,94 +1,66 @@
-# Production Request: Frontend & Testing Guide
+# Production Request: Frontend Integration Guide
 
-> **Feature:** Production Request
-> **Role:** API documentation, UX flow logic, and manual verification guide.
-> **Audience:** Frontend Developers and QA/Testers.
-
----
-
-## 1. API Reference (From `productionRequestRoutes.ts`)
-
-### A. List All Requests
-*   **Endpoint:** `GET /api/production-requests`
-*   **Query Params:** `status` (enum), `page`, `limit`.
-*   **Response:** Paginated list of PRs with nested Product, SalesOrder, and Fulfillment data.
-
-### B. Create Production Request (The "Logic Trigger")
-*   **Endpoint:** `POST /api/production-requests`
-*   **Payload:**
-    ```json
-    {
-      "productId": 1,
-      "quantity": 50,
-      "priority": "HIGH",
-      "soDetailId": 3,      // Omit for Make-to-Stock (Blue Path)
-      "dueDate": "2026-12-31T23:59:59Z",
-      "note": "Urgent"
-    }
-    ```
-*   **Logic:** The backend runs MRP instantly. The response `status` determines the next UX step (`APPROVED` vs `WAITING_MATERIAL`).
-
-### C. Re-check Feasibility
-*   **Endpoint:** `PUT /api/production-requests/{id}/recheck`
-*   **Usage:** For `WAITING_MATERIAL` PRs after a PO has been received. Transitions the PR to `APPROVED` if stock is now sufficient.
-
-### D. Get Shortage List (Draft PO)
-*   **Endpoint:** `GET /api/production-requests/{id}/draft-purchase-order`
-*   **Usage:** Returns the "Shopping List" of missing components needed to unblock this PR.
-
-### E. Convert to Work Order (Bulk)
-*   **Endpoint:** `POST /api/production-requests/convert-to-work-order`
-*   **Payload:**
-    ```json
-    {
-      "requestIds": [1, 2, 5],
-      "productionLineId": 101,
-      "quantities": [50, 20, 100] // Optional
-    }
-    ```
-*   **Action:** Bundles multiple PRs into a single Work Order for the shop floor.
+> **Feature:** Production Request ( replenishment of finished goods)
+> **Role:** Implementation guide for the "Create Production Request" form and dashboard integration.
+> **Audience:** Frontend Developers (Web/Mobile).
 
 ---
 
-## 2. Integrated User Flows (The 4 Paths)
+## 1. Core API Reference
 
-### 🟢 Path 1: The Green Path (Ship from Stock)
-*   **Trigger:** Sales Order shows `availableStock >= quantity`.
-*   **UX:** Hide "Request Production" button. Show **`[ Create Shipment ]`**.
-*   **Test:** Login as Admin -> `POST /api/sales-orders/{id}/ship` with specific Serial Numbers.
+### A. Decision Support (Call these *before* creating a PR)
+*   **`GET /api/products/:id/production-context`**
+    *   **Usage**: Triggered when a product is selected.
+    *   **Provides**: Current Stock, Min Level, Pending Demand, and `suggestedQuantity`.
+*   **`POST /api/products/:id/production-feasibility`**
+    *   **Usage**: Triggered when the user types/changes the **Quantity** (Debounced).
+    *   **Payload**: `{ "quantity": number }`
+    *   **Provides**: `canProduce` status and a detailed component requirement list.
 
-### 🟡 Path 2: The Yellow Path (Produce Now)
-*   **Trigger:** SO has shortage, but MRP says "Can Produce" (Yellow Light).
-*   **UX:** Click `[ Request Production ]` -> Result is `APPROVED`. Show **`[ Create Work Order ]`**.
-*   **Test:** Login -> `POST /api/production-requests` -> Verify response `status: "APPROVED"`.
-
-### 🔴 Path 3: The Red Path (Blocked by Materials)
-*   **Trigger:** SO has shortage, AND MRP says "Shortage" (Red Light).
-*   **UX:** Click `[ Request Production ]` -> Result is `WAITING_MATERIAL`. 
-*   **Action:** Show alert link to `[ View Shortage ]` (Draft PO endpoint).
-*   **Test:** 
-    1. Create PR -> Status is `WAITING_MATERIAL`.
-    2. Add stock to DB (via Prisma Studio or `IMPORT_PO`).
-    3. Call `PUT /api/recheck` -> Verify status becomes `APPROVED`.
-
-### 🔵 Path 4: The Blue Path (Make-to-Stock)
-*   **Trigger:** Manual replenishment for forecast.
-*   **UX:** Simple form to pick Product + Qty. No Sales Order link.
-*   **Test:** `POST /api/production-requests` (with `soDetailId: null`). Verify `note` contains "Manual Request (MTS)".
+### B. Execution
+*   **`POST /api/production-requests`**
+    *   **Usage**: Final submission.
+    *   **Payload**: `{ "productId": number, "quantity": number, "priority": string, "dueDate": date }`
+*   **`GET /api/production-requests`**
+    *   **Usage**: List view for tracking status (`APPROVED` vs `WAITING_MATERIAL`).
 
 ---
 
-## 3. Manual Verification Steps (Swagger)
+## 2. Recommended Form Logic (The "Proactive Flow")
 
-1.  **Seed Database:** `npx prisma migrate reset --force` followed by `npx tsx prisma/scripts/seed.ts`.
-2.  **Log In:** `POST /api/auth/login` (Admin/123456). Apply token to "Authorize" header.
-3.  **Execute Path 2 (Yellow):** 
-    *   Find a "Gray" order in `GET /api/sales-orders`.
-    *   Create PR with its `productId` and `soDetailId`.
-    *   Confirm status is `APPROVED` immediately.
-4.  **Bundle Work Order:** 
-    *   Take the result ID from Step 3.
-    *   Call `POST /convert-to-work-order` with that ID.
-    *   Verify a new Work Order is created in the `work_orders` table.
+This flow ensures the Production Manager (PM) is never "surprised" by a shortage after submitting.
+
+### Step 1: Select Product
+- **Action**: UI calls `GET /api/products/:id/production-context`.
+- **Result**: Display a "Status Card" showing:
+    - 📊 **Current Stock**: 0
+    - 🛡️ **Safety Stock**: 20
+    - 📦 **Pending Orders**: 18
+    - ✨ **Suggested**: **38** (Pre-fill the quantity input with this value).
+
+### Step 2: Input Quantity
+- **Action**: User types `50`. UI calls `POST /api/products/:id/production-feasibility`.
+- **Result**: Display the **Live Feasibility** panel:
+    - 🟢 **Green**: "Materials sufficient. This request will be approved immediately."
+    - 🔴 **Red**: "Shortage detected! You need 100 more Batteries. This request will be placed on **Hold**."
+
+### Step 3: Submission
+- **Action**: User clicks `[ Save Request ]`.
+- **Result**: PR is created. If feasibility was Red, the user should be redirected to a "Create Purchase Order" screen or shown a "View Shortages" prompt.
+
+---
+
+## 3. Dashboard Integration
+The **Warehouse Dashboard** (`GET /api/warehouse/dashboard`) provides the high-level signals to start the flow above.
+- **KPI**: `totalGap` (The sum of all units missing across all low-stock products).
+- **Action**: Clicking any item in the `lowStockProducts` list should navigate the user to the "Create Production Request" form with that product ID pre-selected.
+
+---
+
+## 4. Manual Verification (QA)
+1.  **Clean State**: `npx prisma migrate reset --force` (Ensures 50 Laptops/30 Smartwatches in Sales WH).
+2.  **Verify Healthy**: Dashboard should show **0 Gap** for Laptops and Smartwatches.
+3.  **Verify Shortage**: Dashboard should show **Gap: 5** for Monitor M1 Pro.
+4.  **Verify Context**: `GET /api/products/1/production-context` should return a `suggestedQuantity` that accounts for current stock and pending orders.
 
 ---

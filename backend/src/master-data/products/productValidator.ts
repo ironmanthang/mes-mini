@@ -19,3 +19,29 @@ export const updateProductSchema = Joi.object({
     unit: Joi.string().optional(),
     categoryId: Joi.number().integer().optional().allow(null)
 });
+
+export const addBomComponentSchema = Joi.object({
+    componentId: Joi.number().integer().required().messages({
+        'number.base': 'Component ID must be a number',
+        'any.required': 'Component ID is required'
+    }),
+    quantityNeeded: Joi.number().integer().min(1).required().messages({
+        'number.min': 'Quantity must be at least 1',
+        'any.required': 'Quantity needed is required'
+    })
+});
+
+export const updateBomComponentSchema = Joi.object({
+    quantityNeeded: Joi.number().integer().min(1).required().messages({
+        'number.min': 'Quantity must be at least 1',
+        'any.required': 'Quantity needed is required'
+    })
+});
+
+export const checkFeasibilitySchema = Joi.object({
+    quantity: Joi.number().integer().min(1).required().messages({
+        'number.min': 'Quantity must be at least 1',
+        'any.required': 'Quantity is required'
+    })
+});
+

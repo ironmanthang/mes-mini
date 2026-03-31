@@ -1,3 +1,8 @@
+> [!CAUTION]
+> **OUTDATED (2026-03-17):** This document predates the MTS-only pivot. 
+> The source of truth is now [docs/05_mts_dispatch_flows.md](cci:7://file:///d:/program/mes-mini/docs/05_mts_dispatch_flows.md:0:0-0:0).
+> This file will be revised. Do NOT use it for implementation decisions.
+
 # Production Request: Business & Technical Logic (SSOT)
 
 > **Feature:** Production Request
@@ -16,14 +21,13 @@ Production Requests (PR) act as the **Buffer Zone** between Customer Demand (Sal
 The system calculates feasibility in two phases to optimize performance.
 
 ### Phase 1: The Fast Check (Dashboard Load)
-To avoid N+1 query bottlenecks, the Sales Order dashboard only does a shallow check on **Finished Goods**.
-*   **🟢 GREEN (Available to Promise):** `Finished Goods >= Order Qty`.
-    *   *Action:* Warehouse clicks **"Create Shipment"**.
-*   **⚫ GRAY (Unchecked / Needs Production):** `Finished Goods < Order Qty`.
-    *   *Action:* Production Manager clicks **"Check Feasibility"** to trigger the Deep Check.
+To avoid N+1 query bottlenecks, the **Warehouse Dashboard** provides a real-time aggregate of:
+*   **🟢 GREEN (Above Safe Stock):** `Finished Goods >= minStockLevel`.
+*   **🔴 RED (Low Stock Alert):** `Finished Goods < minStockLevel`.
+    *   *Action:* Production Manager creates a **Production Request** based on these alerts.
 
 ### Phase 2: The Deep Check (On-Demand)
-Triggered manually to run the MRP/BOM explosion.
+The **Production Dashboard** shows existing pending requests. Before creating a new one, the PM triggers a BOM feasibility check.
 *   **🟡 YELLOW (Capable to Promise):** `Component Stock` sufficient for production.
     *   *Action:* Manager clicks **"Request Production"** -> Status becomes `APPROVED`.
 *   **🔴 RED (Material Shortage):** `Component Stock` insufficient.
@@ -72,42 +76,68 @@ In `SalesOrderService.approveSO`, we use a **Hard Stock Reservation (FIFO)**.
 *   **Serial Picker:** Currently, the frontend lacks an endpoint to query *available* serial numbers reserved for a specific SO.
 *   **Wastage Buffer:** The current BOM explosion assumes 100% yield. In electronics (SMT), we should eventually add a `% Wastage` factor to raw material requirements.
 
-```mermaid
-graph TD
-    %% Styling
-    classDef trigger fill:#e5f1f9,stroke:#0071c5,stroke-width:2px,color:#000;
-    classDef decision fill:#fff,stroke:#333,stroke-width:2px,color:#000;
-    classDef greenPath fill:#e8f4e8,stroke:#2e7d32,stroke-width:2px,color:#000;
-    classDef yellowPath fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000;
-    classDef redPath fill:#fee0e0,stroke:#d32f2f,stroke-width:2px,color:#000;
-    classDef bluePath fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000;
-    classDef action fill:#f3f4f6,stroke:#4b5563,stroke-width:2px,color:#000;
-
-    %% Node Bắt đầu
-    A[Phát sinh nhu cầu hàng hóa]:::trigger --> B{Nguồn gốc nhu cầu?}:::decision
-
-    %% Trường hợp 1: Nhánh Blue (Make-to-Stock)
-    B -->|Sản xuất lưu kho / MTS <br> Không qua Sales Order| C[Tạo PR Độc lập <br> 🔵 BLUE PATH]:::bluePath
-    C --> MRP_Stock{Check Kho Linh Kiện <br> MRP}:::decision
-    MRP_Stock -->|Đủ Linh Kiện| Final_WO[Tạo Work Order <br> APPROVED]:::action
-    MRP_Stock -->|Thiếu Linh Kiện| Stock_PO[Tạo Purchase Order <br> WAITING_MATERIAL]:::redPath
-
-    %% Trường hợp 2: Nhánh Sales Order
-    B -->|Từ Sales Order| D{Check Kho Thành Phẩm}:::decision
-
-    %% Nhánh 2.1: Nhánh Green
-    D -->|Đủ Thành Phẩm| E[Bỏ qua Production Request <br> Ship thẳng cho khách <br> 🟢 GREEN PATH]:::greenPath
-
-    %% Nhánh 2.2 & 2.3: Feasibility Check
-    D -->|Thiếu Thành Phẩm| F{Check Kho Linh Kiện <br> Feasibility Check}:::decision
-
-    %% Nhánh 2.2: Nhánh Yellow
-    F -->|Đủ Linh Kiện| G[Tạo PR Link Sales Order <br> 🟡 YELLOW PATH]:::yellowPath
-    G --> Final_WO
-
-    %% Nhánh 2.3: Nhánh Red
-    F -->|Thiếu Linh Kiện| H[Tạo PR Link Sales Order <br> 🔴 RED PATH]:::redPath
-    H --> H_PO[Tạo Purchase Order <br> WAITING_MATERIAL]:::redPath
-    H_PO -->|Nhập kho vật tư & Re-check| Final_WO
-```
 ---
+
+## 5. BOM Structure Constraints
+
+> [!WARNING]
+> **Component-Only BOM Policy:** In this system, a Bill of Materials (BOM) strictly consists of **Components** (`Component` entity) only. 
+
+*   **No Nested Products:** You **cannot** add a `Product` as a component of another `Product`.
+*   **Architectural Reason:** To maintain simplicity in our "Lite MES," we differentiate between "Raw Materials/Components" (which are purchased and stored in boxes/lots) and "Finished Goods" (which are assembled onto serializers). 
+*   **Database Enforcement:** The `bill_of_materials` table schema only permits a `productId` to `componentId` relationship.
+
+If a product requires another assembly, that assembly must be defined as a **Component** in the system if it is managed as a stockable raw material, or the production flow must be flattened.
+
+---
+
+## 6. BOM Snapshotting — The Frozen Contract
+
+> [!IMPORTANT]
+> **Implemented 2026-03-12.** This is one of the most critical architectural decisions in the system. Read this before touching any PR-related service.
+
+### The Problem It Solves
+Before snapshotting, `ProductionRequest` calculated material requirements dynamically from the live `BillOfMaterial` table. If an engineer edited the BOM *after* a PR was created (e.g., swapping Component A for Component B), the shop floor would receive a **phantom shortage** on a PR that was already committed. This is a classic MES data integrity failure.
+
+### The Solution: Freeze at Creation Time
+When a `ProductionRequest` is created, the MRP result is **atomically persisted** into the `ProductionRequestDetail` table. This "frozen snapshot" becomes the immutable contract for that PR's lifecycle.
+
+```
+bill_of_materials (live, editable)
+       │
+       │ read ONCE at PR creation
+       ▼
+production_request_details (frozen, immutable per PR)
+       │
+       ├── recheckFeasibility()
+       ├── draftPurchaseOrder()
+       ├── calculateForRequest() / GET /:id/requirements
+       └── materialRequestService.createFromWorkOrder()
+```
+
+### Rule: Which Function Reads What
+
+| Function | Reads From | Reason |
+|---|---|---|
+| `createRequest` | Master `BillOfMaterial` | Once only — to create the snapshot |
+| `recheckFeasibility` | `ProductionRequestDetail` (snapshot) | Must honour original commitment |
+| `draftPurchaseOrder` | `ProductionRequestDetail` (snapshot) | Shortages relative to original commitment |
+| `calculateForRequest` | `ProductionRequestDetail` (snapshot) | Live MRP view of an existing PR |
+| `createFromWorkOrder` | `ProductionRequestDetail` (snapshot) | Uses `fulfillment.quantity × detail.quantityPerUnit` aggregation |
+| `calculateRequirements` | Master `BillOfMaterial` | Generic planning tool — no PR context |
+
+### Aggregation Formula for Material Requests
+A Work Order can fulfill multiple PRs. When creating a `MaterialExportRequest`, the quantity per component is:
+```
+qty = Σ (fulfillment.quantity × snapshot.quantityPerUnit)  grouped by componentId
+```
+This correctly scopes materials to the WO's partial fulfillment, not the full PR total.
+
+### Graceful Fallback (Legacy Data)
+PRs created before snapshotting was implemented have no `ProductionRequestDetail` rows. Both `mrpService.calculateFromSnapshot()` and `materialRequestService.createFromWorkOrder()` detect this (empty `details` array) and fall back to master BOM, so existing data is not broken.
+
+### Implementation Reference
+- **Migration:** `20260312050436_add_pr_details`
+- **Schema model:** `ProductionRequestDetail` in `schema.prisma`
+- **Key method:** `mrpService.calculateFromSnapshot(prId)` in `mrpService.ts`
+- **Full record:** `docs/features/production_request/03_bom_snapshotting.md`

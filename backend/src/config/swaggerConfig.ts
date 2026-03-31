@@ -23,6 +23,7 @@ const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Agents', description: 'B2B Distributors & Customers' },
             { name: 'Purchase Orders', description: 'Procurement: Buying Materials' },
             { name: 'Sales Orders', description: 'Sales: Selling Products' },
+            { name: 'Warehouses', description: 'Master data for Warehouses' },
             // { name: 'Production Lines', description: 'Manufacturing line management' },
             { name: 'Production Requests', description: 'Managing requests to produce items' },
             // { name: 'Quality', description: 'Quality Control (QC) operations' },
@@ -67,10 +68,18 @@ const swaggerOptions: swaggerJsDoc.Options = {
         './dist/master-data/products/productRoutes.js',
         './src/master-data/suppliers/supplierRoutes.ts',
         './dist/master-data/suppliers/supplierRoutes.js',
+        './src/master-data/warehouses/warehouseRoutes.ts',
+        './dist/master-data/warehouses/warehouseRoutes.js',
 
-        // --- DASHBOARD & NOTIFICATIONS ---
-        // './src/dashboard/dashboardRoutes.ts',
-        // './dist/dashboard/dashboardRoutes.js',
+        // --- DASHBOARDS ---
+        './src/warehouse-ops/dashboard/warehouseDashboardRoutes.ts',
+        './dist/warehouse-ops/dashboard/warehouseDashboardRoutes.js',
+        './src/sales/dashboard/salesDashboardRoutes.ts',
+        './dist/sales/dashboard/salesDashboardRoutes.js',
+        './src/production/dashboard/productionDashboardRoutes.ts',
+        './dist/production/dashboard/productionDashboardRoutes.js',
+
+        // --- NOTIFICATIONS ---
         // './src/notifications/notificationRoutes.ts',
         // './dist/notifications/notificationRoutes.js',
 
@@ -94,15 +103,15 @@ const swaggerOptions: swaggerJsDoc.Options = {
         // './src/production/workOrders/workOrderRoutes.ts',
         // './dist/production/workOrders/workOrderRoutes.js',
 
-        // --- WAREHOUSE ---
-        './src/warehouse/inventory/inventoryRoutes.ts',
-        './dist/warehouse/inventory/inventoryRoutes.js',
-        // './src/warehouse/material-request/materialRequestRoutes.ts',
-        // './dist/warehouse/material-request/materialRequestRoutes.js',
-        // './src/warehouse/stocktaking/stocktakeRoutes.ts',
-        // './dist/warehouse/stocktaking/stocktakeRoutes.js',
-        './src/warehouse/warehouseRoutes.ts',
-        './dist/warehouse/warehouseRoutes.js',
+        // --- WAREHOUSE OPS ---
+        // './src/warehouse-ops/inventory/inventoryRoutes.ts',
+        // './dist/warehouse-ops/inventory/inventoryRoutes.js',
+        // './src/warehouse-ops/material-request/materialRequestRoutes.ts',
+        // './dist/warehouse-ops/material-request/materialRequestRoutes.js',
+        // './src/warehouse-ops/stocktaking/stocktakeRoutes.ts',
+        // './dist/warehouse-ops/stocktaking/stocktakeRoutes.js',
+        './src/warehouse-ops/warehouseRoutes.ts',
+        './dist/warehouse-ops/warehouseRoutes.js',
     ],
 };
 

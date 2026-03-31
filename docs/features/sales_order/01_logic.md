@@ -1,3 +1,8 @@
+> [!CAUTION]
+> **OUTDATED (2026-03-17):** This document predates the MTS-only pivot. 
+> The source of truth is now [docs/05_mts_dispatch_flows.md](cci:7://file:///d:/program/mes-mini/docs/05_mts_dispatch_flows.md:0:0-0:0).
+> This file will be revised. Do NOT use it for implementation decisions.
+
 # Sales Order: Business & Technical Logic (SSOT)
 
 > **Feature:** Sales Order
@@ -29,16 +34,15 @@ To provide immediate feedback while maintaining sequential integrity:
 
 ### B. Hard Stock Reservation (FIFO)
 Unlike "Soft Reservations" that just decrement a counter, this MES implements **Hard Reservations** upon `APPROVE`:
-1.  Specific `ProductInstance` records (based on Serial Number) are searched for where `status = 'IN_STOCK'`.
+1.  Specific `ProductInstance` records (based on Serial Number) are searched for where `status = 'IN_STOCK'` within a warehouse of type `SALES`.
 2.  The records are sorted by `createdAt` (FIFO).
 3.  The `status` is updated to `RESERVED` and the `salesOrderId` is linked.
 4.  **Why?** This ensures that once an order is approved, the physical units on the shelf are legally "sold" and cannot be picked for another order.
 
-### C. The "Traffic Light" Integration
-The Sales Order dashboard integrates with the `FeasibilityService` to show real-time fulfillment status:
-*   **GREEN:** Available stock >= Order quantity.
-*   **YELLOW:** Stock is low, but Bill of Materials (BOM) check says we can produce it.
-*   **RED:** Material shortage; cannot ship or produce immediately.
+### C. The Sales Dashboard Integration
+The **Sales Dashboard** provides real-time visibility into fulfillment:
+*   **PENDING SOs:** Lists orders that are APPROVED or IN_PROGRESS but waiting for stock.
+*   **GREEN/RED:** Visual cues based on whether `availableStock` in the Sales Warehouse covers the order.
 
 ### D. Goods Issue (Shipping)
 Shipping is performed by scanning Serial Numbers:

@@ -502,37 +502,23 @@ class SalesOrderService {
                 throw new Error("Audit Violation: You cannot approve your own Sales Order.");
             }
 
-            // --- Hard Stock Reservation Logic (FIFO) ---
-            let totalReserved = 0;
+            // --- Stock Shortage Alert Logic (No Hard Reservation in MVP) ---
+            let totalReserved = 0; // Keeping variable for return signature
             let totalShortage = 0;
 
             for (const detail of so.details) {
                 const quantityNeeded = detail.quantity - (detail.quantityShipped || 0);
 
-                // Find available stock (FIFO by createdAt)
-                const availableInstances = await tx.productInstance.findMany({
+                // Find available stock
+                const availableStockCount = await tx.productInstance.count({
                     where: {
                         productId: detail.productId,
                         status: 'IN_STOCK',
-                        salesOrderId: null // Ensure not already reserved
-                    },
-                    orderBy: { createdAt: 'asc' },
-                    take: quantityNeeded
+                        salesOrderId: null
+                    }
                 });
 
-                // Lock specific Serial Numbers to this SO
-                for (const instance of availableInstances) {
-                    await tx.productInstance.update({
-                        where: { productInstanceId: instance.productInstanceId },
-                        data: {
-                            status: 'RESERVED',
-                            salesOrderId: id
-                        }
-                    });
-                    totalReserved++;
-                }
-
-                const shortage = Math.max(0, quantityNeeded - availableInstances.length);
+                const shortage = Math.max(0, quantityNeeded - availableStockCount);
                 if (shortage > 0) totalShortage += shortage;
             }
 
@@ -641,6 +627,7 @@ class SalesOrderService {
         soId: string | number,
         shipmentItems: { productId: number; serialNumbers: string[] }[],
         userId: number,
+        warehouseId: number,
         courierShippingCost?: number // NEW: Track actual expense
     ) {
         const id = typeof soId === 'string' ? parseInt(soId) : soId;
@@ -678,8 +665,8 @@ class SalesOrderService {
                     if (!instance) throw new Error(`Serial ${serial} not found.`);
                     if (instance.productId !== item.productId) throw new Error(`Serial ${serial} mismatch for Product ID ${item.productId}.`);
 
-                    // Ensure we only ship what was Reserved for this SO (or at least In Stock)
-                    if (instance.status !== 'RESERVED' && instance.status !== 'IN_STOCK') {
+                    // Ensure we only ship what is In Stock
+                    if (instance.status !== 'IN_STOCK') {
                         throw new Error(`Serial ${serial} is in invalid state for shipping: ${instance.status}`);
                     }
 
@@ -695,7 +682,7 @@ class SalesOrderService {
                             transactionType: 'EXPORT_SALES',
                             quantity: 1,
                             productInstanceId: instance.productInstanceId,
-                            warehouseId: 1, // Defaulting to Main Warehouse
+                            warehouseId,
                             employeeId: userId,
                             note: `Shipped for SO ${so.code}`
                         }
@@ -755,11 +742,10 @@ class SalesOrderService {
             // Statuses that hold stock: APPROVED, IN_PROGRESS
             const stockHoldingStatuses: SalesOrderStatus[] = [SalesOrderStatus.APPROVED, SalesOrderStatus.IN_PROGRESS];
             if (stockHoldingStatuses.includes(so.status)) {
-                // Find all reserved instances for this SO
+                // Find all linked instances for this SO and unlink them
                 await tx.productInstance.updateMany({
-                    where: { salesOrderId: id },
+                    where: { salesOrderId: id, status: 'IN_STOCK' }, // Just in case any were casually linked
                     data: {
-                        status: 'IN_STOCK',
                         salesOrderId: null
                     }
                 });

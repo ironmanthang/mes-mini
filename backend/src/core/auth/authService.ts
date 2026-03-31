@@ -37,8 +37,14 @@ interface ProfileResult {
 
 class AuthService {
     async login(username: string, password: string): Promise<LoginResult> {
-        const employee = await prisma.employee.findUnique({
-            where: { username },
+        const identifier = username.toLowerCase();
+        const employee = await prisma.employee.findFirst({
+            where: {
+                OR: [
+                    { username: identifier },
+                    { email: identifier }
+                ]
+            },
             include: { roles: { include: { role: true } } }
         });
 

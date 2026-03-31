@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from '../../src/common/lib/prisma.js';
-import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority } from '../../src/generated/prisma/index.js';
+import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType } from '../../src/generated/prisma/index.js';
 
 // ============================================================================
 // 🎛️ CENTRAL CONTROL PANEL
 // Toggle these to TRUE/FALSE to control what gets seeded
 // ============================================================================
 const SEED_CONFIG = {
-    MINIMAL: false,  // false = Seed all users for full testing
+    MINIMAL: false,  // false = Seed all for full testing
     ROLES: true,
     EMPLOYEES: true,
     SUPPLIERS: true,
@@ -56,9 +56,11 @@ async function main(): Promise<void> {
     if (SEED_CONFIG.RELATIONS) await seedDemoSupplierComponents();
     if (SEED_CONFIG.COMPONENTS) await seedDemoComponentStock();
     if (SEED_CONFIG.INSTANCES) await seedDemoProductInstances();
-    if (SEED_CONFIG.PURCHASE_ORDERS) await seedDemoPurchaseOrders();
     if (SEED_CONFIG.SALES_ORDERS) await seedDemoSalesOrders();
     if (SEED_CONFIG.PRODUCTION_REQUESTS) await seedDemoProductionRequests();
+    if (SEED_CONFIG.PURCHASE_ORDERS) await seedDemoPurchaseOrders();
+    
+    await seedCodeSequences();
 
     console.log('Seeding Completed.');
 }
@@ -303,10 +305,10 @@ async function seedComponents(): Promise<void> {
 async function seedWarehouses(): Promise<void> {
     console.log('...Seeding Warehouses');
     const warehouses = [
-        { code: 'WH-MAIN', name: 'Main Warehouse (Materials)', location: 'Zone A', type: 'COMPONENT' },
-        { code: 'WH-PROD', name: 'Production Floor', location: 'Zone B', type: 'COMPONENT' },
-        { code: 'WH-FG', name: 'Finished Goods', location: 'Zone C', type: 'PRODUCT' },
-        { code: 'WH-DEFECT', name: 'Defect Warehouse', location: 'Zone D', type: 'DEFECT' }
+        { code: 'WH-MAIN', name: 'Main Warehouse (Materials)', location: 'Zone A', type: WarehouseType.COMPONENT },
+        { code: 'WH-PROD', name: 'Production Floor', location: 'Zone B', type: WarehouseType.COMPONENT },
+        { code: 'WH-FG', name: 'Sales Warehouse', location: 'Zone C', type: WarehouseType.SALES },
+        { code: 'WH-DEFECT', name: 'Error Warehouse', location: 'Zone D', type: WarehouseType.ERROR }
     ];
 
     for (const w of warehouses) {
@@ -317,6 +319,7 @@ async function seedWarehouses(): Promise<void> {
                 code: w.code,
                 warehouseName: w.name,
                 location: w.location,
+                warehouseType: w.type,
             }
         });
     }
@@ -335,7 +338,8 @@ async function seedProducts(): Promise<void> {
         create: {
             code: 'PROD-LAPTOP-X1',
             productName: 'Laptop X1 Pro',
-            unit: 'pcs'
+            unit: 'pcs',
+            minStockLevel: 20
         }
     });
 
@@ -444,7 +448,8 @@ async function seedProductionScenarios(): Promise<void> {
         create: {
             code: 'PROD-GAMING-PC',
             productName: 'Gaming PC Ultra',
-            unit: 'pcs'
+            unit: 'pcs',
+            minStockLevel: 10
         }
     });
 
@@ -597,7 +602,7 @@ async function seedProductionScenarios(): Promise<void> {
     const smartwatch = await prisma.product.upsert({
         where: { code: 'PROD-SMARTWATCH' },
         update: {},
-        create: { code: 'PROD-SMARTWATCH', productName: 'Smartwatch V1', unit: 'pcs' }
+        create: { code: 'PROD-SMARTWATCH', productName: 'Smartwatch V1', unit: 'pcs', minStockLevel: 30 }
     });
 
     const screen = await prisma.component.upsert({
@@ -728,7 +733,7 @@ async function seedDemoProducts(): Promise<void> {
     const tablet = await prisma.product.upsert({
         where: { code: 'PROD-TABLET-A1' },
         update: {},
-        create: { code: 'PROD-TABLET-A1', productName: 'Tablet A1', unit: 'pcs' }
+        create: { code: 'PROD-TABLET-A1', productName: 'Tablet A1', unit: 'pcs', minStockLevel: 15 }
     });
     const screenOled = await prisma.component.findUnique({ where: { code: 'COM-SCREEN-OLED' } });
     const battery500 = await prisma.component.findUnique({ where: { code: 'COM-BATTERY-500' } });
@@ -741,7 +746,7 @@ async function seedDemoProducts(): Promise<void> {
     const desktop = await prisma.product.upsert({
         where: { code: 'PROD-DESKTOP-Z5' },
         update: {},
-        create: { code: 'PROD-DESKTOP-Z5', productName: 'Desktop Z5 Workstation', unit: 'pcs' }
+        create: { code: 'PROD-DESKTOP-Z5', productName: 'Desktop Z5 Workstation', unit: 'pcs', minStockLevel: 10 }
     });
     const cpuUltra = await prisma.component.findUnique({ where: { code: 'COM-CPU-ULTRA' } });
     const ram32 = await prisma.component.findUnique({ where: { code: 'COM-RAM-32GB' } });
@@ -756,7 +761,7 @@ async function seedDemoProducts(): Promise<void> {
     const monitor = await prisma.product.upsert({
         where: { code: 'PROD-MONITOR-M1' },
         update: {},
-        create: { code: 'PROD-MONITOR-M1', productName: 'Monitor M1 Pro', unit: 'pcs' }
+        create: { code: 'PROD-MONITOR-M1', productName: 'Monitor M1 Pro', unit: 'pcs', minStockLevel: 25 }
     });
     const display15 = await prisma.component.findUnique({ where: { code: 'COM-DISPLAY-15' } });
     const caseAlloy = await prisma.component.findUnique({ where: { code: 'COM-CASE-ALLOY' } });
@@ -843,7 +848,7 @@ async function seedDemoProductInstances(): Promise<void> {
     if (!admin) return;
 
     // Helper: create instances for a product via a dummy work order + batch
-    async function createInstances(productCode: string, count: number, prefix: string) {
+    async function createInstances(productCode: string, count: number, prefix: string, warehouseId: number) {
         const product = await prisma.product.findUnique({ where: { code: productCode } });
         if (!product) return;
 
@@ -870,16 +875,23 @@ async function seedDemoProductInstances(): Promise<void> {
                 status: 'IN_STOCK' as const,
                 unitProductionCost: 1200000,
                 productionBatchId: batch.productionBatchId,
+                warehouseId: warehouseId
             });
         }
         await prisma.productInstance.createMany({ data: instances, skipDuplicates: true });
     }
 
-    await createInstances('PROD-GAMING-PC', 10, 'GPC');
-    await createInstances('PROD-SMARTWATCH', 30, 'SW');
-    await createInstances('PROD-TABLET-A1', 25, 'TAB');
-    await createInstances('PROD-DESKTOP-Z5', 15, 'DSK');
-    await createInstances('PROD-MONITOR-M1', 20, 'MON');
+    const salesWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
+    if (!salesWarehouse) {
+        console.warn('   ⚠️ Missing sales warehouse (WH-FG) - instances will have no warehouse');
+        return;
+    }
+
+    await createInstances('PROD-GAMING-PC', 10, 'GPC', salesWarehouse.warehouseId);
+    await createInstances('PROD-SMARTWATCH', 30, 'SW', salesWarehouse.warehouseId);
+    await createInstances('PROD-TABLET-A1', 25, 'TAB', salesWarehouse.warehouseId);
+    await createInstances('PROD-DESKTOP-Z5', 15, 'DSK', salesWarehouse.warehouseId);
+    await createInstances('PROD-MONITOR-M1', 20, 'MON', salesWarehouse.warehouseId);
 
     console.log('   ✓ Demo product instances created');
 }
@@ -900,7 +912,7 @@ async function seedDemoPurchaseOrders(): Promise<void> {
 
     interface POSeed {
         code: string; supplierCode: string; status: PurchaseOrderStatus; priority: Priority;
-        approved: boolean; items: { componentCode: string; qty: number; price: number; received: number }[];
+        approved: boolean; items: { componentCode: string; qty: number; price: number; received: number; linkedPrCode?: string }[];
     }
 
     const poSeeds: POSeed[] = [
@@ -908,27 +920,29 @@ async function seedDemoPurchaseOrders(): Promise<void> {
             items: [{ componentCode: 'COM-STEEL-5MM', qty: 100, price: 45000, received: 100 }, { componentCode: 'COM-STEEL-10MM', qty: 50, price: 85000, received: 50 }] },
         { code: 'PO-2026-902', supplierCode: 'SUP-SS', status: PurchaseOrderStatus.COMPLETED, priority: Priority.MEDIUM, approved: true,
             items: [{ componentCode: 'COM-CHIP-X1', qty: 200, price: 120000, received: 200 }] },
-        { code: 'PO-2026-903', supplierCode: 'SUP-INTEL', status: PurchaseOrderStatus.SENT_TO_SUPPLIER, priority: Priority.HIGH, approved: true,
-            items: [{ componentCode: 'COM-CPU-ULTRA', qty: 50, price: 10000000, received: 0 }] },
-        { code: 'PO-2026-904', supplierCode: 'SUP-KINGSTON', status: PurchaseOrderStatus.PARTIALLY_RECEIVED, priority: Priority.MEDIUM, approved: true,
+        { code: 'PO-2026-903', supplierCode: 'SUP-INTEL', status: PurchaseOrderStatus.ORDERED, priority: Priority.HIGH, approved: true,
+            items: [{ componentCode: 'COM-CPU-ULTRA', qty: 50, price: 10000000, received: 0, linkedPrCode: 'PR-20260310-0001' }] },
+        { code: 'PO-2026-904', supplierCode: 'SUP-KINGSTON', status: PurchaseOrderStatus.RECEIVING, priority: Priority.MEDIUM, approved: true,
             items: [{ componentCode: 'COM-RAM-32GB', qty: 100, price: 2000000, received: 40 }] },
-        { code: 'PO-2026-905', supplierCode: 'SUP-CORSAIR', status: PurchaseOrderStatus.PENDING_APPROVAL, priority: Priority.LOW, approved: false,
+        { code: 'PO-2026-905', supplierCode: 'SUP-CORSAIR', status: PurchaseOrderStatus.PENDING, priority: Priority.LOW, approved: false,
             items: [{ componentCode: 'COM-PSU-850W', qty: 30, price: 3000000, received: 0 }] },
-        { code: 'PO-2026-906', supplierCode: 'SUP-FOXCONN', status: PurchaseOrderStatus.DRAFT, priority: Priority.MEDIUM, approved: false,
+        { code: 'D-PO-260310-906', supplierCode: 'SUP-FOXCONN', status: PurchaseOrderStatus.DRAFT, priority: Priority.MEDIUM, approved: false,
             items: [{ componentCode: 'COM-SCREW-M5', qty: 5000, price: 500, received: 0 }] },
         { code: 'PO-2026-907', supplierCode: 'SUP-INTEL', status: PurchaseOrderStatus.CANCELLED, priority: Priority.LOW, approved: false,
             items: [{ componentCode: 'COM-CPU-ULTRA', qty: 10, price: 10000000, received: 0 }] },
-        { code: 'PO-2026-908', supplierCode: 'SUP-KINGSTON', status: PurchaseOrderStatus.SENT_TO_SUPPLIER, priority: Priority.HIGH, approved: true,
+        { code: 'PO-2026-908', supplierCode: 'SUP-KINGSTON', status: PurchaseOrderStatus.ORDERED, priority: Priority.HIGH, approved: true,
             items: [{ componentCode: 'COM-RAM-32GB', qty: 200, price: 2000000, received: 0 }, { componentCode: 'COM-BATTERY-500', qty: 100, price: 50000, received: 0 }] },
-        { code: 'PO-2026-909', supplierCode: 'SUP-HP', status: PurchaseOrderStatus.DRAFT, priority: Priority.MEDIUM, approved: false,
+        { code: 'D-PO-260310-909', supplierCode: 'SUP-HP', status: PurchaseOrderStatus.DRAFT, priority: Priority.MEDIUM, approved: false,
             items: [{ componentCode: 'COM-STEEL-5MM', qty: 200, price: 45000, received: 0 }] },
-        { code: 'PO-2026-910', supplierCode: 'SUP-FOXCONN', status: PurchaseOrderStatus.PENDING_APPROVAL, priority: Priority.HIGH, approved: false,
+        { code: 'PO-2026-910', supplierCode: 'SUP-FOXCONN', status: PurchaseOrderStatus.PENDING, priority: Priority.HIGH, approved: false,
             items: [{ componentCode: 'COM-SCREEN-OLED', qty: 300, price: 200000, received: 0 }] },
         { code: 'PO-2026-911', supplierCode: 'SUP-CORSAIR', status: PurchaseOrderStatus.COMPLETED, priority: Priority.MEDIUM, approved: true,
             items: [{ componentCode: 'COM-PSU-850W', qty: 50, price: 3000000, received: 50 }] },
-        { code: 'PO-2026-912', supplierCode: 'SUP-SS', status: PurchaseOrderStatus.SENT_TO_SUPPLIER, priority: Priority.LOW, approved: true,
+        { code: 'PO-2026-912', supplierCode: 'SUP-SS', status: PurchaseOrderStatus.ORDERED, priority: Priority.LOW, approved: true,
             items: [{ componentCode: 'COM-CHIP-X1', qty: 500, price: 120000, received: 0 }] },
     ];
+
+    const mainWh = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
 
     for (const po of poSeeds) {
         const supplier = await sup(po.supplierCode);
@@ -941,15 +955,23 @@ async function seedDemoPurchaseOrders(): Promise<void> {
             const component = await comp(item.componentCode);
             if (!component) continue;
             subtotal += item.qty * item.price;
+            
+            let prId = null;
+            if (item.linkedPrCode) {
+                const linkedPr = await prisma.productionRequest.findUnique({ where: { code: item.linkedPrCode } });
+                prId = linkedPr?.productionRequestId || null;
+            }
+
             detailsData.push({
                 componentId: component.componentId,
                 quantityOrdered: item.qty,
                 unitPrice: item.price,
                 quantityReceived: item.received,
+                productionRequestId: prId
             });
         }
 
-        await prisma.purchaseOrder.upsert({
+        const createdPo = await prisma.purchaseOrder.upsert({
             where: { code: po.code },
             update: {},
             create: {
@@ -961,12 +983,53 @@ async function seedDemoPurchaseOrders(): Promise<void> {
                 orderDate: new Date(2026, 2, Math.floor(Math.random() * 10) + 1), // March 1-10
                 expectedDeliveryDate: new Date(2026, 2, 20),
                 totalAmount: subtotal,
-                discount: 0, shippingCost: 0, tax: 0,
+                warehouseId: mainWh.warehouseId,
+                shippingCost: 0, 
+                taxRate: 0,
                 approverId: po.approved ? manager.employeeId : null,
                 approvedAt: po.approved ? new Date() : null,
                 details: { create: detailsData },
-            }
+            },
+            include: { details: true }
         });
+
+        // Seed ComponentLot & Transaction if received > 0
+        if (mainWh) {
+            for (const detail of createdPo.details) {
+                if (detail.quantityReceived > 0) {
+                    // We only create stock if this PO doesn't already have one (to prevent duplicates on re-seed without reset)
+                    const existingLot = await prisma.componentLot.findFirst({ where: { poDetailId: detail.poDetailId } });
+                    if (!existingLot) {
+                        try {
+                            const transaction = await prisma.inventoryTransaction.create({
+                                data: {
+                                    transactionDate: createdPo.orderDate,
+                                    quantity: detail.quantityReceived,
+                                    note: `Initial seed receipt for ${createdPo.code}`,
+                                    employeeId: purchaser.employeeId,
+                                    warehouseId: mainWh.warehouseId,
+                                    componentId: detail.componentId,
+                                    transactionType: InventoryTransactionType.IMPORT_PO,
+                                    purchaseOrderId: createdPo.purchaseOrderId
+                                }
+                            });
+
+                            await prisma.componentLot.create({
+                                data: {
+                                    lotCode: `LOT-260310-${detail.poDetailId.toString().padStart(3, '0')}`,
+                                    componentId: detail.componentId,
+                                    poDetailId: detail.poDetailId,
+                                    warehouseId: mainWh.warehouseId,
+                                    quantity: detail.quantityReceived
+                                }
+                            });
+                        } catch (e: any) {
+                          console.warn(`Could not seed lot for ${detail.poDetailId}:`, e.message);
+                        }
+                    }
+                }
+            }
+        }
     }
     console.log(`   ✓ ${poSeeds.length} demo purchase orders created`);
 }
@@ -1098,6 +1161,14 @@ async function seedDemoProductionRequests(): Promise<void> {
         const product = await prod(pr.productCode);
         if (!product) continue;
 
+        // Fetch Product BOM
+        const bom = await prisma.billOfMaterial.findMany({ where: { productId: product.productId } });
+        const detailsData = bom.map((b: any) => ({
+            componentId: b.componentId,
+            quantityPerUnit: b.quantityNeeded,
+            totalRequired: b.quantityNeeded * pr.qty
+        }));
+
         await prisma.productionRequest.upsert({
             where: { code: pr.code },
             update: {},
@@ -1111,6 +1182,7 @@ async function seedDemoProductionRequests(): Promise<void> {
                 requestDate: new Date(2026, 2, 10),
                 soDetailId: pr.soDetailId,
                 note: pr.note,
+                details: { create: detailsData },
             }
         });
     }
@@ -1159,6 +1231,26 @@ async function seedDemoProductionRequests(): Promise<void> {
     }
 
     console.log(`   ✓ ${prSeeds.length} demo production requests created`);
+}
+
+// ============================================================================
+// 21. SEED CODE SEQUENCES
+// ============================================================================
+async function seedCodeSequences(): Promise<void> {
+    console.log('...Seeding Code Sequences');
+    const sequences = [
+        { scope: 'PO-2026', value: 912 }, // Since we used PO-2026-901 to 912
+        { scope: 'LOT-260310', value: 100 } // Safety padding
+    ];
+
+    for (const seq of sequences) {
+        await prisma.codeSequence.upsert({
+            where: { scope: seq.scope },
+            update: { currentValue: seq.value },
+            create: { scope: seq.scope, currentValue: seq.value }
+        });
+    }
+    console.log('   ✓ Code Sequences initialized');
 }
 
 // Execution

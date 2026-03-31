@@ -1,5 +1,5 @@
 import prisma from '../../common/lib/prisma.js';
-import SalesOrderService from '../../sales/salesOrders/salesOrderService.js';
+import InventoryService from '../../warehouse-ops/inventory/inventoryService.js';
 import MrpService from './mrpService.js';
 
 // ─── Response Types ────────────────────────────────────────────────
@@ -70,7 +70,7 @@ class FeasibilityService {
 
         // 2. Bulk fetch finished goods stock
         const productIds = so.details.map(d => d.productId);
-        const finishedGoodsMap = await SalesOrderService.getBulkAvailableStock(productIds);
+        const finishedGoodsMap = await InventoryService.getBulkProductStock(productIds);
 
         // 3. Process each line item
         const lineItems: LineItemFeasibility[] = [];

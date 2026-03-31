@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PO Receiving App Mockup</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        .row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; flex: 1; min-width: 320px; }
+        h2 { margin-top: 0; color: #38bdf8; font-size: 1.1rem; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; font-weight: bold; }
+        input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 10px; border-radius: 4px; font-family: monospace; }
+        input:focus { outline: none; border-color: #38bdf8; }
+        
+        button { background: #0ea5e9; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; width: 100%; transition: background 0.2s; }
+        button:hover { background: #0284c7; }
+        button.success { background: #10b981; }
+        button.success:hover { background: #059669; }
+        button.secondary { background: transparent; border: 1px solid #475569; color: #fff; }
+        button.secondary:hover { background: #334155; }
+        
+        pre { background: #020617; border: 1px solid #1e293b; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; color: #a7f3d0; max-height: 250px; }
+        .error { color: #fca5a5 !important; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #334155; }
+        th { color: #94a3b8; }
+        tr:hover { background: #0f172a; }
+
+        #print-zone { background: white; color: black; padding: 20px; border-radius: 8px; text-align: center; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-zone, #print-zone * { visibility: visible; }
+            #print-zone { position: absolute; left: 0; top: 0; margin: 0; border-radius: 0; width: 400px; height: 200px; }
+        }
+    </style>
+    <!-- Reverted back to QR Code for robust Mobile Web Camera scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="card" style="flex: none;">
+        <h2>🔐 API Connection & Auth Token</h2>
+        <div class="row">
+            <div class="form-group" style="flex: 2;">
+                <label>Backend API Base URL</label>
+                <input type="text" id="api-base" value="http://localhost:5000/api">
+                <div style="font-size: 0.7rem; color: #f6ad55; margin-top:4px;">⚠️ On Phone: Change 'localhost' to your PC IP (e.g. 192.168.1.5)</div>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Target PO ID</label>
+                <input type="number" id="po-id" value="18">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Account JWT Token</label>
+            <input type="text" id="jwt-token" placeholder="Paste your Bearer token here...">
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Panel 1: Receive POST -->
+        <div class="card">
+            <h2>📥 1. Receive Box (POST /api/purchase-orders/{id}/receive)</h2>
+            <div class="form-group">
+                <label>Component ID (Must exist in PO)</label>
+                <input type="number" id="rcv-comp" value="5">
+            </div>
+            <div class="form-group">
+                <label>Warehouse ID (Must match PO destination)</label>
+                <input type="number" id="rcv-wh" value="1">
+            </div>
+            <div class="form-group">
+                <label>Quantity in Box</label>
+                <input type="number" id="rcv-qty" value="10">
+            </div>
+            <button onclick="receiveGoods()">Simulate "Slap & Receive"</button>
+            <pre id="rcv-log">Waiting for action...</pre>
+        </div>
+
+        <!-- Panel 2: List Lots GET -->
+        <div class="card">
+            <h2>📋 2. View Lots (GET /api/purchase-orders/{id}/lots)</h2>
+            <button class="secondary" onclick="fetchLots()">Fetch Lots for PO</button>
+            <div style="overflow-y: auto; max-height: 350px;">
+                <table id="lots-table">
+                    <thead><tr><th>LOT Code</th><th>Comp ID</th><th>Qty</th><th>Action</th></tr></thead>
+                    <tbody id="lots-body">
+                        <tr><td colspan="4" style="text-align:center; color:#64748b">No Data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Panel 3: Print -->
+        <div class="card">
+            <h2>🖨️ 3. Physical Print Formatter (2D QR Code)</h2>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 0;">Click "Print Label" on a Lot above to render it here.</p>
+            <div id="print-zone" style="display:none; flex-direction: column; align-items: center;">
+                <div id="qrcode-box" style="margin-bottom: 8px;"></div>
+                <div style="font-weight:bold; font-size:1.2rem; font-family:monospace; margin-top:8px" id="lbl-text"></div>
+            </div>
+            <button class="success" style="margin-top: 15px; display:none" id="btn-print" onclick="window.print()">Force Browser Print Dialog</button>
+        </div>
+
+        <!-- Panel 4: Scan -->
+        <div class="card">
+            <h2>📷 4. Mobile Webcam QR Scanner</h2>
+            <button id="btn-scan" onclick="startScanner()">Activate Camera Tool</button>
+            
+            <div id="reader-container" style="display:none; background:black; border-radius:8px; overflow:hidden; margin-top:10px;">
+                <div id="reader" style="width:100%;"></div>
+                <button class="secondary" style="margin: 10px; width:calc(100% - 20px);" onclick="stopScanner()">Stop Camera</button>
+            </div>
+            
+            <pre id="scan-res" style="margin-top:15px; min-height: 40px; font-size: 1.2rem; text-align: center; align-content: center; display: flex; align-items:center; justify-content:center;">...waiting for 2D QR Code...</pre>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getApiBase() {
+        return document.getElementById('api-base').value;
+    }
+
+    function getHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${document.getElementById('jwt-token').value}`
+        };
+    }
+
+    // --- 1. POST Receive ---
+    async function receiveGoods() {
+        const token = document.getElementById('jwt-token').value;
+        const log = document.getElementById('rcv-log');
+        const apiBase = getApiBase();
+        
+        if(!token) {
+            log.className = 'error';
+            log.textContent = "Error: Please paste your JWT token into the top box first.";
+            return;
+        }
+
+        const poId = document.getElementById('po-id').value;
+        const body = {
+            items: [{
+                componentId: parseInt(document.getElementById('rcv-comp').value),
+                warehouseId: parseInt(document.getElementById('rcv-wh').value),
+                quantity: parseInt(document.getElementById('rcv-qty').value)
+            }]
+        };
+
+        log.textContent = 'Processing API Request...';
+        log.className = '';
+
+        try {
+            const res = await fetch(`${apiBase}/purchase-orders/${poId}/receive`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                log.className = 'error';
+                log.textContent = JSON.stringify(data, null, 2);
+            } else {
+                log.textContent = JSON.stringify(data, null, 2);
+                fetchLots(); // Auto-refresh the lots table
+            }
+        } catch (err) {
+            log.className = 'error';
+            log.textContent = "Network Error: Is the backend running on port 5000?\n" + err.message;
+        }
+    }
+
+    // --- 2. GET Lots ---
+    async function fetchLots() {
+        const token = document.getElementById('jwt-token').value;
+        if(!token) return;
+
+        const poId = document.getElementById('po-id').value;
+        const apiBase = getApiBase();
+        const tbody = document.getElementById('lots-body');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Fetching lots from API...</td></tr>';
+
+        try {
+            const res = await fetch(`${apiBase}/purchase-orders/${poId}/lots`, {
+                headers: getHeaders()
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.message || 'API Error occurred');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b">No Lots have been generated for this PO yet. Receive items first!</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(lot => `
+                <tr>
+                    <td style="font-family:monospace; color:#38bdf8">${lot.lotCode}</td>
+                    <td>${lot.componentId}</td>
+                    <td>${lot.quantity}</td>
+                    <td>
+                        <button class="secondary" style="padding:4px 8px; font-size:0.8rem" 
+                            onclick="renderBarcode('${lot.lotCode}')">Print Label</button>
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="4" class="error" style="text-align:center">${err.message}</td></tr>`;
+        }
+    }
+
+    // --- 3. QR RENDER (2D) ---
+    var qrcodeObj = null;
+    function renderBarcode(lotCode) {
+        document.getElementById('print-zone').style.display = 'flex';
+        document.getElementById('btn-print').style.display = 'block';
+        
+        if (!qrcodeObj) {
+            qrcodeObj = new QRCode(document.getElementById("qrcode-box"), {
+                text: lotCode,
+                width: 150,
+                height: 150,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        } else {
+            qrcodeObj.clear();
+            qrcodeObj.makeCode(lotCode);
+        }
+        
+        document.getElementById('lbl-text').textContent = lotCode;
+    }
+
+    // --- 4. CAMERA SCANNER ---
+    let html5QrcodeScanner = null;
+
+    function startScanner() {
+        document.getElementById('btn-scan').style.display = 'none';
+        document.getElementById('reader-container').style.display = 'block';
+        document.getElementById('scan-res').textContent = "Scanning...";
+        document.getElementById('scan-res').className = "";
+        
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: {width: 250, height: 250},
+            // Strictly enforce 2D QR Codes for extremely fast mobile web scanning
+            formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+        }, false);
+          
+        html5QrcodeScanner.render(
+            (decodedText) => {
+                document.getElementById('scan-res').textContent = decodedText;
+                document.getElementById('scan-res').style.color = '#10b981';
+                
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    oscillator.type = "sine";
+                    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                    oscillator.connect(audioCtx.destination);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                } catch(e) {}
+            },
+            (err) => { /* ignore frame errors */ }
+        );
+    }
+
+    function stopScanner() {
+        if(html5QrcodeScanner) {
+            html5QrcodeScanner.clear();
+            document.getElementById('reader-container').style.display = 'none';
+            document.getElementById('btn-scan').style.display = 'block';
+        }
+    }
+</script>
+</body>
+</html>

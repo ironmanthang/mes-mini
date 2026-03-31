@@ -120,6 +120,7 @@ model Product {
   productId          Int                 @id @default(autoincrement()) @map("product_id")
   productName        String              @map("product_name")
   categoryId         Int?                @map("category_id")
+  minStockLevel      Int                 @default(0) @map("min_stock_level")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   code               String              @unique
@@ -145,13 +146,15 @@ model Component {
   minStockLevel         Int                     @default(0) @map("min_stock_level")
   standardCost          Decimal                 @default(0) @map("standard_cost") @db.Decimal(10, 2)
   unit                  String
-  bom                   BillOfMaterial[]
-  componentStocks       ComponentStock[]
-  inventoryTransactions InventoryTransaction[]
-  materialReqDetails    MaterialRequestDetail[]
-  purchaseOrderDetails  PurchaseOrderDetail[]
-  stocktakeItems        StocktakeItem[]
-  suppliedBy            SupplierComponent[]
+  bom                      BillOfMaterial[]
+  componentStocks          ComponentStock[]
+  inventoryTransactions    InventoryTransaction[]
+  materialReqDetails       MaterialRequestDetail[]
+  purchaseOrderDetails     PurchaseOrderDetail[]
+  productionRequestDetails ProductionRequestDetail[]
+  stocktakeItems           StocktakeItem[]
+  suppliedBy               SupplierComponent[]
+  componentLots            ComponentLot[]
 
   @@index([componentName])
   @@map("components")
@@ -160,7 +163,7 @@ model Component {
 model BillOfMaterial {
   productId      Int       @map("product_id")
   componentId    Int       @map("component_id")
-  quantityNeeded Decimal   @map("quantity_needed") @db.Decimal(10, 4)
+  quantityNeeded Int       @map("quantity_needed")
   component      Component @relation(fields: [componentId], references: [componentId], onDelete: Cascade)
   product        Product   @relation(fields: [productId], references: [productId], onDelete: Cascade)
 
@@ -180,10 +183,11 @@ model PurchaseOrder {
   paymentTerms          String?                @map("payment_terms")
   priority              Priority               @default(MEDIUM)
   shippingCost          Decimal                @default(0) @map("shipping_cost") @db.Decimal(15, 2)
-  tax                   Decimal                @default(0) @db.Decimal(15, 2)
+  taxRate               Decimal                @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  warehouseId           Int                    @map("warehouse_id")
   code                  String                 @unique
   totalAmount           Decimal                @default(0) @map("total_amount") @db.Decimal(15, 2)
-  discount              Decimal                @default(0) @db.Decimal(15, 2)
+  note                  String?
   approvedAt            DateTime?              @map("approved_at")
   approverId            Int?                   @map("approver_id")
   status                PurchaseOrderStatus    @default(DRAFT)
@@ -192,6 +196,7 @@ model PurchaseOrder {
   approver              Employee?              @relation("POApprover", fields: [approverId], references: [employeeId])
   employee              Employee               @relation("POCreator", fields: [employeeId], references: [employeeId])
   supplier              Supplier               @relation(fields: [supplierId], references: [supplierId])
+  warehouse             Warehouse              @relation(fields: [warehouseId], references: [warehouseId])
 
   @@map("purchase_orders")
 }
@@ -207,9 +212,27 @@ model PurchaseOrderDetail {
   component           Component          @relation(fields: [componentId], references: [componentId])
   purchaseOrder       PurchaseOrder      @relation(fields: [purchaseOrderId], references: [purchaseOrderId], onDelete: Cascade)
   productionRequest   ProductionRequest? @relation(fields: [productionRequestId], references: [productionRequestId])
+  componentLots       ComponentLot[]
 
   @@unique([purchaseOrderId, componentId])
   @@map("purchase_order_details")
+}
+
+model ComponentLot {
+  componentLotId      Int                 @id @default(autoincrement()) @map("component_lot_id")
+  lotCode             String              @unique @map("lot_code")
+  componentId         Int                 @map("component_id")
+  poDetailId          Int                 @map("po_detail_id")
+  warehouseId         Int                 @map("warehouse_id")
+  quantity            Int
+  receivedAt          DateTime            @default(now()) @map("received_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+
+  component           Component           @relation(fields: [componentId], references: [componentId])
+  poDetail            PurchaseOrderDetail @relation(fields: [poDetailId], references: [poDetailId])
+  warehouse           Warehouse           @relation(fields: [warehouseId], references: [warehouseId])
+
+  @@map("component_lots")
 }
 
 model SalesOrder {
@@ -276,8 +299,23 @@ model ProductionRequest {
   salesOrderDetail      SalesOrderDetail?       @relation(fields: [soDetailId], references: [soDetailId])
   workOrderFulfillments WorkOrderFulfillment[]
   purchaseOrderDetails  PurchaseOrderDetail[]
+  details               ProductionRequestDetail[]
 
   @@map("production_requests")
+}
+
+model ProductionRequestDetail {
+  prDetailId          Int               @id @default(autoincrement()) @map("pr_detail_id")
+  productionRequestId Int               @map("production_request_id")
+  componentId         Int               @map("component_id")
+  quantityPerUnit     Int               @map("quantity_per_unit")
+  totalRequired       Int               @map("total_required")
+
+  productionRequest   ProductionRequest @relation(fields: [productionRequestId], references: [productionRequestId], onDelete: Cascade)
+  component           Component         @relation(fields: [componentId], references: [componentId])
+
+  @@unique([productionRequestId, componentId])
+  @@map("production_request_details")
 }
 
 model ProductionLine {
@@ -355,10 +393,12 @@ model ProductInstance {
   updatedAt             DateTime               @updatedAt @map("updated_at")
   status                ProductInstanceStatus  @default(WIP)
   salesOrderId          Int?                   @map("sales_order_id")
+  warehouseId           Int?                   @map("warehouse_id")
   inventoryTransactions InventoryTransaction[]
   product               Product                @relation(fields: [productId], references: [productId])
   productionBatch       ProductionBatch        @relation(fields: [productionBatchId], references: [productionBatchId])
   salesOrder            SalesOrder?            @relation(fields: [salesOrderId], references: [salesOrderId])
+  warehouse             Warehouse?             @relation(fields: [warehouseId], references: [warehouseId])
   qualityChecks         QualityCheck[]
   warranty              Warranty?
 
@@ -411,12 +451,16 @@ model Warehouse {
   warehouseId           Int                    @id @default(autoincrement()) @map("warehouse_id")
   warehouseName         String                 @map("warehouse_name")
   location              String?
+  warehouseType         WarehouseType          @map("warehouse_type")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   code                  String                 @unique
   componentStocks       ComponentStock[]
   inventoryTransactions InventoryTransaction[]
   stocktakes            Stocktake[]
+  productInstances      ProductInstance[]
+  componentLots         ComponentLot[]
+  purchaseOrders        PurchaseOrder[]
 
   @@map("warehouses")
 }
@@ -425,7 +469,6 @@ model ComponentStock {
   warehouseId       Int       @map("warehouse_id")
   componentId       Int       @map("component_id")
   quantity          Int
-  allocatedQuantity Int       @default(0) @map("allocated_quantity")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   component         Component @relation(fields: [componentId], references: [componentId])
   warehouse         Warehouse @relation(fields: [warehouseId], references: [warehouseId])
@@ -571,6 +614,13 @@ model StocktakeItem {
   @@map("stocktake_items")
 }
 
+model CodeSequence {
+  scope        String   @id
+  currentValue Int      @default(0) @map("current_value")
+
+  @@map("code_sequences")
+}
+
 enum Priority {
   HIGH
   MEDIUM
@@ -589,9 +639,10 @@ enum SalesOrderStatus {
 
 enum PurchaseOrderStatus {
   DRAFT
-  PENDING_APPROVAL
-  SENT_TO_SUPPLIER
-  PARTIALLY_RECEIVED
+  PENDING
+  APPROVED
+  ORDERED
+  RECEIVING
   COMPLETED
   CANCELLED
 }
@@ -623,7 +674,6 @@ enum QualityCheckResult {
 enum ProductInstanceStatus {
   WIP
   IN_STOCK
-  RESERVED
   SHIPPED
   RETURNED
   DEFECTIVE
@@ -653,6 +703,12 @@ enum RequestStatus {
   APPROVED
   REJECTED
   COMPLETED
+}
+
+enum WarehouseType {
+  COMPONENT
+  SALES
+  ERROR
 }
 
 enum NotificationType {

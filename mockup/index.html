@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MES-Mini Mockup</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;display:flex;height:100vh;overflow:hidden}
+  /* Sidebar */
+  #sidebar{width:220px;background:#161b27;border-right:1px solid #2d3748;display:flex;flex-direction:column;padding:16px 0;flex-shrink:0}
+  #sidebar h1{font-size:14px;font-weight:700;color:#63b3ed;padding:0 16px 16px;border-bottom:1px solid #2d3748;letter-spacing:.05em;text-transform:uppercase}
+  #sidebar nav{margin-top:12px}
+  #sidebar nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:#94a3b8;cursor:pointer;border-left:3px solid transparent;transition:.15s}
+  #sidebar nav a:hover{background:#1e2535;color:#e2e8f0}
+  #sidebar nav a.active{color:#63b3ed;border-left-color:#63b3ed;background:#1a2236}
+  #sidebar nav a .icon{width:18px;text-align:center}
+  /* Main */
+  #main{flex:1;overflow-y:auto;padding:24px}
+  .screen{display:none}
+  .screen.active{display:block}
+  /* Cards */
+  .page-title{font-size:20px;font-weight:700;margin-bottom:4px}
+  .page-sub{font-size:13px;color:#64748b;margin-bottom:20px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+  .kpi{background:#1e2535;border:1px solid #2d3748;border-radius:10px;padding:16px}
+  .kpi .label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .kpi .value{font-size:28px;font-weight:700;margin:4px 0}
+  .kpi .sub{font-size:12px;color:#64748b}
+  .kpi.warn .value{color:#f6ad55}
+  .kpi.ok .value{color:#68d391}
+  .kpi.info .value{color:#63b3ed}
+  /* Table */
+  .card{background:#1e2535;border:1px solid #2d3748;border-radius:10px;overflow:hidden;margin-bottom:16px}
+  .card-header{padding:12px 16px;border-bottom:1px solid #2d3748;display:flex;align-items:center;justify-content:space-between}
+  .card-header h2{font-size:14px;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{padding:10px 16px;text-align:left;border-bottom:1px solid #2d3748}
+  th{color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#232d3f}
+  /* Badges */
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .b-draft{background:#2d3748;color:#94a3b8}
+  .b-pending{background:#2d2200;color:#f6ad55;border:1px solid #744210}
+  .b-approved{background:#1a2e1a;color:#68d391;border:1px solid #276749}
+  .b-progress{background:#1a2040;color:#63b3ed;border:1px solid #2c5282}
+  .b-completed{background:#1a2440;color:#90cdf4}
+  .b-cancelled{background:#2d1515;color:#fc8181}
+  .b-planned{background:#2d2200;color:#fbd38d}
+  .b-released{background:#1c2e40;color:#76e4f7}
+  .b-onhold{background:#2d2d00;color:#faf089}
+  .b-waiting{background:#2d1f00;color:#f6ad55}
+  .b-pass{background:#1a2e1a;color:#68d391}
+  .b-fail{background:#2d1515;color:#fc8181}
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:.15s}
+  .btn-primary{background:#3182ce;color:#fff}
+  .btn-primary:hover{background:#2b6cb0}
+  .btn-sm{padding:4px 10px;font-size:12px;border-radius:5px}
+  .btn-ghost{background:transparent;border:1px solid #2d3748;color:#94a3b8}
+  .btn-ghost:hover{background:#232d3f;color:#e2e8f0}
+  .btn-success{background:#276749;color:#fff}
+  .btn-danger{background:#742a2a;color:#fff}
+  .btn-warn{background:#744210;color:#fff}
+  /* API Panel */
+  .api-panel{background:#0d1219;border:1px solid #2d3748;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px}
+  .api-panel summary{cursor:pointer;color:#63b3ed;font-weight:600;list-style:none}
+  .api-panel summary::before{content:'📡 '}
+  .api-panel ul{margin-top:8px;padding-left:0;list-style:none}
+  .api-panel li{padding:3px 0;color:#94a3b8;font-family:monospace}
+  .api-panel li span{color:#68d391}
+  .api-panel li em{color:#f6ad55}
+  /* Modal-like detail */
+  .detail-panel{background:#1e2535;border:1px solid #2d3748;border-radius:10px;padding:16px;margin-top:12px}
+  .detail-panel h3{font-size:13px;font-weight:600;margin-bottom:10px;color:#63b3ed}
+  .field-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:8px}
+  .field{flex:1;min-width:140px}
+  .field label{font-size:11px;color:#64748b;text-transform:uppercase;display:block;margin-bottom:2px}
+  .field span{font-size:13px}
+  .progress-bar{background:#2d3748;border-radius:20px;height:8px;margin-top:4px}
+  .progress-fill{height:8px;border-radius:20px;background:#3182ce;transition:.3s}
+  /* Tree */
+  .tree{font-family:monospace;font-size:12px;color:#94a3b8;line-height:1.8}
+  .tree .highlight{color:#68d391}
+  .tree .warn{color:#f6ad55}
+  /* Search box */
+  input[type=text]{background:#0f1117;border:1px solid #2d3748;border-radius:7px;color:#e2e8f0;padding:8px 12px;font-size:13px;width:100%;outline:none}
+  input[type=text]:focus{border-color:#3182ce}
+  .input-row{display:flex;gap:8px;margin-bottom:16px}
+  /* Alert */
+  .alert{padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:12px}
+  .alert-warn{background:#2d1f00;border:1px solid #744210;color:#f6ad55}
+  .alert-info{background:#1a2040;border:1px solid #2c5282;color:#90cdf4}
+  .scan-area{background:#0d1219;border:2px dashed #2d3748;border-radius:10px;padding:20px;text-align:center;color:#64748b;font-size:13px;margin:12px 0}
+  .scan-area strong{display:block;font-size:22px;color:#63b3ed;margin-bottom:4px}
+  @media print {
+    body * { visibility: hidden; }
+    #print-zone, #print-zone * { visibility: visible; }
+    #print-zone { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+    .btn { display: none !important; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>⚙ MES-Mini</h1>
+  <nav>
+    <a class="active" onclick="show('dashboard')"><span class="icon">📊</span> Dashboard</a>
+    <a onclick="show('sales')"><span class="icon">📦</span> Sales Orders</a>
+    <a onclick="show('pr')"><span class="icon">🏭</span> Production Requests</a>
+    <a onclick="show('po')"><span class="icon">🛒</span> Purchase Orders</a>
+    <a onclick="show('wo')"><span class="icon">🔧</span> Work Orders</a>
+    <a onclick="show('qc')"><span class="icon">✅</span> Quality Control</a>
+    <a onclick="show('inv')"><span class="icon">🏬</span> Inventory</a>
+    <a onclick="show('trace')"><span class="icon">🔍</span> Traceability</a>
+    <a onclick="show('barcode')"><span class="icon">🖨️</span> Print & Scan</a>
+  </nav>
+</div>
+
+<div id="main">
+
+<!-- ============================== DASHBOARD ============================== -->
+<section id="dashboard" class="screen active">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub">Real-time visibility → humans make decisions (Flow 10)</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span> /api/dashboard/summary</li>
+      <li><span>GET</span> /api/dashboard/alerts</li>
+    </ul>
+  </details>
+  <div class="kpi-grid">
+    <div class="kpi warn"><div class="label">Finished Goods (Sales WH)</div><div class="value">19</div><div class="sub">⚠️ Red Phone — low stock</div></div>
+    <div class="kpi ok"><div class="label">Components OK</div><div class="value">12</div><div class="sub">of 15 above min level</div></div>
+    <div class="kpi info"><div class="label">Pending Sales Orders</div><div class="value">3</div><div class="sub">waiting for stock</div></div>
+    <div class="kpi info"><div class="label">Active Work Orders</div><div class="value">2</div><div class="sub">in progress</div></div>
+    <div class="kpi ok"><div class="label">QC Pass Rate</div><div class="value">97.6%</div><div class="sub">last 30 days</div></div>
+    <div class="kpi warn"><div class="label">Cost / Unit</div><div class="value">₫810K</div><div class="sub">Red Phone latest batch</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>🔔 Active Alerts</h2></div>
+    <table>
+      <tr><th>Severity</th><th>Message</th><th>Time</th></tr>
+      <tr><td><span class="badge b-pending">⚠️ Low Stock</span></td><td>Red Phone stock = 19 (min: 50)</td><td>10 min ago</td></tr>
+      <tr><td><span class="badge b-pending">⚠️ Shortage</span></td><td>Battery stock insufficient for PR-2026-0015</td><td>2h ago</td></tr>
+      <tr><td><span class="badge b-approved">✅ Received</span></td><td>PO-2026-0008 fully received from Supplier B</td><td>Yesterday</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Pending Sales Orders (waiting for stock)</h2></div>
+    <table>
+      <tr><th>SO #</th><th>Agent</th><th>Product</th><th>Qty</th><th>Shipped</th><th>Status</th></tr>
+      <tr><td>SO-2026-0008</td><td>Agent A</td><td>Red Phone</td><td>100</td><td>19</td><td><span class="badge b-progress">IN_PROGRESS</span></td></tr>
+      <tr><td>SO-2026-0009</td><td>Agent B</td><td>Red Phone</td><td>50</td><td>0</td><td><span class="badge b-approved">APPROVED</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== SALES ORDERS ============================== -->
+<section id="sales" class="screen">
+  <div class="page-title">Sales Orders — Dispatch to Agent</div>
+  <div class="page-sub">Flow 1: DRAFT → PENDING_APPROVAL → APPROVED → IN_PROGRESS → COMPLETED</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/sales-orders?status=&agentId=&page=</li>
+      <li><span>POST</span> /api/sales-orders  <em>{ agentId, items:[{productId, qty, unitPrice}] }</em></li>
+      <li><span>PATCH</span> /api/sales-orders/:id/submit</li>
+      <li><span>PATCH</span> /api/sales-orders/:id/approve  <em>(Manager role)</em></li>
+      <li><span>PATCH</span> /api/sales-orders/:id/cancel</li>
+      <li><span>POST</span> /api/sales-orders/:id/scan  <em>{ serialNumber }</em>  → marks unit SHIPPED</li>
+      <li><span>GET</span>  /api/sales-orders/:id  → detail + scan progress</li>
+    </ul>
+  </details>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary" onclick="alert('UI: Fill form → POST /api/sales-orders')">+ New Sales Order</button>
+    <button class="btn btn-ghost">Filter by Status ▾</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Sales Orders</h2><span style="font-size:12px;color:#64748b">5 records</span></div>
+    <table>
+      <tr><th>SO #</th><th>Agent</th><th>Product</th><th>Qty</th><th>Shipped</th><th>Value</th><th>Status</th><th>Action</th></tr>
+      <tr>
+        <td>SO-2026-0010</td><td>Agent C</td><td>Red Phone</td><td>30</td><td>0</td><td>₫150M</td>
+        <td><span class="badge b-draft">DRAFT</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="soSubmit(this)">Submit</button></td>
+      </tr>
+      <tr>
+        <td>SO-2026-0009</td><td>Agent B</td><td>Red Phone</td><td>50</td><td>0</td><td>₫250M</td>
+        <td><span class="badge b-pending" id="so9-badge">PENDING_APPROVAL</span></td>
+        <td><button class="btn btn-sm btn-success" onclick="soApprove('so9')">Approve</button></td>
+      </tr>
+      <tr>
+        <td>SO-2026-0008</td><td>Agent A</td><td>Red Phone</td><td>100</td><td id="so8-shipped">19</td><td>₫500M</td>
+        <td><span class="badge b-progress" id="so8-badge">IN_PROGRESS</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="showScanPanel()">📷 Scan</button></td>
+      </tr>
+      <tr>
+        <td>SO-2026-0007</td><td>Agent A</td><td>Red Phone</td><td>20</td><td>20</td><td>₫100M</td>
+        <td><span class="badge b-completed">COMPLETED</span></td><td>—</td>
+      </tr>
+    </table>
+  </div>
+  <div id="scan-panel" style="display:none">
+    <div class="detail-panel">
+      <h3>📷 Scan Barcodes — SO-2026-0008 (Agent A, Red Phone ×100)</h3>
+      <div class="alert alert-warn">⚠️ Shortage: Required 100 | Available 19 | Shipped so far: <span id="scan-count">19</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="scan-bar" style="width:19%"></div></div>
+      <p style="font-size:12px;color:#64748b;margin:4px 0 12px"><span id="scan-count2">19</span>/100 units shipped</p>
+      <div class="scan-area">
+        <strong>RP-250317-001-00<span id="next-sn">20</span></strong>
+        <p>Next unit to scan (simulated)</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" onclick="doScan()">📡 POST /api/sales-orders/8/scan</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('scan-panel').style.display='none'">Close</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PRODUCTION REQUESTS ============================== -->
+<section id="pr" class="screen">
+  <div class="page-title">Production Requests</div>
+  <div class="page-sub">Flow 2: PM decides to replenish finished goods. Customer-blind, internal only.</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/production-requests</li>
+      <li><span>POST</span> /api/production-requests  <em>{ productId, qty, notes }</em></li>
+      <li><span>GET</span>  /api/production-requests/:id/bom-check  → feasibility result</li>
+      <li><span>PATCH</span> /api/production-requests/:id/cancel</li>
+    </ul>
+  </details>
+  <button class="btn btn-primary" style="margin-bottom:16px" onclick="alert('POST /api/production-requests\nBody: { productId, qty, notes }')">+ New Production Request</button>
+  <div class="card">
+    <table>
+      <tr><th>PR #</th><th>Product</th><th>Requested Qty</th><th>BOM Feasibility</th><th>Status</th><th>Created By</th></tr>
+      <tr>
+        <td>PR-2026-0015</td><td>Red Phone</td><td>500</td>
+        <td><span class="badge b-pending">⚠️ SHORTAGE</span> Battery: need 500, have 200</td>
+        <td><span class="badge b-waiting">WAITING_MATERIAL</span></td><td>PM Minh</td>
+      </tr>
+      <tr>
+        <td>PR-2026-0014</td><td>Red Phone</td><td>200</td>
+        <td><span class="badge b-approved">✅ FEASIBLE</span></td>
+        <td><span class="badge b-progress">PARTIALLY_FULFILLED</span></td><td>PM Minh</td>
+      </tr>
+      <tr>
+        <td>PR-2026-0013</td><td>Blue Phone</td><td>100</td>
+        <td><span class="badge b-approved">✅ FEASIBLE</span></td>
+        <td><span class="badge b-completed">FULFILLED</span></td><td>PM Minh</td>
+      </tr>
+    </table>
+  </div>
+  <div class="detail-panel">
+    <h3>BOM Feasibility Detail — PR-2026-0015 (500 Red Phones)</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:10px">Response from <code style="color:#63b3ed">GET /api/production-requests/15/bom-check</code></p>
+    <table>
+      <tr><th>Component</th><th>Required</th><th>In Stock</th><th>Shortage</th><th>Action</th></tr>
+      <tr><td>Screen</td><td>500</td><td>620</td><td>—</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+      <tr><td>Battery</td><td>500</td><td>200</td><td>300</td><td><button class="btn btn-sm btn-warn" onclick="show('po')">Create PO →</button></td></tr>
+      <tr><td>Main Chip</td><td>1000</td><td>1500</td><td>—</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== PURCHASE ORDERS ============================== -->
+<section id="po" class="screen">
+  <div class="page-title">Purchase Orders — Procurement</div>
+  <div class="page-sub">Flow 3: Buy components from suppliers → replenish Component Warehouse.</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/purchase-orders</li>
+      <li><span>POST</span> /api/purchase-orders  <em>{ supplierId, items:[{componentId, qty, unitCost}] }</em></li>
+      <li><span>PATCH</span> /api/purchase-orders/:id/submit</li>
+      <li><span>PATCH</span> /api/purchase-orders/:id/approve  <em>(Manager)</em></li>
+      <li><span>POST</span> /api/purchase-orders/:id/receive  <em>{ items:[{componentId, receivedQty}] }</em> → creates inventory movement</li>
+      <li><span>GET</span>  /api/purchase-orders/:id → detail + receive history</li>
+    </ul>
+  </details>
+  <button class="btn btn-primary" style="margin-bottom:16px" onclick="alert('POST /api/purchase-orders\nBody: { supplierId, items:[{componentId, qty, unitCost}] }')">+ New Purchase Order</button>
+  <div class="card">
+    <table>
+      <tr><th>PO #</th><th>Supplier</th><th>Component</th><th>Ordered</th><th>Received</th><th>Total Value</th><th>Status</th><th>Action</th></tr>
+      <tr>
+        <td>PO-2026-0012</td><td>Supplier B</td><td>Battery ×500</td><td>500</td><td>0</td><td>₫25M</td>
+        <td><span class="badge b-pending" id="po12-badge">PENDING_APPROVAL</span></td>
+        <td><button class="btn btn-sm btn-success" onclick="poApprove()">Approve</button></td>
+      </tr>
+      <tr>
+        <td>PO-2026-0011</td><td>Supplier A</td><td>Screen ×300</td><td>300</td><td id="po11-recv">150</td><td>₫15M</td>
+        <td><span class="badge b-progress" id="po11-badge">PARTIALLY_RECEIVED</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="poReceive()">Receive Goods</button></td>
+      </tr>
+      <tr>
+        <td>PO-2026-0010</td><td>Supplier A</td><td>Main Chip ×1000</td><td>1000</td><td>1000</td><td>₫40M</td>
+        <td><span class="badge b-completed">COMPLETED</span></td><td>—</td>
+      </tr>
+    </table>
+  </div>
+  <div id="receive-detail" style="display:none" class="detail-panel">
+    <h3>Receive Goods — PO-2026-0011 (Screen ×300)</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:10px">Calls <code style="color:#63b3ed">POST /api/purchase-orders/11/receive</code> → creates inventory movement (Import)</p>
+    <table>
+      <tr><th>Component</th><th>Ordered</th><th>Previously Received</th><th>Receiving Now</th></tr>
+      <tr><td>Screen</td><td>300</td><td>150</td><td><input type="text" value="150" style="width:80px"></td></tr>
+    </table>
+    <button class="btn btn-primary" style="margin-top:12px" onclick="confirmReceive()">Confirm Receipt</button>
+  </div>
+</section>
+
+<!-- ============================== WORK ORDERS ============================== -->
+<section id="wo" class="screen">
+  <div class="page-title">Work Orders — Factory Floor</div>
+  <div class="page-sub">Flow 4: PLANNED → RELEASED → IN_PROGRESS → COMPLETED → CLOSED</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/work-orders</li>
+      <li><span>POST</span> /api/work-orders  <em>{ productionRequestId, productId, plannedQty, lineId, batchPrefix, productionDate }</em></li>
+      <li><span>PATCH</span> /api/work-orders/:id/release</li>
+      <li><span>POST</span> /api/work-orders/:id/material-request  <em>{ items:[{componentId, qty}] }</em></li>
+      <li><span>PATCH</span> /api/work-orders/:id/material-request/:mrId/approve  <em>(Warehouse)</em></li>
+      <li><span>POST</span> /api/work-orders/:id/scan  <em>{ serialNumber }</em>  → creates ProductInstance WIP</li>
+      <li><span>POST</span> /api/work-orders/:id/complete  <em>{ surplusComponents[], damagedComponents[] }</em></li>
+      <li><span>GET</span>  /api/work-orders/:id  → full detail incl. batch, instances, costs</li>
+    </ul>
+  </details>
+  <div class="card">
+    <table>
+      <tr><th>WO #</th><th>Product</th><th>Planned</th><th>Produced</th><th>Line</th><th>PR Link</th><th>Status</th><th>Action</th></tr>
+      <tr>
+        <td>WO-2026-0042</td><td>Red Phone</td><td>500</td><td id="wo42-prod">0</td><td>Line Alpha</td><td>PR-2026-0015</td>
+        <td><span class="badge b-released" id="wo42-badge">RELEASED</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="showMR()">Material Request</button></td>
+      </tr>
+      <tr>
+        <td>WO-2026-0041</td><td>Red Phone</td><td>200</td><td>200</td><td>Line Beta</td><td>PR-2026-0014</td>
+        <td><span class="badge b-progress">IN_PROGRESS</span></td>
+        <td><button class="btn btn-sm btn-primary" onclick="showWOScan()">📷 Scan Units</button></td>
+      </tr>
+      <tr>
+        <td>WO-2026-0040</td><td>Blue Phone</td><td>100</td><td>100</td><td>Line Alpha</td><td>PR-2026-0013</td>
+        <td><span class="badge b-completed">COMPLETED</span></td><td>—</td>
+      </tr>
+    </table>
+  </div>
+  <div id="mr-panel" style="display:none" class="detail-panel">
+    <h3>Material Request — WO-2026-0042 (Line Lead action)</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:10px">Calls <code style="color:#63b3ed">POST /api/work-orders/42/material-request</code>  →  Warehouse approves → components leave Component WH</p>
+    <table>
+      <tr><th>Component</th><th>BOM × 500 units</th><th>In Stock</th><th>Status</th></tr>
+      <tr><td>Screen</td><td>500</td><td>620</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+      <tr><td>Battery</td><td>500</td><td>200</td><td><span class="badge b-pending">⚠️ SHORT</span></td></tr>
+      <tr><td>Main Chip</td><td>1000</td><td>1500</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+    </table>
+    <div class="alert alert-warn" style="margin-top:12px">⚠️ Cannot issue materials — Battery shortage. PM must create PO first.</div>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="document.getElementById('mr-panel').style.display='none'">Close</button>
+  </div>
+  <div id="woscan-panel" style="display:none" class="detail-panel">
+    <h3>📷 Scan Units into WIP — WO-2026-0041 (200 Red Phones)</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:10px">Calls <code style="color:#63b3ed">POST /api/work-orders/41/scan { serialNumber }</code>  →  creates ProductInstance with status WIP</p>
+    <div class="scan-area"><strong>RP-250317-002-<span id="wo-sn">0145</span></strong><p>Simulated next serial number</p></div>
+    <div class="progress-bar"><div class="progress-fill" id="wo-bar" style="width:72%"></div></div>
+    <p style="font-size:12px;color:#64748b;margin:4px 0 12px"><span id="wo-count">144</span>/200 units scanned</p>
+    <button class="btn btn-primary" onclick="doWOScan()">Scan Next Unit</button>
+    <button class="btn btn-ghost" style="margin-left:8px" onclick="document.getElementById('woscan-panel').style.display='none'">Close</button>
+  </div>
+</section>
+
+<!-- ============================== QC ============================== -->
+<section id="qc" class="screen">
+  <div class="page-title">Quality Control</div>
+  <div class="page-sub">Flow 5: Gate between Production WH and Sales WH. Pass → IN_STOCK. Fail → SCRAPPED.</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/qc/pending  → batches awaiting inspection</li>
+      <li><span>GET</span>  /api/qc/batches/:batchId/instances  → list of product instances</li>
+      <li><span>POST</span> /api/qc/inspect  <em>{ serialNumber, result:"PASS"|"FAIL", notes?, checklist? }</em></li>
+      <li><em>PASS</em> → ProductInstance moves to Sales WH (status: IN_STOCK)</li>
+      <li><em>FAIL</em> → ProductInstance moves to Error WH (status: SCRAPPED)</li>
+    </ul>
+  </details>
+  <div class="card">
+    <div class="card-header"><h2>Batches Pending QC</h2></div>
+    <table>
+      <tr><th>Batch Code</th><th>WO #</th><th>Product</th><th>Units</th><th>Inspected</th><th>Pass</th><th>Fail</th><th>Action</th></tr>
+      <tr>
+        <td>RP-250317-002</td><td>WO-2026-0041</td><td>Red Phone</td><td>200</td>
+        <td id="qc-inspected">120</td><td id="qc-pass">118</td><td id="qc-fail">2</td>
+        <td><button class="btn btn-sm btn-primary" onclick="showQCPanel()">Inspect Next</button></td>
+      </tr>
+      <tr>
+        <td>BP-250316-001</td><td>WO-2026-0040</td><td>Blue Phone</td><td>100</td>
+        <td>100</td><td>97</td><td>3</td>
+        <td><span class="badge b-completed">Done</span></td>
+      </tr>
+    </table>
+  </div>
+  <div id="qc-panel" style="display:none" class="detail-panel">
+    <h3>Inspect: RP-250317-002-<span id="qc-sn">0121</span></h3>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field"><label>Serial #</label><span>RP-250317-002-0121</span></div>
+      <div class="field"><label>Batch</label><span>RP-250317-002</span></div>
+      <div class="field"><label>Production Date</label><span>2026-03-17</span></div>
+      <div class="field"><label>Inspector</label><span>Nguyen Van B</span></div>
+    </div>
+    <p style="font-size:12px;color:#64748b;margin-bottom:8px">Calls <code style="color:#63b3ed">POST /api/qc/inspect { serialNumber, result, notes }</code></p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-success" onclick="doQC('pass')">✅ PASS → Sales WH</button>
+      <button class="btn btn-danger" onclick="doQC('fail')">❌ FAIL → Scrap</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('qc-panel').style.display='none'">Close</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== INVENTORY ============================== -->
+<section id="inv" class="screen">
+  <div class="page-title">Inventory</div>
+  <div class="page-sub">Flow 6: All 4 warehouses + movement log. Read-only view for most users.</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/inventory?warehouseType=COMPONENT|PRODUCTION|SALES|ERROR</li>
+      <li><span>GET</span>  /api/inventory/movements?warehouseId=&type=&dateFrom=&dateTo=</li>
+      <li><span>GET</span>  /api/inventory/components/:id  → stock level + min level</li>
+    </ul>
+  </details>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary" onclick="setWH('component')">🔩 Component WH</button>
+    <button class="btn btn-ghost" onclick="setWH('sales')">📦 Sales WH</button>
+    <button class="btn btn-ghost" onclick="setWH('production')">🏭 Production WH</button>
+    <button class="btn btn-ghost" onclick="setWH('error')">⚠️ Error WH</button>
+  </div>
+  <div class="card" id="inv-card">
+    <div class="card-header"><h2 id="inv-title">🔩 Component Warehouse</h2></div>
+    <div id="inv-body">
+      <table>
+        <tr><th>Component</th><th>In Stock</th><th>Min Level</th><th>Status</th></tr>
+        <tr><td>Battery</td><td>200</td><td>300</td><td><span class="badge b-pending">⚠️ LOW</span></td></tr>
+        <tr><td>Screen</td><td>620</td><td>100</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+        <tr><td>Main Chip</td><td>1500</td><td>500</td><td><span class="badge b-approved">✅ OK</span></td></tr>
+        <tr><td>Camera Module</td><td>80</td><td>100</td><td><span class="badge b-pending">⚠️ LOW</span></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Recent Inventory Movements</h2></div>
+    <table>
+      <tr><th>Time</th><th>Type</th><th>Item</th><th>Qty</th><th>From</th><th>To</th><th>Ref</th></tr>
+      <tr><td>10:42</td><td>Export (Sales)</td><td>Red Phone</td><td>1</td><td>Sales WH</td><td>Agent A</td><td>SO-2026-0008</td></tr>
+      <tr><td>09:15</td><td>QC Pass Transfer</td><td>Red Phone</td><td>50</td><td>Production WH</td><td>Sales WH</td><td>WO-2026-0040</td></tr>
+      <tr><td>Yesterday</td><td>Import (PO)</td><td>Screen</td><td>150</td><td>Supplier A</td><td>Component WH</td><td>PO-2026-0011</td></tr>
+      <tr><td>Yesterday</td><td>Export (Production)</td><td>Main Chip</td><td>1000</td><td>Component WH</td><td>Production Floor</td><td>WO-2026-0041</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== TRACEABILITY ============================== -->
+<section id="trace" class="screen">
+  <div class="page-title">Traceability — Serial Number Genealogy</div>
+  <div class="page-sub">Flow 8: Full product lifecycle by serial number. Used by QC, customers, and management.</div>
+  <details class="api-panel">
+    <summary>APIs needed</summary>
+    <ul>
+      <li><span>GET</span>  /api/traceability/:serialNumber  → full genealogy tree</li>
+      <li><em>Response includes:</em> product info, batch, work order, PR, QC result, inventory history, SO, warranty</li>
+    </ul>
+  </details>
+  <div class="input-row">
+    <input type="text" id="trace-input" placeholder="Enter Serial Number e.g. RP-250317-001-0042" value="RP-250317-001-0042">
+    <button class="btn btn-primary" onclick="doTrace()">🔍 Search</button>
+  </div>
+  <div id="trace-result" class="card" style="display:none">
+    <div class="card-header"><h2>📡 GET /api/traceability/RP-250317-001-0042</h2></div>
+    <div style="padding:16px">
+      <div class="tree">
+<pre>
+Serial Number: <span class="highlight">RP-250317-001-0042</span>
+├── Product:          Red Phone (SKU: RED-PH-001)
+├── Production Batch: <span class="highlight">RP-250317-001</span>
+│   ├── Production Date:  2026-03-17
+│   ├── Expiry Date:      2028-03-17
+│   └── Production Line:  Line Alpha
+├── Work Order:       <span class="highlight">WO-2026-0042</span>
+│   └── Production Request: PR-2026-0015 (internal stock replenishment)
+├── QC Result:        <span class="highlight">PASSED</span> (Inspector: Nguyen Van B, Date: 2026-03-18)
+├── Inventory History:
+│   ├── 2026-03-17:  Produced → Production Warehouse
+│   ├── 2026-03-18:  QC Passed → Sales Warehouse
+│   └── 2026-03-20:  <span class="warn">Shipped → Agent A (SO-2026-0008)</span>
+├── Sales Order:      <span class="highlight">SO-2026-0008</span>  (Agent A, Price: ₫5,000,000)
+└── Warranty:         <span class="highlight">Active</span> until 2027-03-20 (Customer: Tran Van C)
+</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== BARCODE SCAN & PRINT ============================== -->
+<section id="barcode" class="screen">
+  <div class="page-title">Barcode Generation & Scanning</div>
+  <div class="page-sub">Simulates the physical "slap" and scan workflow on the floor</div>
+  
+  <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+    <!-- GENERATE PANEL -->
+    <div class="card" style="flex: 1; padding: 16px; min-width: 300px;">
+      <h2 style="margin-bottom:12px;color:#63b3ed">🖨️ Generate & Print Label</h2>
+      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Mocking the LOT code generation after calling <code style="color:#68d391">/api/purchase-orders/:id/receive</code></p>
+      <div class="input-row">
+        <input type="text" id="gen-lot-input" value="LOT-260331-002">
+        <button class="btn btn-primary" onclick="generateQR()">Generate QR</button>
+      </div>
+      <div id="print-zone" class="scan-area" style="background:#fff; color:#000; border: none; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height: 200px">
+        <div id="qrcode-box" style="margin-bottom: 8px;"></div>
+        <p style="margin-top:10px; font-weight:bold; font-size:18px; font-family:monospace; margin: 0" id="qrcode-label">LOT-260331-002</p>
+        <p style="font-size:11px; color:#555; margin-top:4px">Component: CPU i9 Ultra | Warehouse: 1</p>
+      </div>
+      <button class="btn btn-success" style="width:100%; margin-top: 12px" onclick="window.print()">🖨️ Open Print Dialog</button>
+    </div>
+
+    <!-- SCAN PANEL -->
+    <div class="card" style="flex: 1; padding: 16px; min-width: 300px;">
+      <h2 style="margin-bottom:12px;color:#68d391">📷 Scan Label</h2>
+      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Uses laptop/phone camera via <code style="color:#68d391">html5-qrcode</code></p>
+      <button class="btn btn-primary" id="start-scan-btn" onclick="startScanner()" style="width:100%; margin-bottom: 12px">▶ Start Camera Scanner</button>
+      
+      <div id="reader-container" style="display:none; text-align:center">
+         <div id="reader" style="width:100%; border:1px solid #2d3748; overflow:hidden; border-radius: 8px; background: #000"></div>
+         <button class="btn btn-danger btn-sm" style="margin-top:12px" onclick="stopScanner()">Stop Camera</button>
+      </div>
+
+      <div style="margin-top:16px">
+        <label style="font-size:11px; color:#64748b; text-transform:uppercase">Scanned Result:</label>
+        <div style="background:#0f1117; border:1px solid #3182ce; padding: 12px; border-radius: 6px; font-family:monospace; color:#63b3ed; font-size:18px; margin-top:4px; min-height: 46px" id="scan-result">...waiting for scan...</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /main -->
+
+<script>
+// ─── Navigation ───
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+// ─── Sales Orders ───
+function soSubmit(btn) {
+  btn.closest('tr').querySelector('.badge').className = 'badge b-pending';
+  btn.closest('tr').querySelector('.badge').textContent = 'PENDING_APPROVAL';
+  btn.textContent = 'Approve';
+  btn.className = 'btn btn-sm btn-success';
+  btn.onclick = function(){ soApproveRow(this); };
+}
+function soApproveRow(btn) {
+  btn.closest('tr').querySelector('.badge').className = 'badge b-approved';
+  btn.closest('tr').querySelector('.badge').textContent = 'APPROVED';
+  btn.textContent = '📷 Scan';
+  btn.className = 'btn btn-sm btn-primary';
+  btn.onclick = showScanPanel;
+}
+function soApprove(id) {
+  document.getElementById(id+'-badge').className = 'badge b-approved';
+  document.getElementById(id+'-badge').textContent = 'APPROVED';
+  event.currentTarget.textContent = '📷 Scan';
+  event.currentTarget.className = 'btn btn-sm btn-primary';
+  event.currentTarget.onclick = showScanPanel;
+}
+function showScanPanel() { document.getElementById('scan-panel').style.display='block'; }
+var scanCount = 19;
+function doScan() {
+  if (scanCount >= 100) { alert('All 100 units shipped! SO auto-completes.'); return; }
+  scanCount++;
+  document.getElementById('scan-count').textContent = scanCount;
+  document.getElementById('scan-count2').textContent = scanCount;
+  document.getElementById('so8-shipped').textContent = scanCount;
+  document.getElementById('next-sn').textContent = String(scanCount+1).padStart(2,'0');
+  document.getElementById('scan-bar').style.width = (scanCount)+'%';
+  if (scanCount >= 100) {
+    document.getElementById('so8-badge').className = 'badge b-completed';
+    document.getElementById('so8-badge').textContent = 'COMPLETED';
+    alert('✅ All 100/100 units shipped! SO auto-completed.');
+  }
+}
+
+// ─── Purchase Orders ───
+function poApprove() {
+  document.getElementById('po12-badge').className = 'badge b-progress';
+  document.getElementById('po12-badge').textContent = 'SENT_TO_SUPPLIER';
+  event.currentTarget.textContent = 'Sent ✓';
+  event.currentTarget.disabled = true;
+}
+function poReceive() { document.getElementById('receive-detail').style.display='block'; }
+function confirmReceive() {
+  document.getElementById('po11-recv').textContent = '300';
+  document.getElementById('po11-badge').className = 'badge b-completed';
+  document.getElementById('po11-badge').textContent = 'COMPLETED';
+  document.getElementById('receive-detail').style.display='none';
+  alert('✅ 150 Screens received. Component WH updated. Inventory movement created.');
+}
+
+// ─── Work Orders ───
+function showMR() { document.getElementById('mr-panel').style.display='block'; }
+function showWOScan() { document.getElementById('woscan-panel').style.display='block'; }
+var woCount = 144;
+function doWOScan() {
+  if (woCount >= 200) { alert('All 200 units scanned!'); return; }
+  woCount++;
+  document.getElementById('wo-count').textContent = woCount;
+  document.getElementById('wo-sn').textContent = String(woCount).padStart(4,'0');
+  document.getElementById('wo-bar').style.width = (woCount/2)+'%';
+  document.getElementById('wo42-prod').textContent = woCount;
+  if (woCount >= 200) alert('✅ 200 units scanned. WO ready for post-production step.');
+}
+
+// ─── QC ───
+function showQCPanel() { document.getElementById('qc-panel').style.display='block'; }
+var qcInspected = 120, qcPass = 118, qcFail = 2, qcSN = 121;
+function doQC(result) {
+  qcInspected++;
+  if (result === 'pass') qcPass++; else qcFail++;
+  qcSN++;
+  document.getElementById('qc-inspected').textContent = qcInspected;
+  document.getElementById('qc-pass').textContent = qcPass;
+  document.getElementById('qc-fail').textContent = qcFail;
+  document.getElementById('qc-sn').textContent = String(qcSN).padStart(4,'0');
+  alert(result === 'pass' ? '✅ PASSED → ProductInstance moved to Sales Warehouse (status: IN_STOCK)' : '❌ FAILED → ProductInstance moved to Error Warehouse (status: SCRAPPED)');
+  if (qcInspected >= 200) { document.getElementById('qc-panel').style.display='none'; alert('Batch fully inspected!'); }
+}
+
+// ─── Inventory ───
+const whData = {
+  component: {title:'🔩 Component Warehouse', rows:`<tr><td>Battery</td><td>200</td><td>300</td><td><span class="badge b-pending">⚠️ LOW</span></td></tr><tr><td>Screen</td><td>620</td><td>100</td><td><span class="badge b-approved">✅ OK</span></td></tr><tr><td>Main Chip</td><td>1500</td><td>500</td><td><span class="badge b-approved">✅ OK</span></td></tr>`},
+  sales: {title:'📦 Sales Warehouse (Finished Goods)', rows:`<tr><td>Red Phone</td><td>19</td><td>50</td><td><span class="badge b-pending">⚠️ LOW</span></td></tr><tr><td>Blue Phone</td><td>215</td><td>50</td><td><span class="badge b-approved">✅ OK</span></td></tr>`},
+  production: {title:'🏭 Production Warehouse', rows:`<tr><td>Red Phone (WIP batch RP-250317-002)</td><td>80</td><td>—</td><td><span class="badge b-progress">Awaiting QC</span></td></tr>`},
+  error: {title:'⚠️ Error Warehouse (Scrapped)', rows:`<tr><td>Red Phone</td><td>12</td><td>—</td><td><span class="badge b-cancelled">SCRAPPED</span></td></tr>`}
+};
+function setWH(type) {
+  const d = whData[type];
+  document.getElementById('inv-title').textContent = d.title;
+  document.getElementById('inv-body').innerHTML = `<table><tr><th>Item</th><th>In Stock</th><th>Min Level</th><th>Status</th></tr>${d.rows}</table>`;
+}
+
+// ─── Traceability ───
+function doTrace() { document.getElementById('trace-result').style.display='block'; }
+
+// ─── Barcode Generate & Print ───
+var qrcodeBox = null;
+function generateQR() {
+    var text = document.getElementById("gen-lot-input").value;
+    if(!qrcodeBox) {
+        qrcodeBox = new QRCode(document.getElementById("qrcode-box"), {
+            text: text, width: 150, height: 150, colorDark : "#000", colorLight : "#fff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    } else {
+        qrcodeBox.clear();
+        qrcodeBox.makeCode(text);
+    }
+    document.getElementById("qrcode-label").textContent = text;
+}
+// Init the first QR rendering
+setTimeout(generateQR, 500);
+
+// ─── Barcode Scanner ───
+let html5QrcodeScanner = null;
+
+function startScanner() {
+    document.getElementById('start-scan-btn').style.display = 'none';
+    document.getElementById('reader-container').style.display = 'block';
+    
+    html5QrcodeScanner = new Html5QrcodeScanner(
+      "reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+      
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+}
+
+function stopScanner() {
+    if(html5QrcodeScanner) {
+        html5QrcodeScanner.clear();
+        document.getElementById('reader-container').style.display = 'none';
+        document.getElementById('start-scan-btn').style.display = 'block';
+    }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    document.getElementById('scan-result').textContent = decodedText;
+    document.getElementById('scan-result').style.borderColor = '#68d391';
+    document.getElementById('scan-result').style.color = '#68d391';
+    
+    // Play a beep sound using HTML5 Audio (synthesized)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz beep
+    oscillator.connect(audioCtx.destination);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1); // 100ms beep
+}
+
+function onScanFailure(error) {
+    // Ignore frame failures, it runs 10 times a second
+}
+</script>
+</body>
+</html>

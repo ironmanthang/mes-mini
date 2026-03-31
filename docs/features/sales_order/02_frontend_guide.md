@@ -1,3 +1,8 @@
+> [!CAUTION]
+> **OUTDATED (2026-03-17):** This document predates the MTS-only pivot. 
+> The source of truth is now [docs/05_mts_dispatch_flows.md](cci:7://file:///d:/program/mes-mini/docs/05_mts_dispatch_flows.md:0:0-0:0).
+> This file will be revised. Do NOT use it for implementation decisions.
+
 # Sales Order: Frontend & Testing Guide
 
 > **Feature:** Sales Order

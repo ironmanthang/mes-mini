@@ -1,6 +1,6 @@
 import prisma from '../../common/lib/prisma.js';
 import { WorkOrderStatus } from '../../generated/prisma/index.js';
-import MaterialRequestService from '../../warehouse/material-request/materialRequestService.js';
+import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
 
 interface CreateWorkOrderData {
     productionRequestId: number;
@@ -333,7 +333,7 @@ class WorkOrderService {
                         productId: wo.productId,
                         productionBatchId: batch.productionBatchId,
                         status: 'IN_STOCK',
-                        // warehouseId: 1, // Assumed Main Warehouse
+                        warehouseId: warehouseId,
                     }
                 });
 

@@ -1,10 +1,11 @@
 import prisma from '../../common/lib/prisma.js';
+import InventoryService from '../../warehouse-ops/inventory/inventoryService.js';
 
 export interface MaterialRequirement {
     componentId: number;
     componentCode: string;
     componentName: string;
-    quantityPerUnit: number; // Decimal in DB, number here
+    quantityPerUnit: number; // Int in DB
     totalRequired: number;
     availableStock: number;
     missingQuantity: number;
@@ -23,8 +24,11 @@ export interface MrpResult {
 class MrpService {
 
     /**
-     * Calculate material needs for a specific product and quantity
-     * This is the "Brain" of the planning phase.
+     * ─── PLANNING BRAIN ─────────────────────────────────────────────────────────
+     * Calculate material needs from the MASTER BOM (live data).
+     * Use this ONLY when there is no existing PR snapshot yet:
+     *   - Creating a new Production Request
+     *   - Checking feasibility for a Sales Order / Work Order (not yet committed)
      */
     async calculateRequirements(productId: number, quantityToProduce: number, requestId?: number): Promise<MrpResult> {
         // 1. Fetch Product & BOM
@@ -52,33 +56,14 @@ class MrpService {
 
         // 2. Fetch Current Stock Levels for all components in BOM
         const componentIds = product.bom.map(b => b.componentId);
-
-        // Group stock by component (sum across all warehouses)
-        const stockCounts = await prisma.componentStock.groupBy({
-            by: ['componentId'],
-            where: {
-                componentId: { in: componentIds }
-            },
-            _sum: {
-                quantity: true,
-                allocatedQuantity: true
-            }
-        });
-
-        // Map stock for easy lookup (subtract allocated to avoid double-counting)
-        const stockMap = new Map<number, number>();
-        stockCounts.forEach(s => {
-            const total = s._sum.quantity || 0;
-            const allocated = s._sum.allocatedQuantity || 0;
-            stockMap.set(s.componentId, total - allocated);
-        });
+        const stockMap = await this._buildStockMap(componentIds);
 
         // 3. Calculate Logic
         const requirements: MaterialRequirement[] = [];
         let canProduce = true;
 
         for (const item of product.bom) {
-            const qtyPerUnit = Number(item.quantityNeeded);
+            const qtyPerUnit = item.quantityNeeded;
             const totalRequired = qtyPerUnit * quantityToProduce;
             const available = stockMap.get(item.componentId) || 0;
             const missing = Math.max(0, totalRequired - available);
@@ -108,16 +93,84 @@ class MrpService {
     }
 
     /**
-     * Run MRP for an existing Production Request
+     * ─── EXECUTION BRAIN ────────────────────────────────────────────────────────
+     * Calculate material status from the FROZEN SNAPSHOT (ProductionRequestDetail).
+     * Use this for all operations on an EXISTING Production Request:
+     *   - GET /:id/requirements (view MRP for a committed PR)
+     *   - Recheck feasibility (WAITING_MATERIAL → APPROVED transition)
+     *   - Draft Purchase Order (shortage pre-fill)
+     *
+     * WHY: If master BOM changes after a PR is created, we must honour the frozen
+     * requirements, not the updated BOM. This prevents ghost shortages/surpluses.
      */
-    async calculateForRequest(productionRequestId: number): Promise<MrpResult> {
-        const request = await prisma.productionRequest.findUnique({
-            where: { productionRequestId }
+    async calculateFromSnapshot(productionRequestId: number): Promise<MrpResult> {
+        const pr = await prisma.productionRequest.findUnique({
+            where: { productionRequestId },
+            include: {
+                product: true,
+                details: {
+                    include: { component: true }
+                }
+            }
         });
 
-        if (!request) throw new Error("Production Request not found");
+        if (!pr) throw new Error("Production Request not found");
 
-        return this.calculateRequirements(request.productId, request.quantity, request.productionRequestId);
+        if (!pr.details || pr.details.length === 0) {
+            // Fallback: PR was created before snapshotting was implemented.
+            // Gracefully degrade to master BOM calculation so old PRs still work.
+            return this.calculateRequirements(pr.productId, pr.quantity, pr.productionRequestId);
+        }
+
+        const componentIds = pr.details.map(d => d.componentId);
+        const stockMap = await this._buildStockMap(componentIds);
+
+        const requirements: MaterialRequirement[] = [];
+        let canProduce = true;
+
+        for (const detail of pr.details) {
+            const available = stockMap.get(detail.componentId) || 0;
+            const missing = Math.max(0, detail.totalRequired - available);
+
+            if (missing > 0) canProduce = false;
+
+            requirements.push({
+                componentId: detail.componentId,
+                componentCode: detail.component.code,
+                componentName: detail.component.componentName,
+                unit: detail.component.unit,
+                quantityPerUnit: detail.quantityPerUnit,
+                totalRequired: detail.totalRequired,
+                availableStock: available,
+                missingQuantity: missing
+            });
+        }
+
+        return {
+            productionRequestId,
+            productId: pr.productId,
+            productName: pr.product.productName,
+            quantityToProduce: pr.quantity,
+            canProduce,
+            requirements
+        };
+    }
+
+    /**
+     * Run MRP for an existing Production Request — uses the snapshot when available.
+     * This is the endpoint handler target for GET /:id/requirements.
+     */
+    async calculateForRequest(productionRequestId: number): Promise<MrpResult> {
+        return this.calculateFromSnapshot(productionRequestId);
+    }
+
+    // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────
+
+    /**
+     * Build a Map<componentId, availableStock> across all warehouses.
+     */
+    private async _buildStockMap(componentIds: number[]): Promise<Map<number, number>> {
+        return InventoryService.getBulkComponentStock(componentIds);
     }
 }
 
