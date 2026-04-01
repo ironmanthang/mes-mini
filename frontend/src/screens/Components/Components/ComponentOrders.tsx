@@ -44,6 +44,7 @@ export const ComponentOrders = (): JSX.Element => {
 
       const response = await purchaseOrderService.getAllPOs(params);
       
+      // Tương thích với format { data, total, page } từ backend
       const data = (response as any).data || response || [];
       const totalItems = (response as any).total || data.length || 0;
       
@@ -108,6 +109,7 @@ export const ComponentOrders = (): JSX.Element => {
     }
   }
 
+  // Chuyển trạng thái từ APPROVED sang ORDERED
   const handleSendToSupplier = async (id: number) => {
     if (window.confirm("Send this Purchase Order to the supplier?")) {
       try {
@@ -120,7 +122,8 @@ export const ComponentOrders = (): JSX.Element => {
     }
   }
 
-  const handleReceiveGoods = async (_id: number) => {
+  const handleReceiveGoods = async (id: number) => {
+    console.log(id);
     alert("Tính năng Nhận Hàng (Receive Goods) yêu cầu chọn kho và số lượng cho từng mã. Vui lòng tạo ReceiveGoodsModal để gọi API.");
   };
 
