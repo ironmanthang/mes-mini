@@ -30,6 +30,7 @@ model Employee {
   createdProductionReqs  ProductionRequest[]
   approvedPurchaseOrders PurchaseOrder[]         @relation("POApprover")
   createdPurchaseOrders  PurchaseOrder[]         @relation("POCreator")
+  attachments            Attachment[]
   performedQualityChecks QualityCheck[]
   approvedSalesOrders    SalesOrder[]            @relation("SOApprover")
   managedSalesOrders     SalesOrder[]
@@ -625,6 +626,32 @@ enum Priority {
   HIGH
   MEDIUM
   LOW
+}
+
+enum AttachmentCategory {
+  CONTRACT
+  INVOICE
+  PACKING_SLIP
+  INSPECTION
+  OTHER
+}
+
+model Attachment {
+  attachmentId Int                @id @default(autoincrement()) @map("attachment_id")
+  entityType   String             @map("entity_type")  // "PURCHASE_ORDER", "WORK_ORDER", "QUALITY_CHECK"
+  entityId     Int                @map("entity_id")    // FK-like reference to the parent entity PK
+  fileKey      String             @map("file_key")     // R2 object key, e.g. "purchase-orders/47/invoice.pdf"
+  fileName     String             @map("file_name")    // Original filename for display
+  fileSize     Int                @map("file_size")    // Bytes
+  mimeType     String             @map("mime_type")    // "application/pdf", "video/mp4", etc.
+  category     AttachmentCategory @default(OTHER)
+  uploadedBy   Int                @map("uploaded_by")
+  uploadedAt   DateTime           @default(now()) @map("uploaded_at")
+
+  employee     Employee           @relation(fields: [uploadedBy], references: [employeeId])
+
+  @@index([entityType, entityId])
+  @@map("attachments")
 }
 
 enum SalesOrderStatus {

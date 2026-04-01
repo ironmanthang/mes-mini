@@ -3,6 +3,7 @@ import { NotificationType, PurchaseOrderStatus, ProductionRequestStatus, Priorit
 import { AppError } from '../../common/utils/AppError.js';
 import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
 import NotificationService from '../../notifications/notificationService.js';
+import AttachmentService from '../../common/services/attachmentService.js';
 
 // ─────────────────────────────────────────────
 // Interfaces
@@ -111,7 +112,7 @@ class PurchaseOrderService {
 
         // O(1) Data Fetching to avoid N+1 traps
         const componentIds = details.map(d => d.componentId);
-        const prIds = [...new Set(details.map(d => d.productionRequestId).filter((id): id is number => id !== null))];
+        const prIds = [...new Set(details.map(d => d.productionRequestId).filter((id): id is number => id != null))];
 
         const [supplierTokens, prs, prDetails] = await Promise.all([
             prisma.supplierComponent.findMany({
@@ -678,7 +679,13 @@ class PurchaseOrderService {
             throw new AppError('Only the creator can delete a draft Purchase Order.', 403);
         }
 
-        // Hard-delete — PurchaseOrderDetail cascade is handled by onDelete: Cascade in schema.
+        // ── Cascade: Delete attachments from R2 + DB first ───────────────────
+        // The Attachment table uses a polymorphic (entityType, entityId) pattern
+        // with no real FK — so onDelete: Cascade does NOT apply here.
+        // We must clean up manually before removing the PO.
+        await AttachmentService.deleteAllForEntity('PURCHASE_ORDER', id);
+
+        // Hard-delete the PO — PurchaseOrderDetail cascade is handled by onDelete: Cascade in schema.
         // DRAFTs have no InventoryTransaction records (receiveGoods blocks DRAFT status), so no FK risk.
         await prisma.purchaseOrder.delete({ where: { purchaseOrderId: id } });
 

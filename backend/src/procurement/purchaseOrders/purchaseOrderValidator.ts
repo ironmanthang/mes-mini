@@ -99,3 +99,46 @@ export const receiveGoodsSchema = Joi.object({
         'array.min': 'At least one item is required for receiving'
     })
 });
+
+// ── Attachment schemas ────────────────────────────────────────────────────────
+
+const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/mp4',
+] as const;
+
+const ATTACHMENT_CATEGORIES = ['CONTRACT', 'INVOICE', 'PACKING_SLIP', 'INSPECTION', 'OTHER'] as const;
+
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+/**
+ * Step 1: Request a presigned upload URL.
+ * Backend validates metadata and returns a time-limited PUT URL.
+ * No file bytes ever touch the backend.
+ */
+export const requestUploadSchema = Joi.object({
+    fileName: Joi.string().max(255).required(),
+    mimeType: Joi.string().valid(...ALLOWED_MIME_TYPES).required().messages({
+        'any.only': `File type is not allowed. Accepted: ${ALLOWED_MIME_TYPES.join(', ')}`
+    }),
+    fileSize: Joi.number().integer().min(1).max(MAX_FILE_SIZE_BYTES).required().messages({
+        'number.max': 'File size exceeds the 20 MB limit.'
+    }),
+    category: Joi.string().valid(...ATTACHMENT_CATEGORIES).default('OTHER'),
+});
+
+/**
+ * Step 2: Confirm upload is complete.
+ * Called by frontend after successfully PUTting the file to R2.
+ * Creates the DB record.
+ */
+export const confirmUploadSchema = Joi.object({
+    fileKey:  Joi.string().max(1024).required(),
+    fileName: Joi.string().max(255).required(),
+    mimeType: Joi.string().valid(...ALLOWED_MIME_TYPES).required(),
+    fileSize: Joi.number().integer().min(1).max(MAX_FILE_SIZE_BYTES).required(),
+    category: Joi.string().valid(...ATTACHMENT_CATEGORIES).default('OTHER'),
+});

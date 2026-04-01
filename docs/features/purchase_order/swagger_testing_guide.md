@@ -88,12 +88,23 @@ Implements the **Box-Level Receiving (Slap Rule)**. Each entry in the `items` ar
 *   **Validation**: Backend checks `qtyReceived +Incoming <= qtyOrdered`.
 *   **Concurrency**: If two workers scan simultaneously, one will receive a `409 Conflict`. UI should tell the user to refresh.
 
+### 4.5 Attachments Flow (Cloudflare R2)
+*   **Step 1. Request Upload:** `POST /api/purchase-orders/:id/attachments/request-upload`
+    *   **Body:** `{ "fileName": "contract.pdf", "mimeType": "application/pdf", "fileSize": 1024, "category": "CONTRACT" }`
+    *   **Returns:** `uploadUrl` (Presigned PUT URL) and `fileKey`.
+*   **Step 2. Direct R2 Upload:** Send raw file bytes `PUT` directly to the `uploadUrl`.
+*   **Step 3. Confirm Database:** `POST /api/purchase-orders/:id/attachments/confirm`
+    *   **Body:** `{ "fileKey": "purchase-orders/X/Y.pdf", "fileName": "contract.pdf", ... }`
+*   **View Attachments:** `GET /api/purchase-orders/:id/attachments`
+    *   Returns array with `downloadUrl` (Presigned GET URL).
+
 ---
 
 ## 5. Integration Rules for Frontend
 
 1.  **Two-State Numbering**: Display the `code` field prominently. Users need to know if they are looking at a "Draft" (`D-PO-...`) or an "Official" (`PO-...`) order.
-2.  **DRAFT Isolation**: If a user tries to access a `DRAFT` they didn't create via a direct URL link, the backend returns a `403 Forbidden`. The UI should show a "Access Denied" page.
-3.  **BOM Validation**: When adding a component to a PO line item that is linked to a `productionRequestId`, be prepared for a `400` error if the component is not in that PR's Bill of Materials.
-4.  **The "Box" UI**: After a successful `POST /receive`, the API response contains the generated `lotCode`s. The frontend should immediately show these as barcodes (QR/JsBarcode) so the worker can label the boxes.
-5.  **Safety Net**: Provide a "Scanner Helper" button that calls `GET /api/inventory/lots/:lotCode` to identify unknown marks on stock boxes.
+2.  **DRAFT Isolation**: If a user tries to access a `DRAFT` they didn't create via a direct URL link, the backend returns a `403 Forbidden`.
+3.  **BOM Validation**: When adding a component to a PO line item that is linked to a PR, expect a `400` error if the component is not in the PR's Bill of Materials.
+4.  **The "Box" UI**: After a successful `POST /receive`, the API response contains the generated `lotCode`s. The frontend should immediately show these as barcodes (QR/JsBarcode).
+5.  **Attachment Upload Limit**: Files cannot exceed 20MB. Prevent upload attempt on the client-side BEFORE calling the request URL endpoint.
+6.  **Attachment Mutability Guards**: The UI should hide "Upload" and "Delete" buttons for Attachments based on PO status (e.g. no deleting contracts once PO is ORDERED).

@@ -69,6 +69,22 @@ const swaggerUiOptions = {
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, swaggerUiOptions));
 
+// For import to postman
+app.get('/api-docs-json', async (req, res) => {
+    try {
+        // Re-import/re-build to avoid stale memory
+        const { swaggerOptions: freshOptions } = await import('./config/swaggerConfig.js');
+        const swaggerJsDoc = (await import('swagger-jsdoc')).default;
+        const freshDocs = swaggerJsDoc(freshOptions);
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.send(freshDocs);
+    } catch (error) {
+        console.error('Swagger dynamic build failed:', error);
+        res.status(500).json({ error: 'Failed to generate documentation' });
+    }
+});
+
 
 
 const STARTUP_TIME = new Date().toISOString();

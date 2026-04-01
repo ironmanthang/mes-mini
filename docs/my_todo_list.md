@@ -15,6 +15,9 @@
 - [ ] Dynamic RBAC
 - [/] Purchase Order List Filter/Sort (dateRange, status, sortBy)
 - [ ] Multingual Framework (I18n)
-- [ ] Purchase Order Attachments (Cloudflare R2)
-    - Implement PDF/Video storage logic
-- [ ] Update `PurchaseOrder` schema with `attachmentUrl`
+- [x] Purchase Order Attachments (Cloudflare R2)
+    - [x] Polmorphic `Attachment` table architecture + Cloudflare R2 Presigned URLs
+    - [x] Mutability controls per PO status & Hard cascade deletes for DRAFT
+    - [x] 20MB file limit / 5 whitelisted MIME Types / 10 files per PO limit
+    - [x] Formulated `04_frontend_attachment_guide.md` for Frontend 3-step R2 Upload & CORS config handoff
+- [ ] Implement file attachment logic for `QualityCheck` and `WorkOrder` modules (Reusing `AttachmentService`)

@@ -1,7 +1,7 @@
 import swaggerJsDoc from 'swagger-jsdoc';
 import 'dotenv/config';
 
-const swaggerOptions: swaggerJsDoc.Options = {
+export const swaggerOptions: swaggerJsDoc.Options = {
     swaggerDefinition: {
         openapi: '3.0.0',
         info: {
@@ -28,7 +28,7 @@ const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Production Requests', description: 'Managing requests to produce items' },
             // { name: 'Quality', description: 'Quality Control (QC) operations' },
             // { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
-            // { name: 'Inventory', description: 'Stock Management and Reporting' },
+            { name: 'Inventory', description: 'Stock Management and Reporting' },
             // { name: 'Material Requests', description: 'Requesting materials for production' },
             // { name: 'Stocktaking', description: 'Inventory counting and reconciliation' },
             // { name: 'Notifications', description: 'System alerts and messages' },
@@ -104,8 +104,8 @@ const swaggerOptions: swaggerJsDoc.Options = {
         // './dist/production/workOrders/workOrderRoutes.js',
 
         // --- WAREHOUSE OPS ---
-        // './src/warehouse-ops/inventory/inventoryRoutes.ts',
-        // './dist/warehouse-ops/inventory/inventoryRoutes.js',
+        './src/warehouse-ops/inventory/inventoryRoutes.ts',
+        './dist/warehouse-ops/inventory/inventoryRoutes.js',
         // './src/warehouse-ops/material-request/materialRequestRoutes.ts',
         // './dist/warehouse-ops/material-request/materialRequestRoutes.js',
         // './src/warehouse-ops/stocktaking/stocktakeRoutes.ts',

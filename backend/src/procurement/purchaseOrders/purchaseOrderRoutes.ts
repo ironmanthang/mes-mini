@@ -11,6 +11,10 @@ import {
     deletePO,
     receiveGoods,
     getLotsByPO,
+    requestAttachmentUpload,
+    confirmAttachmentUpload,
+    listAttachments,
+    deleteAttachment,
 } from './purchaseOrderController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -21,6 +25,8 @@ import {
     sendToSupplierSchema,
     cancelPOSchema,
     receiveGoodsSchema,
+    requestUploadSchema,
+    confirmUploadSchema,
 } from './purchaseOrderValidator.js';
 
 const router = Router();
@@ -98,6 +104,34 @@ router.post('/:id/cancel',
 router.delete('/:id',
     authorize('System Admin', 'Purchasing Staff'),
     deletePO
+);
+
+// ── Attachments ───────────────────────────────────────────────────────────────
+
+// Step 1: Request a presigned PUT URL to upload directly to R2
+router.post('/:id/attachments/request-upload',
+    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    validate(requestUploadSchema),
+    requestAttachmentUpload
+);
+
+// Step 2: Confirm file is uploaded — create the DB record
+router.post('/:id/attachments/confirm',
+    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    validate(confirmUploadSchema),
+    confirmAttachmentUpload
+);
+
+// List all attachments for a PO (includes presigned download URLs)
+router.get('/:id/attachments',
+    authorize('System Admin', 'Purchasing Staff', 'Production Manager', 'Warehouse Keeper', 'Warehouse Staff'),
+    listAttachments
+);
+
+// Hard-delete a single attachment (R2 + DB row)
+router.delete('/:id/attachments/:attachmentId',
+    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    deleteAttachment
 );
 
 
@@ -560,6 +594,126 @@ router.delete('/:id',
  *         description: Forbidden (not the creator)
  *       404:
  *         description: PO not found
+ */
+
+
+/**
+ * @swagger
+ * /api/purchase-orders/{id}/attachments/request-upload:
+ *   post:
+ *     summary: Step 1 - Request a presigned upload URL
+ *     description: |
+ *       Validates the file metadata and returns a time-limited presigned PUT URL.
+ *       The frontend uploads the file directly to Cloudflare R2 using this URL.
+ *
+ *       After upload, call POST /:id/attachments/confirm to register the file in the database.
+ *
+ *       Upload Rules:
+ *       - Max file size: 20 MB
+ *       - Allowed types: PDF, JPEG, PNG, WEBP, MP4
+ *       - Max 10 attachments per PO
+ *     tags: [Purchase Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileName, mimeType, fileSize]
+ *             properties:
+ *               fileName: { type: string, example: "contract.pdf" }
+ *               mimeType: { type: string, example: "application/pdf" }
+ *               fileSize: { type: integer, example: 1048576 }
+ *               category: { type: string, enum: ["CONTRACT","INVOICE","PACKING_SLIP","INSPECTION","OTHER"], default: "OTHER" }
+ *     responses:
+ *       200:
+ *         description: URL generated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 uploadUrl: { type: string }
+ *                 fileKey: { type: string }
+ *       400:
+ *         description: Validation error or PO status frozen.
+ */
+
+/**
+ * @swagger
+ * /api/purchase-orders/{id}/attachments/confirm:
+ *   post:
+ *     summary: Step 2 - Confirm upload and register in DB
+ *     description: Called after the file is PUT to R2. Creates the DB record.
+ *     tags: [Purchase Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileKey, fileName, mimeType, fileSize]
+ *             properties:
+ *               fileKey: { type: string }
+ *               fileName: { type: string }
+ *               mimeType: { type: string }
+ *               fileSize: { type: integer }
+ *               category: { type: string }
+ *     responses:
+ *       201:
+ *         description: Registered.
+ */
+
+/**
+ * @swagger
+ * /api/purchase-orders/{id}/attachments:
+ *   get:
+ *     summary: List all attachments for a PO
+ *     description: Returns metadata with presigned download URLs (1 hour).
+ *     tags: [Purchase Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: List retrieved successfully.
+ */
+
+/**
+ * @swagger
+ * /api/purchase-orders/{id}/attachments/{attachmentId}:
+ *   delete:
+ *     summary: Delete an attachment
+ *     description: Hard-delete file from R2 and DB record.
+ *     tags: [Purchase Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: attachmentId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Deleted successfully.
  */
 
 
