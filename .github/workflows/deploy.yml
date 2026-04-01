@@ -59,3 +59,7 @@ jobs:
              DIRECT_URL=${{ secrets.DIRECT_URL }}
              JWT_SECRET=${{ secrets.JWT_SECRET }}
              CONTAINER_PORT=${{ secrets.CONTAINER_PORT }}
+             R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}
+             R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+             R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+             R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}

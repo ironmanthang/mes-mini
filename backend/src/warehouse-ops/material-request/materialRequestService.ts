@@ -39,11 +39,41 @@ class MaterialRequestService {
 
         if (!wo) throw new Error("Work Order not found");
 
-        // Get BOM
-        const bom = await prisma.billOfMaterial.findMany({
-            where: { productId: wo.productId },
-            include: { component: true }
-        });
+        // ── Aggregate component quantities across all PR fulfillments ──────────
+        // Map<componentId, totalQuantityNeeded>
+        const componentTotals = new Map<number, number>();
+
+        if (wo.workOrderFulfillments.length > 0) {
+            for (const fulfillment of wo.workOrderFulfillments) {
+                const pr = fulfillment.productionRequest;
+
+                if (pr.details && pr.details.length > 0) {
+                    // Snapshot path: use frozen BOM requirements
+                    for (const detail of pr.details) {
+                        const needed = fulfillment.quantity * detail.quantityPerUnit;
+                        const current = componentTotals.get(detail.componentId) || 0;
+                        componentTotals.set(detail.componentId, current + needed);
+                    }
+                } else {
+                    // Fallback path: PR has no snapshot (legacy data).
+                    // Use master BOM × fulfillment quantity.
+                    const bom = await prisma.billOfMaterial.findMany({
+                        where: { productId: pr.productId }
+                    });
+                    for (const item of bom) {
+                        const needed = fulfillment.quantity * item.quantityNeeded;
+                        const current = componentTotals.get(item.componentId) || 0;
+                        componentTotals.set(item.componentId, current + needed);
+                    }
+                }
+            }
+        } else {
+            // ── No linked PRs: standalone WO (Make-to-Stock, not linked to any PR) ──
+            // Fall back to master BOM × WO quantity.
+            const bom = await prisma.billOfMaterial.findMany({
+                where: { productId: wo.productId },
+                include: { component: true }
+            });
 
             if (bom.length === 0) {
                 throw new Error(`Product ${wo.product.code} has no BOM defined.`);

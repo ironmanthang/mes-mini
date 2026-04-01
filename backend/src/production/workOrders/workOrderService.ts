@@ -1,6 +1,6 @@
 import prisma from '../../common/lib/prisma.js';
 import { WorkOrderStatus } from '../../generated/prisma/index.js';
-import MaterialRequestService from '../../warehouse/material-request/materialRequestService.js';
+import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
 
 interface CreateWorkOrderData {
     productionRequestId: number;

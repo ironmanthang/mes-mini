@@ -17,7 +17,6 @@ const SEED_CONFIG = {
     PRODUCTS: true,
     LINES: true,
     RELATIONS: true,
-<<<<<<< HEAD
     INSTANCES: true,
     SCENARIOS: true,
     // --- DEMO ENRICHMENT ---
@@ -25,10 +24,6 @@ const SEED_CONFIG = {
     PURCHASE_ORDERS: true,
     SALES_ORDERS: true,
     PRODUCTION_REQUESTS: true,
-=======
-    INSTANCES: true, // NEW: Seed Inventory
-    SCENARIOS: true, // NEW: Seed Complex Production Scenarios
->>>>>>> 556ea06 (feat: complete production request)
 };
 
 const DEFAULT_PASSWORD = '123456';
@@ -37,7 +32,6 @@ async function main(): Promise<void> {
     console.log('Starting Seeding Process...');
 
     // FORCE RUN RELATIONS because they seem missing
-    // console.log('Available Prisma Models:', Object.keys(prisma).filter(k => !k.startsWith('_')));
     await seedSupplierComponents();
 
     if (SEED_CONFIG.ROLES) await seedRoles();
@@ -52,7 +46,21 @@ async function main(): Promise<void> {
     if (SEED_CONFIG.RELATIONS) await seedSupplierComponents();
     if (SEED_CONFIG.INSTANCES) await seedProductInstances();
     await seedAgents();
-    if (SEED_CONFIG.SCENARIOS) await seedProductionScenarios(); // NEW: The "Traffic Light" Logic Test Data
+    if (SEED_CONFIG.SCENARIOS) await seedProductionScenarios();
+
+    // --- DEMO ENRICHMENT (depends on all master data above) ---
+    if (SEED_CONFIG.AGENTS) await seedDemoAgents();
+    if (SEED_CONFIG.SUPPLIERS) await seedDemoSuppliers();
+    if (SEED_CONFIG.COMPONENTS) await seedDemoComponents();
+    if (SEED_CONFIG.PRODUCTS) await seedDemoProducts();
+    if (SEED_CONFIG.RELATIONS) await seedDemoSupplierComponents();
+    if (SEED_CONFIG.COMPONENTS) await seedDemoComponentStock();
+    if (SEED_CONFIG.INSTANCES) await seedDemoProductInstances();
+    if (SEED_CONFIG.SALES_ORDERS) await seedDemoSalesOrders();
+    if (SEED_CONFIG.PRODUCTION_REQUESTS) await seedDemoProductionRequests();
+    if (SEED_CONFIG.PURCHASE_ORDERS) await seedDemoPurchaseOrders();
+    
+    await seedCodeSequences();
 
     console.log('Seeding Completed.');
 }
@@ -440,12 +448,8 @@ async function seedProductionScenarios(): Promise<void> {
         create: {
             code: 'PROD-GAMING-PC',
             productName: 'Gaming PC Ultra',
-<<<<<<< HEAD
             unit: 'pcs',
             minStockLevel: 10
-=======
-            unit: 'pcs'
->>>>>>> 556ea06 (feat: complete production request)
         }
     });
 
@@ -598,11 +602,7 @@ async function seedProductionScenarios(): Promise<void> {
     const smartwatch = await prisma.product.upsert({
         where: { code: 'PROD-SMARTWATCH' },
         update: {},
-<<<<<<< HEAD
         create: { code: 'PROD-SMARTWATCH', productName: 'Smartwatch V1', unit: 'pcs', minStockLevel: 30 }
-=======
-        create: { code: 'PROD-SMARTWATCH', productName: 'Smartwatch V1', unit: 'pcs' }
->>>>>>> 556ea06 (feat: complete production request)
     });
 
     const screen = await prisma.component.upsert({
@@ -657,7 +657,6 @@ async function seedProductionScenarios(): Promise<void> {
     }
 }
 
-<<<<<<< HEAD
 // ============================================================================
 // 11. DEMO ENRICHMENT: AGENTS
 // ============================================================================
@@ -1254,8 +1253,6 @@ async function seedCodeSequences(): Promise<void> {
     console.log('   ✓ Code Sequences initialized');
 }
 
-=======
->>>>>>> 556ea06 (feat: complete production request)
 // Execution
 main()
     .catch((e) => {
