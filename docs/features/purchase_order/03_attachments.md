@@ -48,3 +48,26 @@ Documents attached to a Purchase Order serve as official evidence (contracts, in
 - **Client calls:** `GET /api/purchase-orders/:id/attachments`
 - **Backend Action:** Returns all metadata for the PO's attachments, decorating each with a fresh, 1-hour presigned `GET` URL from Cloudflare R2.
 - **Client Action:** Opens or downloads the file directly from the presigned URL.
+
+## Local Development (MinIO Mock)
+
+For local development inside Docker, we use **MinIO** as a 1:1, S3-compatible mock for Cloudflare R2. This allows developers to test the full attachment flow (upload/download/delete) without needing real production keys.
+
+- **MinIO Web Console:** [http://localhost:9001](http://localhost:9001)
+- **Root Admin Keys:** `minioadmin` / `minioadmin`
+- **Bucket:** `lite-mes` (automatically created by the `minio-init` container)
+
+### Dual-Client Architecture (`r2Client.ts`)
+
+The backend runs inside Docker where MinIO is reachable at `minio:9000` (Docker DNS). But presigned URLs are consumed by the **browser on the host machine**, which needs `localhost:9000`. We solve this with two S3 clients:
+
+| Client | Endpoint Env Var | Used For |
+| :--- | :--- | :--- |
+| `s3Internal` | `R2_ENDPOINT` (`http://minio:9000`) | Server-side operations (deleteObject) |
+| `s3Public` | `R2_PUBLIC_ENDPOINT` (`http://localhost:9000`) | Generating browser-facing presigned URLs |
+
+In production, `R2_PUBLIC_ENDPOINT` is not set, so it falls back to `R2_ENDPOINT` (the public Cloudflare URL). Both clients become identical. **Zero behavior change.**
+
+> [!IMPORTANT]
+> `forcePathStyle: true` is set on both clients. This prevents the SDK from prepending the bucket name to the hostname (e.g. `lite-mes.minio:9000`), which Docker cannot resolve. Both R2 and MinIO support path-style addressing.
+

@@ -1,5 +1,5 @@
 /**
- * r2Client.ts — Cloudflare R2 SDK wrapper
+ * r2Client.ts — Cloudflare R2 / MinIO SDK wrapper
  *
  * Cloudflare R2 is S3-compatible, so we use the AWS SDK with a custom endpoint.
  * We only expose three functions: presign upload, presign download, delete object.
@@ -8,6 +8,16 @@
  *
  * Object Key Convention: "{entityType-slug}/{entityId}/{filename}"
  *   e.g. "purchase-orders/47/contract.pdf"
+ *
+ * ── Dual-Client Architecture (Local Dev) ──────────────────────────────────
+ * In Docker, the backend reaches MinIO at "http://minio:9000" (internal DNS).
+ * But presigned URLs are consumed by the BROWSER (on the host machine), which
+ * needs "http://localhost:9000". We solve this with two S3 clients:
+ *   - s3Internal: for server-side operations (deleteObject)
+ *   - s3Public:   for generating browser-facing presigned URLs
+ *
+ * In production (Cloudflare R2), both endpoints are the same public URL,
+ * so both clients behave identically. Zero behavior change.
  */
 
 import {
@@ -26,6 +36,9 @@ const R2_ACCESS_KEY   = process.env.R2_ACCESS_KEY_ID!;
 const R2_SECRET_KEY   = process.env.R2_SECRET_ACCESS_KEY!;
 const R2_BUCKET       = process.env.R2_BUCKET_NAME!;
 
+/** Public endpoint for presigned URLs. Defaults to R2_ENDPOINT if not set. */
+const R2_PUBLIC_ENDPOINT = process.env.R2_PUBLIC_ENDPOINT || R2_ENDPOINT;
+
 if (!R2_ENDPOINT || !R2_ACCESS_KEY || !R2_SECRET_KEY || !R2_BUCKET) {
     throw new Error(
         'R2 configuration is incomplete. Ensure R2_ENDPOINT, R2_ACCESS_KEY_ID, ' +
@@ -34,17 +47,35 @@ if (!R2_ENDPOINT || !R2_ACCESS_KEY || !R2_SECRET_KEY || !R2_BUCKET) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Singleton S3 client pointed at Cloudflare R2
+// S3 Clients
 // ─────────────────────────────────────────────────────────────────────────────
-const s3 = new S3Client({
-    region: 'auto',           // R2 requires "auto" for region
+
+const sharedCredentials = {
+    accessKeyId:     R2_ACCESS_KEY,
+    secretAccessKey: R2_SECRET_KEY,
+};
+
+/**
+ * Internal client — used for server-side operations (deleteObject).
+ * Endpoint: Docker-internal (e.g. http://minio:9000) or production R2.
+ */
+const s3Internal = new S3Client({
+    region: 'auto',
     endpoint: R2_ENDPOINT,
-    credentials: {
-        accessKeyId:     R2_ACCESS_KEY,
-        secretAccessKey: R2_SECRET_KEY,
-    },
-    // R2 does NOT use path-style addressing by default but we must set it:
-    forcePathStyle: false,
+    credentials: sharedCredentials,
+    forcePathStyle: true,   // Both R2 and MinIO support path-style
+});
+
+/**
+ * Public client — used exclusively for generating presigned URLs.
+ * Endpoint: Host-reachable (e.g. http://localhost:9000) or production R2.
+ * The signature is bound to this endpoint, so the browser MUST use it as-is.
+ */
+const s3Public = new S3Client({
+    region: 'auto',
+    endpoint: R2_PUBLIC_ENDPOINT,
+    credentials: sharedCredentials,
+    forcePathStyle: true,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +110,7 @@ export async function generatePresignedUploadUrl(
         ContentType:   mimeType,
         ContentLength: fileSize,
     });
-    return getSignedUrl(s3, cmd, { expiresIn: PRESIGN_UPLOAD_EXPIRES_SEC });
+    return getSignedUrl(s3Public, cmd, { expiresIn: PRESIGN_UPLOAD_EXPIRES_SEC });
 }
 
 /**
@@ -93,13 +124,15 @@ export async function generatePresignedDownloadUrl(fileKey: string): Promise<str
         Bucket: R2_BUCKET,
         Key:    fileKey,
     });
-    return getSignedUrl(s3, cmd, { expiresIn: PRESIGN_DOWNLOAD_EXPIRES_SEC });
+    return getSignedUrl(s3Public, cmd, { expiresIn: PRESIGN_DOWNLOAD_EXPIRES_SEC });
 }
 
 /**
  * Hard-deletes an object from R2.
  * R2 delete is idempotent — deleting a non-existent key returns success.
  * Callers must handle any thrown errors (network / auth issues).
+ *
+ * Uses the INTERNAL client because this runs server-side inside Docker.
  *
  * @param fileKey  R2 object key
  */
@@ -108,5 +141,5 @@ export async function deleteObject(fileKey: string): Promise<void> {
         Bucket: R2_BUCKET,
         Key:    fileKey,
     });
-    await s3.send(cmd);
+    await s3Internal.send(cmd);
 }

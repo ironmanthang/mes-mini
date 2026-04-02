@@ -15,9 +15,20 @@
 - [ ] Dynamic RBAC
 - [/] Purchase Order List Filter/Sort (dateRange, status, sortBy)
 - [ ] Multingual Framework (I18n)
-- [x] Purchase Order Attachments (Cloudflare R2)
-    - [x] Polmorphic `Attachment` table architecture + Cloudflare R2 Presigned URLs
+- [x] **Purchase Order Attachments (Cloudflare R2 Integration)**
+    - [x] Polymorphic `Attachment` table architecture + S3-compatible Presigned URLs
     - [x] Mutability controls per PO status & Hard cascade deletes for DRAFT
     - [x] 20MB file limit / 5 whitelisted MIME Types / 10 files per PO limit
-    - [x] Formulated `04_frontend_attachment_guide.md` for Frontend 3-step R2 Upload & CORS config handoff
+    - [x] Implementation of Local MinIO Storage Mock (S3 protocol)
+    - [x] Dual-Client `r2Client.ts` fix (`s3Internal` + `s3Public` + `forcePathStyle: true`)
+    - [x] `R2_PUBLIC_ENDPOINT` env var for Docker ↔ Host URL separation
+    - [x] Restructured `frontend_attachment_guide.md` (Local-first, with Postman walkthrough)
+    - [x] Updated Deployment Guide with Cloudflare R2 Secret Registry
 - [ ] Implement file attachment logic for `QualityCheck` and `WorkOrder` modules (Reusing `AttachmentService`)
+
+## 2. Next Steps (Session Handoff)
+- [ ] **End-to-End Upload Test:** Complete the 3-step upload via Postman and verify the file appears in MinIO Console + GET /attachments returns the `downloadUrl`.
+- [ ] **Purchase Order List Filter/Sort** (dateRange, status, sortBy) — currently `[/]` in progress
+- [ ] Extend `AttachmentService` to `QualityCheck` and `WorkOrder` modules
+- [ ] Dynamic RBAC
+- [ ] Multilingual Framework (I18n)

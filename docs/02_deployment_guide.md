@@ -196,7 +196,11 @@ In Cloud Run Console → Your Service → **Edit & Deploy New Revision** → **V
 | `DIRECT_URL` | `postgresql://postgres.xxx:password@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres` |
 | `JWT_SECRET` | Your secret key |
 | `PORT` | `3000` |
-| `API_URL` | `https://mes-mini-backend-433210406598.us-central1.run.app` |
+| `API_URL` | `https://mes-mini-backend-...run.app` |
+| **`R2_ENDPOINT`** | `https://<id>.r2.cloudflarestorage.com` |
+| **`R2_ACCESS_KEY_ID`** | (Real Cloudflare Access Key) |
+| **`R2_SECRET_ACCESS_KEY`** | (Real Cloudflare Secret Key) |
+| **`R2_BUCKET_NAME`** | `lite-mes` |
 
 ### Step 2.5: Run Migrations
 
