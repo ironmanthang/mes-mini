@@ -33,8 +33,8 @@
 
 ## 2. Next Steps (Session Handoff)
 - [x] **Employee Email Flow:** Verified with Gmail App Password (✅ Test email sent to `nguyennhuthang26112004@gmail.com`)
+- [x] **Status Consolidation:** Merged `TERMINATED` into `INACTIVE`. Deleted Hard Delete API logically.
 - [ ] **End-to-End Upload Test:** Verify Cloudflare R2 / MinIO 3-step upload via Postman.
 - [ ] **Extend AttachmentService:** Implement for `QualityCheck` and `WorkOrder`.
-- [ ] **Status Consolidation:** Merge `TERMINATED` into `INACTIVE`.
 - [ ] **Dynamic RBAC Phase 2:** (Permissions assignments).
 - [ ] **Multilingual Framework (I18n)**.

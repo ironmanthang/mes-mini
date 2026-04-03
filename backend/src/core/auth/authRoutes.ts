@@ -213,7 +213,7 @@ router.put('/change-password', validate(changePasswordSchema), changePassword);
  *               InactiveUser:
  *                 summary: Correct Password but Account Banned
  *                 value:
- *                   message: "Account is inactive or terminated. Contact admin."
+ *                   message: "Account is inactive. Contact admin."
  *       500:
  *         description: Server Error
  *         content:

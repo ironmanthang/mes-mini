@@ -208,12 +208,14 @@ class EmployeeService {
         });
     }
 
+/*
     async deleteEmployeeHard(id: string | number) {
         const employeeId = typeof id === 'string' ? parseInt(id) : id;
         return prisma.employee.delete({
             where: { employeeId }
         });
     }
+*/
 
     async getAllEmployees(query: { page?: number; limit?: number; search?: string } = {}): Promise<any> {
         const { getPaginationParams, createPaginatedResponse } = await import('../../common/utils/pagination.js');

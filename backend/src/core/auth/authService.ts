@@ -50,7 +50,7 @@ class AuthService {
 
         if (!employee) throw new Error('Invalid credentials');
         if (!(await bcrypt.compare(password, employee.password))) throw new Error('Invalid credentials');
-        if (employee.status !== 'ACTIVE') throw new Error('Account is inactive or terminated. Contact admin.');
+        if (employee.status !== 'ACTIVE') throw new Error('Account is inactive. Contact admin.');
 
         const token = jwt.sign(
             { id: employee.employeeId, username: employee.username },

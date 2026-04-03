@@ -4,8 +4,8 @@ import {
     getAllEmployees,
     getEmployeeById,
     updateEmployee,
-    updateEmployeeStatus,
-    deleteEmployee
+    updateEmployeeStatus
+    // deleteEmployee
 } from './employeeController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -19,7 +19,8 @@ router.post('/', validate(employeeCreateSchema), createUser);
 router.get('/', getAllEmployees);
 router.get('/:id', getEmployeeById);
 router.put('/:id', validate(employeeUpdateSchema), updateEmployee);
-router.delete('/:id', deleteEmployee);
+// DELETE route is commented out as hard-deleting employees ruins data traceability. Use status update to INACTIVE instead.
+// router.delete('/:id', deleteEmployee);
 router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
 
 
@@ -39,7 +40,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *         dateOfBirth: { type: string, format: date-time, example: "2000-05-20T00:00:00.000Z" }
  *         hireDate: { type: string, format: date-time, example: "2025-01-01T00:00:00.000Z" }
  *         terminationDate: { type: string, format: date-time, nullable: true }
- *         status: { type: string, enum: [ACTIVE, INACTIVE, TERMINATED], example: "ACTIVE" }
+ *         status: { type: string, enum: [ACTIVE, INACTIVE], example: "ACTIVE" }
  *         createdAt: { type: string, format: date-time }
  *         updatedAt: { type: string, format: date-time }
  *         roles: 
@@ -49,6 +50,12 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *             properties:
  *               roleId: { type: integer, example: 1 }
  *               roleName: { type: string, example: "System Admin" }
+ *         _devCredentials:
+ *           type: object
+ *           description: "SPECIAL FIELD: Returned only in development mode when GMAIL_USER is unconfigured. Never sent in production."
+ *           properties:
+ *             email: { type: string, example: "user1@example.com" }
+ *             password: { type: string, example: "temp-password-123" }
  */
 
 /**
@@ -104,7 +111,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *                 example: "ACTIVE"
  *     responses:
  *       201:
- *         description: Employee created successfully
+ *         description: Employee created successfully. If GMAIL_USER or GMAIL_APP_PASSWORD  is unconfigured (Dev Mode), response includes '_devCredentials' with the plain text password.
  *         content:
  *           application/json:
  *             schema:
@@ -206,7 +213,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *               hireDate: { type: string, format: date }
  *               terminationDate: { type: string, format: date, nullable: true }
  *               roleIds: { type: array, items: { type: integer } }
- *               status: { type: string, enum: [ACTIVE, INACTIVE, TERMINATED] }
+ *               status: { type: string, enum: [ACTIVE, INACTIVE] }
  *     responses:
  *       200:
  *         description: Employee updated successfully
@@ -223,7 +230,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  * /api/employees/{id}/status:
  *   patch:
  *     summary: Quick update status (System Admin only)
- *     description: Use this for Soft Delete (Terminating) or Reactivating users.
+ *     description: Use this for Soft Delete (Deactivating) or Reactivating users.
  *     tags: [Employees]
  *     security:
  *       - bearerAuth: []
@@ -239,7 +246,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *             type: object
  *             required: [status]
  *             properties:
- *               status: { type: string, enum: [ACTIVE, INACTIVE, TERMINATED] }
+ *               status: { type: string, enum: [ACTIVE, INACTIVE] }
  *     responses:
  *       200:
  *         description: Status updated successfully
@@ -252,26 +259,6 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  */
 
 
-/**
- * @swagger
- * /api/employees/{id}:
- *   delete:
- *     summary: Hard delete employee (System Admin only)
- *     description: Permanently remove from database. CAUTION - Use status update instead for normal termination.
- *     tags: [Employees]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Employee permanently deleted
- *       500:
- *         description: Constraint Violation (Employee has existing records)
- */
-
+// DELETE api doc removed
 
 export default router;

@@ -56,6 +56,7 @@ export const updateEmployeeStatus = async (req: Request, res: Response): Promise
     }
 };
 
+/*
 export const deleteEmployee = async (req: Request, res: Response): Promise<void> => {
     try {
         await EmployeeService.deleteEmployeeHard(req.params.id as string);
@@ -64,3 +65,4 @@ export const deleteEmployee = async (req: Request, res: Response): Promise<void>
         res.status(500).json({ message: (error as Error).message });
     }
 };
+*/

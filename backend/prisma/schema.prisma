@@ -710,7 +710,6 @@ enum ProductInstanceStatus {
 enum EmployeeStatus {
   ACTIVE
   INACTIVE
-  TERMINATED
 }
 
 enum InventoryTransactionType {
