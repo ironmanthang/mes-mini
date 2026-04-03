@@ -11,9 +11,14 @@
     - [x] Implement `POST /api/purchase-orders/:id/receive` (Generate Lots)
     - [x] Secure `receiveGoods` API against Split-Routing and Warehouse Poisoning
     - [x] Update swagger to match the backend structure
-    - [ ] Add status, dateFrom / dateTo, sortOrder and sortBy to PO list API (Reusable pattern)
-- [ ] Dynamic RBAC
-- [/] Purchase Order List Filter/Sort (dateRange, status, sortBy)
+    - [x] Dynamic RBAC (Logic Architecture only)
+- [ ] Purchase Order List Filter/Sort (Canceled/Deferred)
+- [x] **HR Module: Refactored Onboarding & Identity**
+    - [x] Automated Password Generator (12 chars + symbols)
+    - [x] Nodemailer/Gmail email delivery integration
+    - [x] 3-part Address concatenation (street, ward, province)
+    - [x] Read-only Identity lock (Email/Username)
+    - [x] Auth/Employee Profile duplication removal
 - [ ] Multingual Framework (I18n)
 - [x] **Purchase Order Attachments (Cloudflare R2 Integration)**
     - [x] Polymorphic `Attachment` table architecture + S3-compatible Presigned URLs
@@ -27,8 +32,9 @@
 - [ ] Implement file attachment logic for `QualityCheck` and `WorkOrder` modules (Reusing `AttachmentService`)
 
 ## 2. Next Steps (Session Handoff)
-- [ ] **End-to-End Upload Test:** Complete the 3-step upload via Postman and verify the file appears in MinIO Console + GET /attachments returns the `downloadUrl`.
-- [ ] **Purchase Order List Filter/Sort** (dateRange, status, sortBy) — currently `[/]` in progress
-- [ ] Extend `AttachmentService` to `QualityCheck` and `WorkOrder` modules
-- [ ] Dynamic RBAC
-- [ ] Multilingual Framework (I18n)
+- [x] **Employee Email Flow:** Verified with Gmail App Password (✅ Test email sent to `nguyennhuthang26112004@gmail.com`)
+- [ ] **End-to-End Upload Test:** Verify Cloudflare R2 / MinIO 3-step upload via Postman.
+- [ ] **Extend AttachmentService:** Implement for `QualityCheck` and `WorkOrder`.
+- [ ] **Status Consolidation:** Merge `TERMINATED` into `INACTIVE`.
+- [ ] **Dynamic RBAC Phase 2:** (Permissions assignments).
+- [ ] **Multilingual Framework (I18n)**.

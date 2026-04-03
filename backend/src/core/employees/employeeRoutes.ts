@@ -66,26 +66,26 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [fullName, username, password, email, phoneNumber, hireDate, roleIds]
+ *             required: [fullName, email, phoneNumber, province, ward, street, hireDate, roleIds]
  *             properties:
  *               fullName: 
  *                 type: string
  *                 example: "Nguyen Van A"
- *               username: 
- *                 type: string
- *                 example: "user1"
- *               password: 
- *                 type: string
- *                 example: "123456"
  *               email: 
  *                 type: string
  *                 example: "user1@example.com"
  *               phoneNumber: 
  *                 type: string
  *                 example: "0901234567"
- *               address: 
+ *               province: 
  *                 type: string
- *                 example: "123 Ha Noi Street"
+ *                 example: "Ho Chi Minh"
+ *               ward: 
+ *                 type: string
+ *                 example: "District 1"
+ *               street: 
+ *                 type: string
+ *                 example: "123 Le Loi"
  *               dateOfBirth: 
  *                 type: string
  *                 format: date
@@ -198,10 +198,10 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *             type: object
  *             properties:
  *               fullName: { type: string }
- *               username: { type: string }
- *               email: { type: string }
  *               phoneNumber: { type: string }
- *               address: { type: string }
+ *               province: { type: string }
+ *               ward: { type: string }
+ *               street: { type: string }
  *               dateOfBirth: { type: string, format: date }
  *               hireDate: { type: string, format: date }
  *               terminationDate: { type: string, format: date, nullable: true }

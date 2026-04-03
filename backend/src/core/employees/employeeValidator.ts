@@ -3,13 +3,13 @@ import { EmployeeStatus } from '../../generated/prisma/index.js';
 
 export const employeeCreateSchema = Joi.object({
     fullName: Joi.string().required(),
-    username: Joi.string().alphanum().min(3).required(),
-    password: Joi.string().min(6).required(),
     email: Joi.string().email().required(),
     phoneNumber: Joi.string().pattern(phonePattern).required().messages({
         'string.pattern.base': 'Phone number must be 10-15 digits'
     }),
-    address: Joi.string().optional(),
+    province: Joi.string().required(),
+    ward: Joi.string().required(),
+    street: Joi.string().required(),
     dateOfBirth: Joi.date().iso().optional(),
     hireDate: Joi.date().iso().required(),
     status: Joi.string().valid(EmployeeStatus.ACTIVE, EmployeeStatus.INACTIVE).optional(),
@@ -20,11 +20,11 @@ export const employeeCreateSchema = Joi.object({
 
 export const employeeUpdateSchema = Joi.object({
     fullName: Joi.string().optional(),
-    username: Joi.string().alphanum().min(3).optional(),
-    email: Joi.string().email().optional(),
+    // email and username are explicitly NOT allowed here per strict read-only rule
     phoneNumber: Joi.string().pattern(phonePattern).optional(),
-    password: Joi.string().min(6).optional().allow(''),
-    address: Joi.string().optional(),
+    province: Joi.string().optional(),
+    ward: Joi.string().optional(),
+    street: Joi.string().optional(),
     dateOfBirth: Joi.date().iso().optional().allow(null),
     hireDate: Joi.date().iso().optional(),
     terminationDate: Joi.date().iso().optional().allow(null),

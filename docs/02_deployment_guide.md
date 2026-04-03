@@ -295,6 +295,75 @@ Go to your GitHub Repository → **Settings → Secrets and variables → Action
 
 ### Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
 | Cold start slow (~5s) | Normal for scale-to-zero; set min instances to 1 if needed |
+
+---
+
+## Part 8: Database Maintenance (Reset vs Safe Update)
+
+Managing a remote database requires a different approach than local dev. **Never** run `npx prisma migrate dev` directly against Supabase; always generate migrations locally first.
+
+### Workflow A: Full Reset & Seed (DESTROYS DATA)
+Use this only during setup or if you want to wipe everything and start from scratch.
+
+1.  **Open PowerShell** on your computer, in the `backend/` folder.
+2.  **Set temporary environment variables** (Replace `[YOUR-PASSWORD]`):
+    ```powershell
+    $env:DATABASE_URL="postgresql://postgres.yrcobwomqngtkkbwfgjm:[YOUR-PASSWORD]@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+    $env:DIRECT_URL="postgresql://postgres.yrcobwomqngtkkbwfgjm:[YOUR-PASSWORD]@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+    ```
+3.  **Run the reset**:
+    ```powershell
+    npx prisma migrate reset --force
+    npx prisma db seed
+    ```
+4.  **Clear variables** (safety):
+    ```powershell
+    $env:DATABASE_URL=$null; $env:DIRECT_URL=$null
+    ```
+
+### Workflow B: Safe Update (KEEPS REAL USER DATA)
+Use this when adding new tables/columns to a database that already has real users.
+
+1.  **Local Step**: Modify `schema.prisma` and generate the migration locally:
+    ```powershell
+    # This creates a SQL file in prisma/migrations/
+    npx prisma migrate dev --name <describe_your_change>
+    ```
+2.  **Production Step**: Apply the new migration to Supabase:
+    ```powershell
+    # 1. Set environment to Supabase
+    $env:DATABASE_URL="postgresql://postgres.yrcobwomqngtkkbwfgjm:[YOUR-PASSWORD]@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+    $env:DIRECT_URL="postgresql://postgres.yrcobwomqngtkkbwfgjm:[YOUR-PASSWORD]@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+
+    # 2. Apply ONLY the new migrations (SAFE)
+    npx prisma migrate deploy
+
+    # 3. Cleanup
+    $env:DATABASE_URL=$null; $env:DIRECT_URL=$null
+    ```
+
+> [!TIP]
+> **Summary**: Use `migrate reset` to wipe everything. Use `migrate deploy` to keep your existing users and just add new features.
+
+---
+
+### Workflow C: Zero-Downtime Updates (Expand and Contract Pattern)
+*This is an advanced pattern we plan to use in the future when the system demands 100% uptime during deployments.*
+
+When making breaking changes (like renaming a column or making a previously optional field required), a simple `migrate deploy` could temporarily crash the backend during the deployment window. The **Expand and Contract pattern** solves this safely in three distinct deployment phases:
+
+1. **Phase 1: Expand (Additive Database Change)**
+   - Add the new column (e.g., `new_status`), but keep it `Optional`.
+   - Deploy the database migration. Both the old and new code can still run safely.
+2. **Phase 2: Code & Data Migration**
+   - Update the backend code to write to **both** the old and new columns.
+   - Run a migration script to copy existing data from the old column to the new one.
+   - Deploy the backend code. 
+3. **Phase 3: Contract (Cleanup)**
+   - Change the backend code to only read/write from the `new_status` column.
+   - Deploy the new backend code.
+   - Run a final database migration to drop the old column (or add `NOT NULL` constraints).
+
+> [!TIP]
+> This pattern ensures the system never crashes due to a schema mismatch between the running backend instances and the database during the CI/CD pipeline.

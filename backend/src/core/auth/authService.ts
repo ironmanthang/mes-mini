@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../../common/lib/prisma.js';
 import type { Employee } from '../../generated/prisma/index.js';
+import employeeService from '../employees/employeeService.js';
 
 // Define return types
 interface LoginResult {
@@ -18,7 +19,6 @@ interface LoginResult {
 
 interface ProfileData {
     fullName?: string;
-    email?: string;
     phoneNumber?: string;
     address?: string;
     dateOfBirth?: Date;
@@ -75,53 +75,28 @@ class AuthService {
     }
 
     async updateProfile(id: number, data: ProfileData): Promise<ProfileResult> {
-        const { fullName, email, phoneNumber, address, dateOfBirth } = data;
+        const { fullName, phoneNumber, address, dateOfBirth } = data;
 
-        if (email || phoneNumber) {
-            const existing = await prisma.employee.findFirst({
-                where: {
-                    NOT: { employeeId: id },
-                    OR: [
-                        { email: email || undefined },
-                        { phoneNumber: phoneNumber || undefined }
-                    ]
-                }
-            });
-
-            if (existing) {
-                if (existing.email === email) throw new Error('Email already in use');
-                if (existing.phoneNumber === phoneNumber) throw new Error('Phone number already in use');
-            }
-        }
-
-        const updatedEmployee = await prisma.employee.update({
-            where: { employeeId: id },
-            data: {
-                fullName,
-                email,
-                phoneNumber,
-                address,
-                dateOfBirth,
-            },
-            include: {
-                roles: {
-                    include: { role: true }
-                }
-            }
+        const updated = await employeeService.updateBasicProfile(id, {
+            fullName,
+            phoneNumber,
+            address,
+            dateOfBirth
         });
 
+        if (!updated) {
+            throw new Error('Employee not found or update failed');
+        }
+
         return {
-            employeeId: updatedEmployee.employeeId,
-            fullName: updatedEmployee.fullName,
-            email: updatedEmployee.email,
-            phoneNumber: updatedEmployee.phoneNumber,
-            address: updatedEmployee.address,
-            dateOfBirth: updatedEmployee.dateOfBirth,
-            status: updatedEmployee.status,
-            roles: updatedEmployee.roles.map(r => ({
-                roleId: r.role.roleId,
-                roleName: r.role.roleName
-            }))
+            employeeId: updated.employeeId,
+            fullName: updated.fullName,
+            email: updated.email,
+            phoneNumber: updated.phoneNumber,
+            address: updated.address,
+            dateOfBirth: updated.dateOfBirth,
+            status: updated.status,
+            roles: updated.roles
         };
     }
 

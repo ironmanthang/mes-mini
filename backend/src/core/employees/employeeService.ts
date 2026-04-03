@@ -5,12 +5,12 @@ import { EmployeeStatus } from '../../generated/prisma/index.js';
 
 interface EmployeeCreateData {
     fullName: string;
-    username: string;
-    password: string;
     roleIds: number[];
     email: string;
     phoneNumber: string;
-    address?: string;
+    province: string;
+    ward: string;
+    street: string;
     dateOfBirth?: Date;
     hireDate: Date;
     status?: EmployeeStatus;
@@ -18,11 +18,10 @@ interface EmployeeCreateData {
 
 interface EmployeeUpdateData {
     fullName?: string;
-    username?: string;
-    email?: string;
     phoneNumber?: string;
-    password?: string;
-    address?: string;
+    province?: string;
+    ward?: string;
+    street?: string;
     dateOfBirth?: Date;
     hireDate?: Date;
     terminationDate?: Date;
@@ -44,9 +43,34 @@ interface FormattedEmployee {
     createdAt: Date;
     updatedAt: Date;
     roles: { roleId: number; roleName: string }[];
+    _devCredentials?: { email: string; password: string };
 }
 
+import { generateSecurePassword } from '../../common/utils/passwordGenerator.js';
+import { sendCredentialsEmail } from '../../common/utils/email.js';
+
 class EmployeeService {
+    async _checkUniqueConstraints(id: number | null, email?: string, phoneNumber?: string, username?: string): Promise<void> {
+        const orConditions: any[] = [];
+        if (email) orConditions.push({ email });
+        if (phoneNumber) orConditions.push({ phoneNumber });
+        if (username) orConditions.push({ username });
+
+        if (orConditions.length > 0) {
+            const conflicting = await prisma.employee.findFirst({
+                where: {
+                    ...(id ? { NOT: { employeeId: id } } : {}),
+                    OR: orConditions
+                },
+            });
+
+            if (conflicting) {
+                if (email && conflicting.email === email) throw new Error('Email already in use');
+                if (phoneNumber && conflicting.phoneNumber === phoneNumber) throw new Error('Phone number already in use');
+                if (username && conflicting.username === username) throw new Error('Username already taken');
+            }
+        }
+    }
     _formatEmployee(employee: any): FormattedEmployee | null {
         if (!employee) return null;
         return {
@@ -60,29 +84,22 @@ class EmployeeService {
     }
 
     async createUser(data: EmployeeCreateData): Promise<FormattedEmployee | null> {
-        const { fullName, username, password, roleIds, email, phoneNumber, address, dateOfBirth, hireDate, status } = data;
+        const { fullName, roleIds, email, phoneNumber, province, ward, street, dateOfBirth, hireDate, status } = data;
 
-        const count = await prisma.role.count({
-            where: {
-                roleId: { in: roleIds }
-            }
-        });
+        const count = await prisma.role.count({ where: { roleId: { in: roleIds } } });
         if (count !== roleIds.length) {
             throw new Error('One or more Role IDs are invalid.');
         }
-        const existingEmployee = await prisma.employee.findFirst({
-            where: {
-                OR: [{ username }, { email }, { phoneNumber }],
-            },
-        });
 
-        if (existingEmployee) {
-            if (existingEmployee.username === username) throw new Error('Username already exists');
-            if (existingEmployee.email === email) throw new Error('Email already in use');
-            if (existingEmployee.phoneNumber === phoneNumber) throw new Error('Phone number already in use');
-        }
+        const username = email;
+        await this._checkUniqueConstraints(null, email, phoneNumber, username);
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const tempPassword = generateSecurePassword(12);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        
+        let address = [street, ward, province].filter(Boolean).join(', ');
+        if (!address) address = '';
+
         const newEmployee = await prisma.employee.create({
             data: {
                 fullName, username, password: hashedPassword, email, phoneNumber,
@@ -91,50 +108,54 @@ class EmployeeService {
                     create: roleIds.map(id => ({ role: { connect: { roleId: id } } })),
                 },
             },
-            include: {
-                roles: { include: { role: true } }
-            }
+            include: { roles: { include: { role: true } } }
         });
 
-        return this._formatEmployee(newEmployee);
+        // Send email (handling both SMTP and Dev/Mock mode)
+        const emailResult = await sendCredentialsEmail(email, tempPassword, fullName);
+        
+        const formatted = this._formatEmployee(newEmployee);
+        
+        // If system is in Dev Mode (no GMAIL config) and not production, attach credentials to response
+        if (formatted && emailResult.method === 'mock' && process.env.NODE_ENV !== 'production') {
+            formatted._devCredentials = { email, password: tempPassword };
+        }
+
+        return formatted;
     }
 
     async updateEmployeeByAdmin(targetId: string | number, data: EmployeeUpdateData, adminUser: AuthUser): Promise<FormattedEmployee | null> {
         const id = typeof targetId === 'string' ? parseInt(targetId) : targetId;
 
-        // Safety check for self-termination
         if (id === adminUser.employeeId && data.status && data.status !== 'ACTIVE') {
             throw new Error('Security Safety: You cannot terminate your own account.');
         }
 
-        // Dynamic Conflict Check
-        const orConditions: any[] = [];
-        if (data.username) orConditions.push({ username: data.username });
-        if (data.email) orConditions.push({ email: data.email });
-        if (data.phoneNumber) orConditions.push({ phoneNumber: data.phoneNumber });
+        await this._checkUniqueConstraints(id, undefined, data.phoneNumber); // Email and Username are locked
 
-        if (orConditions.length > 0) {
-            const conflicting = await prisma.employee.findFirst({
-                where: {
-                    NOT: { employeeId: id },
-                    OR: orConditions
-                },
-            });
-
-            if (conflicting) {
-                if (conflicting.username === data.username) throw new Error('Username already taken');
-                if (conflicting.email === data.email) throw new Error('Email already in use');
-                if (conflicting.phoneNumber === data.phoneNumber) throw new Error('Phone number already in use');
-            }
-        }
-
-        // Prepare Update Object
         const updateData: any = { ...data };
+        delete updateData.email;
+        delete updateData.username;
         delete updateData.roleIds;
-        delete updateData.password;
+        delete updateData.province;
+        delete updateData.ward;
+        delete updateData.street;
 
-        if (data.password && data.password.trim() !== "") {
-            updateData.password = await bcrypt.hash(data.password, 10);
+        if (data.province || data.ward || data.street) {
+            const currentEmployee = await prisma.employee.findUnique({ where: { employeeId: id } });
+            if (currentEmployee) {
+                // For simplicity, if they update address, we expect them to update the whole thing.
+                // Or if any part is passed, just build it. Typically frontend sends all 3 if editing.
+                const addressFields = [
+                    data.street || '',
+                    data.ward || '',
+                    data.province || ''
+                ].filter(Boolean);
+                
+                if (addressFields.length > 0) {
+                    updateData.address = addressFields.join(', ');
+                }
+            }
         }
 
         // Role Logic
@@ -157,6 +178,20 @@ class EmployeeService {
         const updatedEmployee = await prisma.employee.update({
             where: { employeeId: id },
             data: updateData,
+            include: {
+                roles: { include: { role: true } },
+            },
+        });
+
+        return this._formatEmployee(updatedEmployee);
+    }
+
+    async updateBasicProfile(id: number, data: { fullName?: string, phoneNumber?: string, address?: string, dateOfBirth?: Date }): Promise<FormattedEmployee | null> {
+        await this._checkUniqueConstraints(id, undefined, data.phoneNumber);
+        
+        const updatedEmployee = await prisma.employee.update({
+            where: { employeeId: id },
+            data,
             include: {
                 roles: { include: { role: true } },
             },
