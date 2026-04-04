@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { getAllWarehouses } from './warehouseController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/', 
-    authorize('System Admin', 'Production Manager', 'Purchasing Staff', 'Sales Representative', 'Warehouse Staff'), 
+    authorize(PERM.WH_STOCK_READ), 
     getAllWarehouses
 );
 

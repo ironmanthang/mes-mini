@@ -30,11 +30,25 @@
     - [x] Restructured `frontend_attachment_guide.md` (Local-first, with Postman walkthrough)
     - [x] Updated Deployment Guide with Cloudflare R2 Secret Registry
 - [ ] Implement file attachment logic for `QualityCheck` and `WorkOrder` modules (Reusing `AttachmentService`)
+- [x] **Dynamic RBAC (Full Implementation)**
+    - [x] Schema: `Permission`, `RolePermission` models, `roleCode` on Role, `sessionVersion` on Employee
+    - [x] `PERM` const object with 58 permission codes + `PermCode` type for compile-time safety
+    - [x] `protect()` refactored — single nested Prisma query loads Employee → Role → Permission chain
+    - [x] `authorize()` refactored — accepts `PermCode[]` with OR logic (zero DB queries)
+    - [x] `sessionVersion` JWT invalidation — `PATCH /api/employees/:id/force-logout`
+    - [x] Permission management API: `GET /api/permissions`, `GET/PUT /api/roles/:id/permissions`
+    - [x] Login response now includes `permissions[]` array and `roleCode` for frontend feature gating
+    - [x] All ~20 route files migrated from `authorize('Role Name')` to `authorize(PERM.X)`
+    - [x] Seed overhauled: 8 roles with `roleCode`, 58 permissions, full role-permission matrix
+    - [x] `SYS_ADMIN` deletion guard, P2002 atomic uniqueness, `roleCode`-based service checks
+    - [x] Architecture doc: `docs/architecture/dynamic_rbac.md`
 
 ## 2. Next Steps (Session Handoff)
 - [x] **Employee Email Flow:** Verified with Gmail App Password (✅ Test email sent to `nguyennhuthang26112004@gmail.com`)
 - [x] **Status Consolidation:** Merged `TERMINATED` into `INACTIVE`. Deleted Hard Delete API logically.
+- [x] **Dynamic RBAC:** Full implementation complete (schema + middleware + services + routes + seed + docs).
 - [ ] **End-to-End Upload Test:** Verify Cloudflare R2 / MinIO 3-step upload via Postman.
 - [ ] **Extend AttachmentService:** Implement for `QualityCheck` and `WorkOrder`.
-- [ ] **Dynamic RBAC Phase 2:** (Permissions assignments).
+- [ ] **Frontend RBAC Integration:** Transition frontend to use `permissions[]` array from login response for UI feature gating (stop using role name strings).
+- [ ] **Frontend Roles & Permission Dashboard:** Build the UI to consume `GET /api/roles/permissions` and `PUT /api/roles/:id/permissions` to allow admins to manage role access.
 - [ ] **Multilingual Framework (I18n)**.

@@ -29,7 +29,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
     const {
         employeeId, fullName, username, email,
         phoneNumber, address, dateOfBirth,
-        hireDate, status, roles
+        hireDate, status, roles, permissions
     } = req.user!;
 
     res.status(200).json({
@@ -42,7 +42,8 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
         dateOfBirth,
         hireDate,
         status,
-        roles
+        roles,
+        permissions
     });
 };
 

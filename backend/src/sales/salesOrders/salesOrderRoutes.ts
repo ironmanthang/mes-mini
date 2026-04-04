@@ -16,70 +16,71 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createSOSchema, updateSOSchema, shipOSchema, cancelSOSchema } from './salesOrderValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/',
-    authorize('System Admin', 'Production Manager', 'Sales Staff'),
+    authorize(PERM.SO_READ),
     getAllSOs
 );
 
 router.get('/:id/feasibility',
-    authorize('Production Manager', 'Sales Staff', 'System Admin'),
+    authorize(PERM.SO_READ),
     checkFeasibility
 );
 
 router.get('/:id',
-    authorize('System Admin', 'Production Manager', 'Sales Staff', 'Warehouse Staff'),
+    authorize(PERM.SO_READ),
     getSOById
 );
 
 router.post('/',
-    authorize('Sales Staff', 'Sales Manager', 'System Admin'),
+    authorize(PERM.SO_CREATE),
     validate(createSOSchema),
     createSO
 );
 
 router.put('/:id',
-    authorize('Sales Staff', 'System Admin'),
+    authorize(PERM.SO_CREATE),
     validate(updateSOSchema),
     updateSO
 );
 
 router.delete('/:id',
-    authorize('Sales Staff', 'System Admin'),
+    authorize(PERM.SO_CREATE),
     deleteSO
 );
 router.put('/:id/approve',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.SO_APPROVE),
     approveSO
 );
 
 router.put('/:id/submit',
-    authorize('Sales Staff', 'System Admin'),
+    authorize(PERM.SO_SUBMIT),
     submitSO
 );
 
 router.put('/:id/reject',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.SO_APPROVE),
     rejectSO
 );
 
 router.put('/:id/cancel',
-    authorize('Sales Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.SO_CANCEL),
     validate(cancelSOSchema),
     cancelSO
 );
 
 router.put('/:id/process',
-    authorize('Production Manager', 'Warehouse Staff'),
+    authorize(PERM.SO_SHIP),
     startProcessing
 );
 
 router.post('/:id/ship',
-    authorize('Warehouse Staff', 'Production Manager'),
+    authorize(PERM.SO_SHIP),
     validate(shipOSchema),
     shipOrder
 );

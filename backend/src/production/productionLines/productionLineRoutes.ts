@@ -9,16 +9,17 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createProductionLineSchema, updateProductionLineSchema } from './productionLineValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
-router.get('/', authorize('System Admin', 'Production Manager', 'Line Leader'), getAllProductionLines);
-router.get('/:id', authorize('System Admin', 'Production Manager', 'Line Leader'), getProductionLineById);
-router.post('/', authorize('System Admin', 'Production Manager'), validate(createProductionLineSchema), createProductionLine);
-router.put('/:id', authorize('System Admin', 'Production Manager'), validate(updateProductionLineSchema), updateProductionLine);
-router.delete('/:id', authorize('System Admin'), deleteProductionLine);
+router.get('/', authorize(PERM.LINE_READ), getAllProductionLines);
+router.get('/:id', authorize(PERM.LINE_READ), getProductionLineById);
+router.post('/', authorize(PERM.LINE_CREATE), validate(createProductionLineSchema), createProductionLine);
+router.put('/:id', authorize(PERM.LINE_UPDATE), validate(updateProductionLineSchema), updateProductionLine);
+router.delete('/:id', authorize(PERM.LINE_DELETE), deleteProductionLine);
 
 /**
  * @swagger

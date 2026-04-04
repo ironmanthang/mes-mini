@@ -4,24 +4,30 @@ import {
     getAllEmployees,
     getEmployeeById,
     updateEmployee,
-    updateEmployeeStatus
+    updateEmployeeStatus,
+    forceLogout  // NEW
     // deleteEmployee
 } from './employeeController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { employeeCreateSchema, employeeUpdateSchema, statusUpdateSchema } from './employeeValidator.js';
+import { PERM } from '../../common/constants/permissions.js';  // NEW
 
 const router = Router();
 
-router.use(protect, authorize('System Admin'));
-
-router.post('/', validate(employeeCreateSchema), createUser);
-router.get('/', getAllEmployees);
-router.get('/:id', getEmployeeById);
-router.put('/:id', validate(employeeUpdateSchema), updateEmployee);
+// TODO (Grinder): Decompose this blanket into per-route authorize() calls.
+// Each route should use: protect, authorize(PERM.<SPECIFIC_PERM>)
+// See implementation_plan.md Phase 6 for the exact mapping.
+router.post('/',     protect, authorize(PERM.EMP_CREATE), validate(employeeCreateSchema), createUser);
+router.get('/',      protect, authorize(PERM.EMP_READ),   getAllEmployees);
+router.get('/:id',   protect, authorize(PERM.EMP_READ),   getEmployeeById);
+router.put('/:id',   protect, authorize(PERM.EMP_UPDATE), validate(employeeUpdateSchema), updateEmployee);
 // DELETE route is commented out as hard-deleting employees ruins data traceability. Use status update to INACTIVE instead.
 // router.delete('/:id', deleteEmployee);
-router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
+router.patch('/:id/status',       protect, authorize(PERM.EMP_STATUS), validate(statusUpdateSchema), updateEmployeeStatus);
+
+// Force-logout: instantly invalidates all active sessions for a target employee.
+router.patch('/:id/force-logout', protect, authorize(PERM.EMP_STATUS), forceLogout);
 
 
 /**
@@ -41,6 +47,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *         hireDate: { type: string, format: date-time, example: "2025-01-01T00:00:00.000Z" }
  *         terminationDate: { type: string, format: date-time, nullable: true }
  *         status: { type: string, enum: [ACTIVE, INACTIVE], example: "ACTIVE" }
+ *         sessionVersion: { type: integer, example: 1 }
  *         createdAt: { type: string, format: date-time }
  *         updatedAt: { type: string, format: date-time }
  *         roles: 
@@ -49,6 +56,7 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *             type: object
  *             properties:
  *               roleId: { type: integer, example: 1 }
+ *               roleCode: { type: string, example: "SYS_ADMIN" }
  *               roleName: { type: string, example: "System Admin" }
  *         _devCredentials:
  *           type: object
@@ -258,6 +266,27 @@ router.patch('/:id/status', validate(statusUpdateSchema), updateEmployeeStatus);
  *         description: Validation error
  */
 
+
+/**
+ * @swagger
+ * /api/employees/{id}/force-logout:
+ *   patch:
+ *     summary: Instantly invalidates all active sessions for a target employee
+ *     description: Increments the employee's sessionVersion in the database, effectively marking all currently issued JWTs as invalid upon their next middleware check.
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       204:
+ *         description: Sessions invalidated successfully (No Content)
+ *       404:
+ *         description: Employee not found
+ */
 
 // DELETE api doc removed
 

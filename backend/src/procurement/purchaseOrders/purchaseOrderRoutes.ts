@@ -28,6 +28,7 @@ import {
     requestUploadSchema,
     confirmUploadSchema,
 } from './purchaseOrderValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
@@ -35,25 +36,25 @@ router.use(protect);
 
 // ── List & Detail ─────────────────────────────────────────────────────────────
 router.get('/',
-    authorize('System Admin', 'Production Manager', 'Purchasing Staff'),
+    authorize(PERM.PO_READ),
     getAllPOs
 );
 
 router.get('/:id',
-    authorize('System Admin', 'Production Manager', 'Purchasing Staff'),
+    authorize(PERM.PO_READ),
     getPOById
 );
 
 // ── Create ────────────────────────────────────────────────────────────────────
 router.post('/',
-    authorize('System Admin', 'Purchasing Staff'),
+    authorize(PERM.PO_CREATE),
     validate(createPOSchema),
     createPO
 );
 
 // ── Generic Edit ──────────────────────────────────────────────────────────────
 router.put('/:id',
-    authorize('System Admin', 'Purchasing Staff'),
+    authorize(PERM.PO_CREATE),
     validate(updatePOSchema),
     updatePO
 );
@@ -62,47 +63,47 @@ router.put('/:id',
 
 // DRAFT → PENDING (generates official PO code)
 router.post('/:id/submit',
-    authorize('System Admin', 'Purchasing Staff'),
+    authorize(PERM.PO_SUBMIT),
     validate(submitPOSchema),
     submitPO
 );
 
 // PENDING → APPROVED (was PUT, now POST per Decision #12)
 router.post('/:id/approve',
-    authorize('System Admin', 'Production Manager', 'Purchasing Staff'),
+    authorize(PERM.PO_APPROVE),
     approvePO
 );
 
 // APPROVED → ORDERED
 router.post('/:id/send-to-supplier',
-    authorize('System Admin', 'Purchasing Staff'),
+    authorize(PERM.PO_SEND),
     validate(sendToSupplierSchema),
     sendToSupplierPO
 );
 
 // Receive goods (ORDERED / RECEIVING → RECEIVING / COMPLETED)
 router.post('/:id/receive',
-    authorize('System Admin', 'Purchasing Staff', 'Warehouse Keeper'),
+    authorize(PERM.PO_RECEIVE),
     validate(receiveGoodsSchema),
     receiveGoods
 );
 
 // Get Generated Lots for a PO (For printing/viewing barcodes)
 router.get('/:id/lots',
-    authorize('System Admin', 'Purchasing Staff', 'Warehouse Keeper', 'Production Manager'),
+    authorize(PERM.PO_READ),
     getLotsByPO
 );
 
 // PENDING|APPROVED → CANCELLED (soft-delete, preserves audit trail)
 router.post('/:id/cancel',
-    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    authorize(PERM.PO_CANCEL),
     validate(cancelPOSchema),
     cancelPO
 );
 
 // Hard-delete (DRAFT only — no official PO code to preserve)
 router.delete('/:id',
-    authorize('System Admin', 'Purchasing Staff'),
+    authorize(PERM.PO_CREATE),
     deletePO
 );
 
@@ -110,27 +111,27 @@ router.delete('/:id',
 
 // Step 1: Request a presigned PUT URL to upload directly to R2
 router.post('/:id/attachments/request-upload',
-    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    authorize(PERM.ATTACH_UPLOAD),
     validate(requestUploadSchema),
     requestAttachmentUpload
 );
 
 // Step 2: Confirm file is uploaded — create the DB record
 router.post('/:id/attachments/confirm',
-    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    authorize(PERM.ATTACH_UPLOAD),
     validate(confirmUploadSchema),
     confirmAttachmentUpload
 );
 
 // List all attachments for a PO (includes presigned download URLs)
 router.get('/:id/attachments',
-    authorize('System Admin', 'Purchasing Staff', 'Production Manager', 'Warehouse Keeper', 'Warehouse Staff'),
+    authorize(PERM.PO_READ),
     listAttachments
 );
 
 // Hard-delete a single attachment (R2 + DB row)
 router.delete('/:id/attachments/:attachmentId',
-    authorize('System Admin', 'Purchasing Staff', 'Production Manager'),
+    authorize(PERM.ATTACH_DELETE_ANY),
     deleteAttachment
 );
 

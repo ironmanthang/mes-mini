@@ -12,39 +12,40 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createComponentSchema, updateComponentSchema } from './componentValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
-router.get('/', authorize('System Admin', 'Production Manager', 'Purchasing Staff'), getAllComponents);
-router.get('/:id', authorize('System Admin', 'Production Manager'), getComponentById);
+router.get('/', authorize(PERM.COMP_READ), getAllComponents);
+router.get('/:id', authorize(PERM.COMP_READ), getComponentById);
 
 router.post('/',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.COMP_CREATE),
     validate(createComponentSchema),
     createComponent
 );
 
 
 router.put('/:id',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.COMP_UPDATE),
     validate(updateComponentSchema),
     updateComponent
 );
 
 router.delete('/:id',
-    authorize('System Admin'),
+    authorize(PERM.COMP_UPDATE),
     deleteComponent
 );
 
 router.get('/:id/suppliers',
-    authorize('System Admin', 'Production Manager', 'Purchasing Staff'),
+    authorize(PERM.COMP_READ),
     getComponentSuppliers
 );
 
 router.get('/:id/barcode',
-    authorize('System Admin', 'Production Manager', 'Warehouse Keeper'),
+    authorize(PERM.COMP_READ),
     getComponentBarcode
 );
 

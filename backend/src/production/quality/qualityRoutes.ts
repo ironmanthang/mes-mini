@@ -3,24 +3,25 @@ import { createCheck, getByProduct, getByWorkOrder } from './qualityController.j
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createCheckSchema } from './qualityValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.post('/',
-    authorize('System Admin', 'Production Manager', 'QC Inspector'),
+    authorize(PERM.QC_CREATE),
     validate(createCheckSchema),
     createCheck
 );
 
 router.get('/product/:productId',
-    authorize('System Admin', 'Production Manager', 'QC Inspector'),
+    authorize(PERM.QC_READ),
     getByProduct
 );
 
 router.get('/work-order/:woId',
-    authorize('System Admin', 'Production Manager', 'QC Inspector'),
+    authorize(PERM.QC_READ),
     getByWorkOrder
 );
 

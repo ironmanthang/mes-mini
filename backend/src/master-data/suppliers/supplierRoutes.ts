@@ -12,45 +12,46 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createSupplierSchema, updateSupplierSchema } from './supplierValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/',
-    authorize('System Admin', 'Production Manager', 'Warehouse Keeper', 'Purchasing Staff'),
+    authorize(PERM.SUPPLIER_READ),
     getAllSuppliers
 );
 router.get('/:id',
-    authorize('System Admin', 'Production Manager', 'Warehouse Keeper'),
+    authorize(PERM.SUPPLIER_READ),
     getSupplierById
 );
 router.post('/',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.SUPPLIER_CREATE),
     validate(createSupplierSchema),
     createSupplier
 );
 router.put('/:id',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.SUPPLIER_UPDATE),
     validate(updateSupplierSchema),
     updateSupplier
 );
 router.delete('/:id',
-    authorize('System Admin'),
+    authorize(PERM.SUPPLIER_UPDATE),
     deleteSupplier
 );
 
 
 router.get('/:id/components',
-    authorize('System Admin', 'Production Manager', 'Warehouse Keeper'),
+    authorize(PERM.SUPPLIER_READ),
     getSupplierComponents
 );
 router.post('/:id/components',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.SUPPLIER_UPDATE),
     assignComponent
 );
 router.delete('/:id/components/:componentId',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.SUPPLIER_UPDATE),
     removeComponent
 );
 

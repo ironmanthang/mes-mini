@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from '../../src/common/lib/prisma.js';
+import { PERM } from '../../src/common/constants/permissions.js';
 import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType } from '../../src/generated/prisma/index.js';
 
 // ============================================================================
@@ -35,6 +36,8 @@ async function main(): Promise<void> {
     await seedSupplierComponents();
 
     if (SEED_CONFIG.ROLES) await seedRoles();
+    if (SEED_CONFIG.ROLES) await seedPermissions();      // NEW — must run after roles
+    if (SEED_CONFIG.ROLES) await seedRolePermissions();  // NEW — must run after permissions
     if (SEED_CONFIG.EMPLOYEES) await seedEmployees();
 
     // Master Data
@@ -121,41 +124,221 @@ async function seedProductInstances(): Promise<void> {
 
 
 // ============================================================================
-// 1. SEED ROLES (Based on ISA-95 & Electronics Manufacturing Best Practices)
+// 1. SEED ROLES
 // ============================================================================
 async function seedRoles(): Promise<void> {
     console.log('...Seeding Roles');
 
-    // Roles mapped to MES functions:
-    // - System Admin: Full access, user management, configurations
-    // - Production Manager: Approves SO/PO/WO, monitors KPIs, scheduling
-    // - Warehouse Keeper: Inventory management, material issue/receipt
-    // - Line Leader: Shop floor supervisor, manages production line workers
-    // - Production Worker: Executes work orders, records production data
-    // - Sales Staff: Creates/submits sales orders, manages agents
-    // - Purchasing Staff: Creates/submits purchase orders, manages suppliers
-    // - QC Inspector: Quality checks, pass/fail decisions (ADDED based on web research)
-
+    // Consolidated to 8 roles (Warehouse Keeper removed, merged into WH_STAFF)
+    // roleCode is the immutable system identifier — NEVER rename after deployment
     const roles = [
-        'System Admin',
-        'Production Manager',
-        'Warehouse Keeper',
-        'Line Leader',
-        'Production Worker',
-        'Sales Staff',
-        'Purchasing Staff',
-        'QC Inspector',
-        'Warehouse Staff'
+        { code: 'SYS_ADMIN',    name: 'System Admin' },
+        { code: 'PROD_MGR',     name: 'Production Manager' },
+        { code: 'WH_STAFF',     name: 'Warehouse Staff' },      // Replaces Warehouse Keeper + Warehouse Manager
+        { code: 'LINE_LEADER',  name: 'Line Leader' },
+        { code: 'PROD_WORKER',  name: 'Production Worker' },
+        { code: 'SALES_STAFF',  name: 'Sales Staff' },
+        { code: 'PURCH_STAFF',  name: 'Purchasing Staff' },
+        { code: 'QC_INSPECTOR', name: 'QC Inspector' },
     ];
 
-    for (const roleName of roles) {
+    for (const role of roles) {
         await prisma.role.upsert({
-            where: { roleName },
-            update: {},
-            create: { roleName },
+            where: { roleCode: role.code },
+            update: { roleName: role.name },
+            create: { roleCode: role.code, roleName: role.name },
         });
     }
-    console.log(`   Created ${roles.length} roles`);
+    console.log(`   Created/updated ${roles.length} roles`);
+}
+
+// ============================================================================
+// 1b. SEED PERMISSIONS
+// ============================================================================
+async function seedPermissions(): Promise<void> {
+    console.log('...Seeding Permissions');
+
+    // Derive module from permCode prefix (e.g., 'PO_READ' → module 'PO')
+    // This ensures 100% parity between PERM const and DB — no manual string lists.
+    const permEntries = Object.entries(PERM).map(([, permCode]) => {
+        const module = permCode.split('_')[0];  // First segment before underscore
+        return { permCode, module };
+    });
+
+    // Description map — human-readable for the Permission Management UI
+    const descriptions: Record<string, string> = {
+        EMP_READ:          'View employee list & details',
+        EMP_CREATE:        'Create new employees',
+        EMP_UPDATE:        'Edit employee details',
+        EMP_STATUS:        'Activate/deactivate employees & force-logout',
+        ROLE_MANAGE:       'Full CRUD on roles & permission assignments',
+        PO_READ:           'View Purchase Orders',
+        PO_CREATE:         'Create & edit draft POs',
+        PO_SUBMIT:         'Submit POs for approval',
+        PO_APPROVE:        'Approve pending POs',
+        PO_SEND:           'Send approved POs to supplier',
+        PO_RECEIVE:        'Receive goods against POs',
+        PO_CANCEL:         'Cancel POs',
+        SO_READ:           'View Sales Orders',
+        SO_CREATE:         'Create & edit draft SOs',
+        SO_SUBMIT:         'Submit SOs for approval',
+        SO_APPROVE:        'Approve pending SOs',
+        SO_SHIP:           'Ship/fulfill SOs',
+        SO_CANCEL:         'Cancel SOs',
+        PR_READ:           'View Production Requests',
+        PR_CREATE:         'Create Production Requests',
+        PR_UPDATE:         'Edit production requests',
+        PR_CANCEL:         'Cancel production requests',
+        PR_LINK_PO:        'Link PR to a Purchase Order',
+        WO_READ:           'View Work Orders',
+        WO_CREATE:         'Create Work Orders',
+        WO_UPDATE:         'Edit & transition Work Orders',
+        WO_COMPLETE:       'Mark Work Orders as completed',
+        LINE_READ:         'View production lines',
+        LINE_CREATE:       'Create production lines',
+        LINE_UPDATE:       'Edit production lines',
+        LINE_DELETE:       'Delete production lines',
+        QC_READ:           'View quality checks',
+        QC_CREATE:         'Perform quality checks',
+        WH_STOCK_READ:     'View inventory/stock levels',
+        WH_STOCK_ADJUST:   'Adjust inventory balances',
+        WH_MANAGE:         'Full CRUD on warehouse entities',
+        MR_READ:           'View material export requests',
+        MR_CREATE:         'Create material requests',
+        MR_APPROVE:        'Approve/process material requests',
+        ST_READ:           'View stocktakes',
+        ST_CREATE:         'Create stocktakes',
+        ST_COMPLETE:       'Complete/approve stocktakes',
+        ATTACH_UPLOAD:     'Upload attachments',
+        ATTACH_DELETE_ANY: 'Delete any user\'s attachments (admin override)',
+        NOTIF_READ:        'Read own notifications',
+        DASH_READ:         'View dashboard metrics',
+        PRODUCT_READ:      'View product list & details',
+        PRODUCT_CREATE:    'Create products',
+        PRODUCT_UPDATE:    'Edit products & BOM',
+        COMP_READ:         'View component list & details',
+        COMP_CREATE:       'Create components',
+        COMP_UPDATE:       'Edit components',
+        SUPPLIER_READ:     'View supplier list & details',
+        SUPPLIER_CREATE:   'Create suppliers',
+        SUPPLIER_UPDATE:   'Edit suppliers',
+        AGENT_READ:        'View agent list & details',
+        AGENT_CREATE:      'Create agents',
+        AGENT_UPDATE:      'Edit agents',
+    };
+
+    for (const entry of permEntries) {
+        await prisma.permission.upsert({
+            where: { permCode: entry.permCode },
+            update: {},  // permCode and module are immutable once deployed
+            create: {
+                permCode:    entry.permCode,
+                module:      entry.module,
+                description: descriptions[entry.permCode] || entry.permCode,
+            },
+        });
+    }
+    console.log(`   Created/updated ${permEntries.length} permissions`);
+}
+
+// ============================================================================
+// 1c. SEED ROLE PERMISSIONS
+// ============================================================================
+async function seedRolePermissions(): Promise<void> {
+    console.log('...Seeding Role-Permission Assignments');
+
+    // All permissions exist in DB — build a lookup map: permCode → permissionId
+    const allPerms = await prisma.permission.findMany({ select: { permissionId: true, permCode: true } });
+    const permMap = new Map(allPerms.map(p => [p.permCode, p.permissionId]));
+
+    // Role → Permission mapping (from full-detail-plan.md Section 3.3)
+    const ALL_PERMS = Object.values(PERM);  // SYS_ADMIN gets everything
+
+    const rolePermissions: Record<string, string[]> = {
+        SYS_ADMIN: ALL_PERMS,  // Explicit, not wildcard — shows every perm in the mgmt UI
+        PROD_MGR: [
+            PERM.PO_READ, PERM.PO_APPROVE, PERM.PO_CANCEL,
+            PERM.SO_READ, PERM.SO_APPROVE, PERM.SO_CANCEL,
+            PERM.PR_READ, PERM.PR_CREATE, PERM.PR_UPDATE, PERM.PR_CANCEL, PERM.PR_LINK_PO,
+            PERM.WO_READ, PERM.WO_CREATE, PERM.WO_UPDATE, PERM.WO_COMPLETE,
+            PERM.LINE_READ, PERM.LINE_CREATE, PERM.LINE_UPDATE, PERM.LINE_DELETE,
+            PERM.QC_READ, PERM.WH_STOCK_READ,
+            PERM.MR_READ, PERM.MR_APPROVE,
+            PERM.ST_READ, PERM.DASH_READ,
+            PERM.PRODUCT_READ, PERM.PRODUCT_CREATE, PERM.PRODUCT_UPDATE,
+            PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
+            PERM.SUPPLIER_READ,
+        ],
+        WH_STAFF: [
+            PERM.WH_STOCK_READ, PERM.WH_STOCK_ADJUST, PERM.WH_MANAGE,
+            PERM.MR_READ, PERM.MR_CREATE, PERM.MR_APPROVE,
+            PERM.ST_READ, PERM.ST_CREATE, PERM.ST_COMPLETE,
+            PERM.PO_RECEIVE, PERM.SO_SHIP,
+            PERM.ATTACH_UPLOAD,
+            PERM.PRODUCT_READ,
+            PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
+            PERM.SUPPLIER_READ, PERM.SUPPLIER_CREATE, PERM.SUPPLIER_UPDATE,
+        ],
+        LINE_LEADER: [
+            PERM.WO_READ, PERM.WO_UPDATE,
+            PERM.LINE_READ, PERM.QC_READ,
+            PERM.MR_READ, PERM.MR_CREATE,
+            PERM.PRODUCT_READ, PERM.COMP_READ,
+        ],
+        PROD_WORKER: [
+            PERM.WO_READ, PERM.QC_READ,
+            PERM.MR_READ,
+            PERM.PRODUCT_READ, PERM.COMP_READ,
+        ],
+        SALES_STAFF: [
+            PERM.SO_READ, PERM.SO_CREATE, PERM.SO_SUBMIT, PERM.SO_APPROVE, PERM.SO_SHIP, PERM.SO_CANCEL,
+            PERM.PR_READ, PERM.PR_CREATE,
+            PERM.DASH_READ,
+            PERM.PRODUCT_READ,
+            PERM.AGENT_READ, PERM.AGENT_CREATE, PERM.AGENT_UPDATE,
+        ],
+        PURCH_STAFF: [
+            PERM.PO_READ, PERM.PO_CREATE, PERM.PO_SUBMIT, PERM.PO_APPROVE, PERM.PO_SEND, PERM.PO_RECEIVE, PERM.PO_CANCEL,
+            PERM.PR_READ, PERM.PR_LINK_PO,
+            PERM.ATTACH_UPLOAD,
+            PERM.PRODUCT_READ, PERM.COMP_READ,
+            PERM.SUPPLIER_READ, PERM.SUPPLIER_CREATE,
+        ],
+        QC_INSPECTOR: [
+            PERM.QC_READ, PERM.QC_CREATE,
+            PERM.WO_READ,
+            PERM.PRODUCT_READ, PERM.COMP_READ,
+        ],
+    };
+
+    // Also assign NOTIF_READ to all roles (notifications are universal)
+    for (const perms of Object.values(rolePermissions)) {
+        if (!perms.includes(PERM.NOTIF_READ)) {
+            perms.push(PERM.NOTIF_READ);
+        }
+    }
+
+    for (const [roleCode, permCodes] of Object.entries(rolePermissions)) {
+        const role = await prisma.role.findUnique({ where: { roleCode } });
+        if (!role) {
+            console.warn(`   ⚠️ Role '${roleCode}' not found, skipping permissions.`);
+            continue;
+        }
+
+        // Full replace: wipe existing and re-seed (idempotent)
+        await prisma.rolePermission.deleteMany({ where: { roleId: role.roleId } });
+
+        const permissionIds = permCodes
+            .map(code => permMap.get(code))
+            .filter((id): id is number => id !== undefined);
+
+        if (permissionIds.length > 0) {
+            await prisma.rolePermission.createMany({
+                data: permissionIds.map(permissionId => ({ roleId: role.roleId, permissionId }))
+            });
+        }
+        console.log(`   ✓ ${roleCode}: ${permissionIds.length} permissions assigned`);
+    }
 }
 
 // ============================================================================
@@ -165,35 +348,19 @@ async function seedEmployees(): Promise<void> {
     console.log('...Seeding Employees');
     const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
-    // Full list of users - one employee per role for comprehensive testing
-    // Each employee represents a persona that would use specific features
+    // Full list — one employee per role for comprehensive testing
+    // CHANGED: lookup by roleCode (immutable) instead of roleName (editable)
     const allUsers = [
-        // Admin - Has full access
-        { name: 'Super Admin', username: 'admin', email: 'admin@mes.com', role: 'System Admin' },
-
-        // Manager - Approves orders, monitors production
-        { name: 'Mr. Production Manager', username: 'manager', email: 'manager@mes.com', role: 'Production Manager' },
-
-        // Warehouse - Handles inventory, material issue/receipt
-        { name: 'Mr. Warehouse Keeper', username: 'warehouse', email: 'warehouse@mes.com', role: 'Warehouse Keeper' },
-
-        // Line Leader - Supervises production workers on shop floor
-        { name: 'Ms. Line Leader', username: 'lineleader', email: 'lineleader@mes.com', role: 'Line Leader' },
-
-        // Worker - Executes work orders, records production data
-        { name: 'Mr. Production Worker', username: 'worker', email: 'worker@mes.com', role: 'Production Worker' },
-
-        // Sales - Creates sales orders for agents
-        { name: 'Ms. Sales Staff', username: 'sales', email: 'sales@mes.com', role: 'Sales Staff' },
-
-        // Purchasing - Creates purchase orders for suppliers
-        { name: 'Mr. Purchasing Staff', username: 'purchaser', email: 'purchase@mes.com', role: 'Purchasing Staff' },
-
-        // QC - Performs quality checks, pass/fail decisions
-        { name: 'Ms. QC Inspector', username: 'qc', email: 'qc@mes.com', role: 'QC Inspector' }
+        { name: 'Super Admin',            username: 'admin',     email: 'admin@mes.com',     roleCode: 'SYS_ADMIN' },
+        { name: 'Mr. Production Manager', username: 'manager',   email: 'manager@mes.com',   roleCode: 'PROD_MGR' },
+        { name: 'Ms. Warehouse Staff',    username: 'warehouse', email: 'warehouse@mes.com', roleCode: 'WH_STAFF' },   // CHANGED: was Warehouse Keeper
+        { name: 'Ms. Line Leader',        username: 'lineleader',email: 'lineleader@mes.com',roleCode: 'LINE_LEADER' },
+        { name: 'Mr. Production Worker',  username: 'worker',    email: 'worker@mes.com',    roleCode: 'PROD_WORKER' },
+        { name: 'Ms. Sales Staff',        username: 'sales',     email: 'sales@mes.com',     roleCode: 'SALES_STAFF' },
+        { name: 'Mr. Purchasing Staff',   username: 'purchaser', email: 'purchase@mes.com',  roleCode: 'PURCH_STAFF' },
+        { name: 'Ms. QC Inspector',       username: 'qc',        email: 'qc@mes.com',        roleCode: 'QC_INSPECTOR' },
     ];
 
-    // MINIMAL mode: only seed super admin; otherwise seed all (one per role)
     const users = SEED_CONFIG.MINIMAL
         ? [allUsers[0]]  // Only Super Admin
         : allUsers;      // All 8 employees (one per role)
@@ -203,9 +370,10 @@ async function seedEmployees(): Promise<void> {
     for (let i = 0; i < users.length; i++) {
         const u = users[i];
         try {
-            const role = await prisma.role.findUnique({ where: { roleName: u.role } });
+            // CHANGED: lookup by roleCode (immutable)
+            const role = await prisma.role.findUnique({ where: { roleCode: u.roleCode } });
             if (!role) {
-                console.warn(`   ⚠️ Role "${u.role}" not found. Skipping user ${u.username}.`);
+                console.warn(`   ⚠️ Role '${u.roleCode}' not found. Skipping user ${u.username}.`);
                 continue;
             }
 
@@ -227,7 +395,7 @@ async function seedEmployees(): Promise<void> {
                     }
                 }
             });
-            console.log(`   ✓ ${u.username} (${u.role})`);
+            console.log(`   ✓ ${u.username} (${u.roleCode})`);
         } catch (error) {
             console.error(`   ❌ Failed to seed user ${u.username}:`, error);
         }

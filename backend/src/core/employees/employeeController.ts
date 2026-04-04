@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import EmployeeService from './employeeService.js';
 import { EmployeeStatus } from '../../generated/prisma/index.js';
+import { AppError } from '../../common/utils/AppError.js';
 
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -38,6 +39,10 @@ export const updateEmployee = async (req: Request, res: Response): Promise<void>
         const employee = await EmployeeService.updateEmployeeByAdmin(req.params.id as string, req.body, req.user!);
         res.status(200).json(employee);
     } catch (error) {
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
         res.status(400).json({ message: (error as Error).message });
     }
 };
@@ -52,9 +57,37 @@ export const updateEmployeeStatus = async (req: Request, res: Response): Promise
         const employee = await EmployeeService.updateStatus(req.params.id as string, status as EmployeeStatus);
         res.status(200).json(employee);
     } catch (error) {
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
         res.status(500).json({ message: (error as Error).message });
     }
 };
+
+/**
+ * forceLogout — Increments target employee's sessionVersion.
+ *
+ * Effect: All JWTs previously issued to this employee immediately fail
+ * the sessionVersion check in protect() → 401 on their next request.
+ * The employee must login fresh to receive a new valid token.
+ *
+ * Returns 204 No Content: the operation is fire-and-forget.
+ * Guard: Requires EMP_STATUS permission (same as status activate/deactivate).
+ */
+export const forceLogout = async (req: Request, res: Response): Promise<void> => {
+    try {
+        await EmployeeService.forceLogout(req.params.id as string);
+        res.status(204).send();
+    } catch (error) {
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+        res.status(500).json({ message: (error as Error).message });
+    }
+};
+
 
 /*
 export const deleteEmployee = async (req: Request, res: Response): Promise<void> => {
@@ -66,3 +99,4 @@ export const deleteEmployee = async (req: Request, res: Response): Promise<void>
     }
 };
 */
+

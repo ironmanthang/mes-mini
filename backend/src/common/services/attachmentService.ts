@@ -263,7 +263,7 @@ class AttachmentService {
         attachmentId: number,
         userId:       number,
         ctx:          EntityContext,
-        userRoles:    { roleName: string }[],
+        userRoles:    { roleCode: string }[],
     ) {
         // 1. Status guard
         if (!ctx.canDelete) {
@@ -283,7 +283,7 @@ class AttachmentService {
 
         // 3. Ownership guard: only uploader or System Admin can delete
         const isUploader  = attachment.uploadedBy === userId;
-        const isAdmin     = userRoles.some(r => r.roleName === 'System Admin');
+        const isAdmin     = userRoles.some(r => r.roleCode === 'SYS_ADMIN');  // CHANGED: roleCode
         if (!isUploader && !isAdmin) {
             throw new AppError(
                 'You can only delete attachments that you uploaded. ' +

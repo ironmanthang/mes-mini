@@ -9,20 +9,21 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createAgentSchema, updateAgentSchema } from './agentValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
-router.get('/', authorize('System Admin', 'Production Manager', 'Sales Staff'), getAllAgents);
-router.get('/:id', authorize('System Admin', 'Production Manager', 'Sales Staff'), getAgentById);
+router.get('/', authorize(PERM.AGENT_READ), getAllAgents);
+router.get('/:id', authorize(PERM.AGENT_READ), getAgentById);
 router.post('/',
-    authorize('Procurement Manager', 'Sales Manager', 'System Admin'),
+    authorize(PERM.AGENT_CREATE),
     validate(createAgentSchema),
     createAgent
 );
-router.put('/:id', authorize('System Admin', 'Sales Staff'), validate(updateAgentSchema), updateAgent);
-router.delete('/:id', authorize('System Admin'), deleteAgent);
+router.put('/:id', authorize(PERM.AGENT_UPDATE), validate(updateAgentSchema), updateAgent);
+router.delete('/:id', authorize(PERM.AGENT_UPDATE), deleteAgent);
 
 /**
  * @swagger

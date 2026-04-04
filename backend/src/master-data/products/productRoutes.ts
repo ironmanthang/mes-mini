@@ -12,16 +12,17 @@ import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createProductSchema, updateProductSchema, addBomComponentSchema, updateBomComponentSchema, checkFeasibilitySchema } from './productValidator.js';
 import { getProductProductionContext, checkProductionFeasibility } from '../../production/mrp/productionFeasibilityController.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
-router.get('/', authorize('System Admin', 'Production Manager', 'Sales Staff', 'Warehouse Keeper', 'Purchasing Staff', 'Line Leader', 'Production Worker', 'QC Inspector'), getAllProducts);
-router.get('/:id', authorize('System Admin', 'Production Manager', 'Sales Staff', 'Warehouse Keeper', 'Purchasing Staff', 'Line Leader', 'Production Worker', 'QC Inspector'), getProductById);
-router.post('/', authorize('System Admin', 'Production Manager'), validate(createProductSchema), createProduct);
-router.put('/:id', authorize('System Admin', 'Production Manager'), validate(updateProductSchema), updateProduct);
-router.delete('/:id', authorize('System Admin'), deleteProduct);
+router.get('/', authorize(PERM.PRODUCT_READ), getAllProducts);
+router.get('/:id', authorize(PERM.PRODUCT_READ), getProductById);
+router.post('/', authorize(PERM.PRODUCT_CREATE), validate(createProductSchema), createProduct);
+router.put('/:id', authorize(PERM.PRODUCT_UPDATE), validate(updateProductSchema), updateProduct);
+router.delete('/:id', authorize(PERM.PRODUCT_UPDATE), deleteProduct);
 
 // --- Production Feasibility Routes ---
 /**
@@ -41,7 +42,7 @@ router.delete('/:id', authorize('System Admin'), deleteProduct);
  *         description: Suggested production quantity based on stock and demand
  */
 router.get('/:id/production-context',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.PRODUCT_READ),
     getProductProductionContext
 );
 
@@ -71,20 +72,20 @@ router.get('/:id/production-context',
  *         description: Feasibility report (canProduce + requirements)
  */
 router.post('/:id/production-feasibility',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.PRODUCT_READ),
     validate(checkFeasibilitySchema),
     checkProductionFeasibility
 );
 
 router.get('/:id/barcode',
-    authorize('System Admin', 'Production Manager', 'Warehouse Keeper', 'QC Inspector'),
+    authorize(PERM.PRODUCT_READ),
     getProductBarcode
 );
 
 // --- BOM Routes ---
-const bomAuth = authorize('System Admin', 'Production Manager');
+const bomAuth = authorize(PERM.PRODUCT_UPDATE);
 
-router.get('/:id/bom', authorize('System Admin', 'Production Manager', 'Warehouse Keeper', 'Purchasing Staff', 'Line Leader'), getBom);
+router.get('/:id/bom', authorize(PERM.PRODUCT_READ), getBom);
 router.post('/:id/bom', bomAuth, validate(addBomComponentSchema), addBomComponent);
 router.put('/:id/bom/:componentId', bomAuth, validate(updateBomComponentSchema), updateBomComponent);
 router.delete('/:id/bom/:componentId', bomAuth, removeBomComponent);
@@ -107,7 +108,7 @@ router.delete('/:id/bom/:componentId', bomAuth, removeBomComponent);
  *         description: Suggested production quantity based on stock and demand
  */
 router.get('/:id/production-context',
-    authorize('System Admin', 'Production Manager'),
+    authorize(PERM.PRODUCT_READ),
     getProductProductionContext
 );
 

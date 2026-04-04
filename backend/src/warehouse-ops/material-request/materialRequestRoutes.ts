@@ -6,28 +6,29 @@ import {
     getDispatchSlip
 } from './materialRequestController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.MR_READ),
     getAllRequests
 );
 
 router.get('/:id',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.MR_READ),
     getRequestById
 );
 
 router.put('/:id/approve',
-    authorize('Warehouse Staff'),
+    authorize(PERM.MR_APPROVE),
     approveRequest
 );
 
 router.get('/:id/slip',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.MR_READ),
     getDispatchSlip
 );
 

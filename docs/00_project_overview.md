@@ -18,6 +18,7 @@ These rules apply to the entire system regardless of the specific feature.
 - `architecture/identification_strategy.md` — Barcode types, labeling, and Scan API rules
 - `architecture/costing.md` — Real-time costing formulas and flexible ledger
 - `architecture/inventory_ledger.md` — Transaction-first principle and stock audit rules
+- `architecture/dynamic_rbac.md` — Permission-based authorization, session invalidation, and role-permission matrix
 
 ### Feature Logic (The Organs)
 Deep-dives into specific business modules.
@@ -43,6 +44,11 @@ PRODUCTION SIDE (Customer-Blind):
   → PM creates Production Request
   → Work Order created → Factory produces
   → QC (Scrap-Only) → Finished goods in Sales Warehouse
+
+AUTHORIZATION:
+  Dynamic permission-based RBAC (see architecture/dynamic_rbac.md)
+  Routes guarded by PERM codes, not role names
+  Permissions managed at runtime via API
 
 SALES SIDE (Dispatch Only):
   Agent calls → Sales staff creates SO (Dispatch Record)

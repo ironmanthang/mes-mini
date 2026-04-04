@@ -22,6 +22,7 @@ model Employee {
   terminationDate        DateTime?               @map("termination_date")
   address                String?
   dateOfBirth            DateTime?               @map("date_of_birth")
+  sessionVersion         Int                     @default(1) @map("session_version") // JWT invalidation counter
   roles                  EmployeeRole[]
   inventoryTransactions  InventoryTransaction[]
   approvedMaterialReqs   MaterialExportRequest[] @relation("Approver")
@@ -42,11 +43,13 @@ model Employee {
 }
 
 model Role {
-  roleId    Int            @id @default(autoincrement()) @map("role_id")
-  roleName  String         @unique @map("role_name")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-  employees EmployeeRole[]
+  roleId      Int              @id @default(autoincrement()) @map("role_id")
+  roleCode    String           @unique @map("role_code")  // Immutable system identifier (e.g., 'SYS_ADMIN')
+  roleName    String           @unique @map("role_name")  // Human-readable display name
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  employees   EmployeeRole[]
+  permissions RolePermission[]
 
   @@map("roles")
 }
@@ -59,6 +62,30 @@ model EmployeeRole {
 
   @@id([employeeId, roleId])
   @@map("employee_roles")
+}
+
+
+
+model Permission {
+  permissionId Int              @id @default(autoincrement()) @map("permission_id")
+  permCode     String           @unique @map("perm_code")  // e.g., 'PO_APPROVE' — matches PERM const
+  module       String                                      // e.g., 'PO', 'SO', 'WO' — for UI grouping
+  description  String                                      // Human-readable description
+  createdAt    DateTime         @default(now()) @map("created_at")
+  roles        RolePermission[]
+
+  @@index([module])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int        @map("role_id")
+  permissionId Int        @map("permission_id")
+  role         Role       @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [permissionId], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
 }
 
 model Agent {

@@ -10,40 +10,41 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createWOSchema, completeWOSchema } from './workOrderValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.WO_READ),
     getAllWorkOrders
 );
 
 router.post('/',
-    authorize('Production Manager'),
+    authorize(PERM.WO_CREATE),
     validate(createWOSchema),
     createWorkOrder
 );
 
 router.get('/:id',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.WO_READ),
     getWorkOrderById
 );
 
 router.put('/:id/start',
-    authorize('Production Manager'),
+    authorize(PERM.WO_UPDATE),
     startWorkOrder
 );
 
 router.put('/:id/complete',
-    authorize('Production Manager'),
+    authorize(PERM.WO_COMPLETE),
     validate(completeWOSchema),
     completeWorkOrder
 );
 
 router.put('/:id/cancel',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.WO_UPDATE),
     cancelWorkOrder
 );
 

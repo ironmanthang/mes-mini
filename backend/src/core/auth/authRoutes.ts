@@ -54,13 +54,20 @@ router.put('/change-password', validate(changePasswordSchema), changePassword);
  *                     fullName: { type: string, example: "Nguyen Van A" }
  *                     email: { type: string, example: "admin@example.com" }
  *                     status: { type: string, example: "ACTIVE" }
+ *                     sessionVersion: { type: integer, description: "JWT version counter. Increments on force-logout.", example: 1 }
  *                     roles: 
  *                       type: array
  *                       items:
  *                         type: object
  *                         properties:
  *                           roleId: { type: integer, example: 1 }
+ *                           roleCode: { type: string, example: "SYS_ADMIN" }
  *                           roleName: { type: string, example: "System Admin" }
+ *                     permissions:
+ *                       type: array
+ *                       items: { type: string }
+ *                       description: "Flat list of permission codes. Use this (not roleName) to conditionally render UI."
+ *                       example: ["PO_READ", "PO_APPROVE", "SO_READ"]
  *       400:
  *         description: Missing Input (Validation Error)
  *         content:
@@ -112,13 +119,19 @@ router.put('/change-password', validate(changePasswordSchema), changePassword);
  *                 address: { type: string, example: "123 Industrial Park" }
  *                 dateOfBirth: { type: string, format: "date", example: "1990-01-01T00:00:00.000Z" }
  *                 status: { type: string, example: "ACTIVE" }
+ *                 sessionVersion: { type: integer, example: 1 }
  *                 roles: 
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       roleId: { type: integer, example: 1 }
+ *                       roleCode: { type: string, example: "SYS_ADMIN" }
  *                       roleName: { type: string, example: "System Admin" }
+ *                 permissions:
+ *                   type: array
+ *                   items: { type: string }
+ *                   example: ["EMP_READ", "PO_READ"]
  *       401:
  *         description: Not authorized (Token missing or invalid)
  *         content:
@@ -181,6 +194,7 @@ router.put('/change-password', validate(changePasswordSchema), changePassword);
  *                 email: { type: string }
  *                 phoneNumber: { type: string }
  *                 roles: { type: array, items: { type: object } }
+ *                 permissions: { type: array, items: { type: string }, example: ["EMP_READ", "PO_READ"] }
  *       400:
  *         description: Validation Error or Duplicate Data
  *         content:

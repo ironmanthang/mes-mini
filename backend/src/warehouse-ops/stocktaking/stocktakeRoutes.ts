@@ -9,35 +9,36 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createSessionSchema, updateCountSchema } from './stocktakeValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.post('/',
-    authorize('System Admin', 'Warehouse Keeper', 'Warehouse Manager'),
+    authorize(PERM.ST_CREATE),
     validate(createSessionSchema),
     createSession
 );
 
 router.get('/:id',
-    authorize('System Admin', 'Warehouse Keeper', 'Warehouse Manager'),
+    authorize(PERM.ST_READ),
     getSessionById
 );
 
 router.post('/:id/items',
-    authorize('System Admin', 'Warehouse Keeper', 'Warehouse Manager'),
+    authorize(PERM.ST_CREATE),
     validate(updateCountSchema),
     updateCount
 );
 
 router.post('/:id/finalize',
-    authorize('System Admin', 'Warehouse Manager'),
+    authorize(PERM.ST_COMPLETE),
     finalizeSession
 );
 
 router.get('/:id/variance',
-    authorize('System Admin', 'Warehouse Manager'),
+    authorize(PERM.ST_COMPLETE),
     getVariance
 );
 

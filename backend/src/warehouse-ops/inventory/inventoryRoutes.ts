@@ -5,23 +5,24 @@ import {
     getStockStatus
 } from './inventoryController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/status',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.WH_STOCK_READ),
     getInventoryStatus
 );
 
 router.get('/low-stock-details',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.WH_STOCK_READ),
     getLowStockDetails
 );
 
 router.get('/stock-status',
-    authorize('Warehouse Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.WH_STOCK_READ),
     getStockStatus
 );
 

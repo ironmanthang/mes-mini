@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { getProductionDashboard } from './productionDashboardController.js';
-import { protect } from '../../common/middleware/authMiddleware.js';
+import { protect, authorize } from '../../common/middleware/authMiddleware.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
-router.use(protect);
+router.use(protect, authorize(PERM.DASH_READ));
 
 /**
  * @swagger

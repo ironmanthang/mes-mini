@@ -31,14 +31,14 @@ class NotificationService {
     /**
      * Create notifications for multiple users (e.g., all managers)
      */
-    async notifyByRole(roleName: string, data: Omit<CreateNotificationData, 'employeeId'>) {
-        // Find all employees with the given role
+    async notifyByRole(roleCode: string, data: Omit<CreateNotificationData, 'employeeId'>) {
+        // Find all employees with the given role (using immutable roleCode, not roleName)
         const employees = await prisma.employee.findMany({
             where: {
                 status: 'ACTIVE',
                 roles: {
                     some: {
-                        role: { roleName }
+                        role: { roleCode }  // CHANGED: roleCode
                     }
                 }
             },

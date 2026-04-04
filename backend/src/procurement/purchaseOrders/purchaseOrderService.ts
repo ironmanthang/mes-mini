@@ -604,7 +604,7 @@ class PurchaseOrderService {
 
 
 
-    async cancelPO(poId: string | number, userId: number, userRoles: { roleName: string }[], note?: string) {
+    async cancelPO(poId: string | number, userId: number, userRoles: { roleCode: string }[], note?: string) {
         const id = typeof poId === 'string' ? parseInt(poId) : poId;
         const po = await prisma.purchaseOrder.findUnique({ where: { purchaseOrderId: id } });
 
@@ -639,7 +639,7 @@ class PurchaseOrderService {
         // ── RBAC guard (creator OR Admin/Manager) ────────────────────────────
         const isCreator = po.employeeId === userId;
         const isPrivilegedRole = userRoles.some(r =>
-            r.roleName === 'System Admin' || r.roleName === 'Production Manager'
+            r.roleCode === 'SYS_ADMIN' || r.roleCode === 'PROD_MGR'
         );
         if (!isCreator && !isPrivilegedRole) {
             throw new AppError(

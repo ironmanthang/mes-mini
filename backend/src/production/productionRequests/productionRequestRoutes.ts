@@ -12,49 +12,50 @@ import {
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
 import { createProductionRequestSchema } from './productionRequestValidator.js';
+import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
 router.use(protect);
 
 router.get('/',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.PR_READ),
     getAllRequests
 );
 
 router.post('/',
-    authorize('Sales Staff', 'Production Manager', 'System Admin'),
+    authorize(PERM.PR_CREATE),
     validate(createProductionRequestSchema),
     createRequest
 );
 
 router.post('/convert-to-work-order',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.WO_CREATE),
     convertRequestsToWorkOrder
 );
 
 router.get('/:id/requirements',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.PR_READ),
     getRequirements
 );
 
 router.put('/:id/recheck',
-    authorize('Production Manager', 'System Admin'),
+    authorize(PERM.PR_UPDATE),
     recheckFeasibility
 );
 
 router.get('/:id/draft-purchase-order',
-    authorize('Production Manager', 'Purchasing Staff', 'System Admin'),
+    authorize(PERM.PR_LINK_PO),
     draftPurchaseOrder
 );
 
 router.put('/:id/cancel',
-    authorize('Production Manager', 'Sales Staff', 'System Admin'),
+    authorize(PERM.PR_CANCEL),
     cancelRequest
 );
 
 router.get('/:id',
-    authorize('Production Manager', 'System Admin', 'Sales Staff'),
+    authorize(PERM.PR_READ),
     getRequestById
 );
 
