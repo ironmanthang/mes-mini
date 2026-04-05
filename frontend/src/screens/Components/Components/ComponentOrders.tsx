@@ -38,18 +38,19 @@ export const ComponentOrders = (): JSX.Element => {
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: any = { page, limit };
+      const params: { page: number; limit: number; search?: string; status?: string } = { 
+        page, 
+        limit 
+      };
+      
       if (searchQuery.trim()) params.search = searchQuery;
       if (filterStatus !== "All") params.status = filterStatus;
 
       const response = await purchaseOrderService.getAllPOs(params);
       
-      // Tương thích với format { data, total, page } từ backend
-      const data = (response as any).data || response || [];
-      const totalItems = (response as any).total || data.length || 0;
+      setOrders(response.data);
+      setTotal(response.total);
       
-      setOrders(data);
-      setTotal(totalItems);
     } catch (error) {
       console.error("Failed to fetch POs:", error);
     } finally {
@@ -109,7 +110,6 @@ export const ComponentOrders = (): JSX.Element => {
     }
   }
 
-  // Chuyển trạng thái từ APPROVED sang ORDERED
   const handleSendToSupplier = async (id: number) => {
     if (window.confirm("Send this Purchase Order to the supplier?")) {
       try {

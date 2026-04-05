@@ -68,6 +68,13 @@ export interface PurchaseOrder {
   };
 }
 
+export interface PaginatedPurchaseOrder {
+  data: PurchaseOrder[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface ComponentLot {
   lotCode: string;
   componentId: number;
@@ -76,6 +83,12 @@ export interface ComponentLot {
   quantity: number;
   component: { componentName: string; code: string };
   warehouse: { warehouseName: string; code: string };
+}
+
+export interface GeneratedLot {
+  lotCode: string;
+  componentId: number;
+  quantity: number;
 }
 
 
@@ -124,9 +137,37 @@ export interface ReceiveGoodsRequest {
   }[];
 }
 
+export interface AttachmentRequestPayload {
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  category: string; 
+}
+
+export interface AttachmentRequestResponse {
+  uploadUrl: string; 
+  fileKey: string;   
+}
+
+export interface AttachmentConfirmPayload {
+  fileKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  category: string;
+}
+
+export interface Attachment {
+  id: number;
+  fileName: string;
+  fileUrl: string;
+  category: string;
+  createdAt: string;
+}
+
 export const purchaseOrderService = {
   getAllPOs: async (params?: { page?: number; limit?: number; search?: string; status?: string; priority?: string }) => {
-    const response = await api.get("/purchase-orders", { params });
+    const response = await api.get<PaginatedPurchaseOrder>("/purchase-orders", { params });
     return response.data;
   },
 
@@ -171,12 +212,47 @@ export const purchaseOrderService = {
   },
 
   receiveGoods: async (id: number, data: ReceiveGoodsRequest) => {
-    const response = await api.post<{ po: PurchaseOrder; generatedLots: any[] }>(`/purchase-orders/${id}/receive`, data);
+    const response = await api.post<{ po: PurchaseOrder; generatedLots: GeneratedLot[] }>(`/purchase-orders/${id}/receive`, data);
     return response.data;
   },
 
   getLotsByPO: async (id: number) => {
     const response = await api.get<ComponentLot[]>(`/purchase-orders/${id}/lots`);
     return response.data;
-  }
+  },
+
+  requestAttachmentUpload: async (id: number, data: AttachmentRequestPayload) => {
+    const response = await api.post<AttachmentRequestResponse>(`/purchase-orders/${id}/attachments/request-upload`, data);
+    return response.data;
+  },
+
+  uploadFileToR2: async (uploadUrl: string, file: File) => {
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "Content-Type": file.type, 
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to upload file ${file.name} to cloud storage.`);
+    }
+    return true;
+  },
+
+  confirmAttachmentUpload: async (id: number, data: AttachmentConfirmPayload) => {
+    const response = await api.post<Attachment>(`/purchase-orders/${id}/attachments/confirm`, data);
+    return response.data;
+  },
+
+  getAttachmentsByPO: async (id: number) => {
+    const response = await api.get<Attachment[]>(`/purchase-orders/${id}/attachments`);
+    return response.data;
+  },
+
+  deleteAttachment: async (poId: number, attachmentId: number) => {
+    const response = await api.delete<{ message: string }>(`/purchase-orders/${poId}/attachments/${attachmentId}`);
+    return response.data;
+  },
 };

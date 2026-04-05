@@ -35,6 +35,50 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
   const totalShipped = order.details?.reduce((sum, item) => sum + item.quantityShipped, 0) || 0;
   const fulfillmentPercent = totalOrdered > 0 ? Math.round((totalShipped / totalOrdered) * 100) : 0;
 
+  const handlePrint = () => {
+    const printContent = document.getElementById("printable-order-content");
+    if (!printContent) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=800");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Sales_Order_${order.code}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @media print { @page { margin: 15mm; } }
+          </style>
+        </head>
+        <body class="p-8 bg-white text-black">
+          <div class="mb-8 pb-4 border-b-2 border-gray-800 flex justify-between items-end">
+             <div>
+               <h1 class="text-3xl font-bold text-gray-900">SALES ORDER</h1>
+               <p class="text-gray-500 mt-1">Code: <span class="text-black font-bold">${order.code}</span></p>
+             </div>
+             <div class="text-right text-sm text-gray-500">
+               <p>Date Printed: ${new Date().toLocaleDateString('vi-VN')}</p>
+             </div>
+          </div>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 2000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div className="bg-white w-[1000px] max-h-[90vh] flex flex-col rounded-lg shadow-xl animate-in fade-in zoom-in duration-200">
@@ -56,7 +100,7 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
           <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-blue-600 cursor-pointer transition-colors" /></button>
         </div>
 
-        <div className="p-8 overflow-y-auto space-y-8 flex-1">
+        <div className="p-8 overflow-y-auto space-y-8 flex-1" id="printable-order-content">
             
             <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -126,9 +170,7 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
                 </div>
             </div>
 
-            {/* Financial & Status Summary */}
             <div className="grid grid-cols-2 gap-8 items-end">
-                {/* Left Side: Alerts & Fulfillment */}
                 <div className="space-y-4">
                     {order.hasShortage && (
                         <div className="bg-red-50 p-4 rounded-lg border border-red-200 flex items-start gap-3">
@@ -162,7 +204,6 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
                     )}
                 </div>
 
-                {/* Right Side: Financials */}
                 <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 space-y-3 text-sm">
                     <div className="flex justify-between text-gray-600">
                         <span>Discount:</span>
@@ -185,9 +226,11 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
 
         </div>
 
-        {/* --- Footer Actions --- */}
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-lg">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer transition-colors shadow-sm">
+            <button className="flex items-center gap-2 px-4 py-2 
+            bg-white border border-gray-300 text-gray-700 font-medium 
+            rounded-lg hover:bg-gray-100 cursor-pointer transition-colors shadow-sm"
+            onClick={handlePrint}>
                 <Printer className="w-4 h-4" /> Print Order
             </button>
             <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer transition-colors shadow-sm">

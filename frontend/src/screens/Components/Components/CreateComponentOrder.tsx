@@ -7,6 +7,7 @@ import { useState, useEffect, type JSX, useRef } from "react";
 import { supplierService, type Supplier, type SupplierComponent } from "../../../services/supplierServices";
 import { purchaseOrderService } from "../../../services/purchaseOrderServices";
 import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
+import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 
 interface OrderRow {
   id: number;
@@ -21,7 +22,6 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   const [componentsList, setComponentsList] = useState<SupplierComponent[]>([]); 
   
-  const [warehousesList, setWarehousesList] = useState<any[]>([]); 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | "">("");
 
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -33,7 +33,7 @@ export const CreateComponentOrder = (): JSX.Element => {
   
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [priority, setPriority] = useState("Medium");
+  const [priority, setPriority] = useState("MEDIUM");
   const [note, setNote] = useState("");
 
   const [rows, setRows] = useState<OrderRow[]>([]);
@@ -49,16 +49,17 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [warehousesList, setWarehousesList] = useState<Warehouse[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const suppliers = await supplierService.getAllSuppliers();
         setSuppliersList(Array.isArray(suppliers) ? suppliers : (suppliers as any).data || []);
         
-        setWarehousesList([
-            { warehouseId: 1, name: "WH-01: Main Component Warehouse" },
-            { warehouseId: 2, name: "WH-02: Sub Storage" }
-        ]);
+        const warehouses = await WarehouseServices.getAllWarehouse();
+        const warehousesData: Warehouse[] = Array.isArray(warehouses) ? warehouses : (warehouses as any).data || [];
+        setWarehousesList(warehousesData.filter(item => item.warehouseType === "COMPONENT"));
       } catch (error) {
         console.error("Failed to load initial data", error);
       } finally {
@@ -166,7 +167,7 @@ export const CreateComponentOrder = (): JSX.Element => {
 
     setIsSubmitting(true);
     try {
-      await purchaseOrderService.createPO({
+      const newPO = await purchaseOrderService.createPO({
         status: submitStatus,
         supplierId: Number(selectedSupplierId),
         warehouseId: Number(selectedWarehouseId),
@@ -185,7 +186,37 @@ export const CreateComponentOrder = (): JSX.Element => {
         }))
       });
 
-      setMessage(submitStatus === 'DRAFT' ? "Draft saved successfully!" : "Purchase Order Submitted!");
+      const poId = newPO.purchaseOrderId;
+
+      if (attachedFiles.length > 0) {
+        for (const file of attachedFiles) {
+          try {
+            const fileCategory = "OTHER";
+
+            const requestRes = await purchaseOrderService.requestAttachmentUpload(poId, {
+              fileName: file.name,
+              mimeType: file.type,
+              fileSize: file.size,
+              category: fileCategory
+            });
+
+            await purchaseOrderService.uploadFileToR2(requestRes.uploadUrl, file);
+
+            await purchaseOrderService.confirmAttachmentUpload(poId, {
+              fileKey: requestRes.fileKey,
+              fileName: file.name,
+              mimeType: file.type,
+              fileSize: file.size,
+              category: fileCategory
+            });
+
+          } catch (fileError) {
+            console.error(`Lỗi khi upload file ${file.name}:`, fileError);
+          }
+        }
+      }
+
+      setMessage(submitStatus === 'DRAFT' ? "Draft & files saved successfully!" : "Purchase Order & files submitted!");
       setShowSuccess(true);
       
       setOrderDate(new Date().toISOString().split('T')[0]);
@@ -195,6 +226,7 @@ export const CreateComponentOrder = (): JSX.Element => {
       setSelectedSupplierId("");
       setSelectedWarehouseId("");
       setSupplierInfo(null);
+      setAttachedFiles([]);
       
       setTimeout(() => {
         setMessage("");
@@ -253,7 +285,7 @@ export const CreateComponentOrder = (): JSX.Element => {
               >
                 <option value="">-- Select Warehouse --</option>
                 {warehousesList.map(w => (
-                  <option key={w.warehouseId} value={w.warehouseId}>{w.name}</option>
+                  <option key={w.warehouseId} value={w.warehouseId}>{w.warehouseName}</option>
                 ))}
               </select>
             </div>
@@ -281,8 +313,8 @@ export const CreateComponentOrder = (): JSX.Element => {
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                <option value="URGENT">High (Urgent)</option>
-                <option value="NORMAL">Medium (Normal)</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
                 <option value="LOW">Low</option>
               </select>
             </div>

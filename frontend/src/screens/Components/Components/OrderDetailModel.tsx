@@ -1,8 +1,8 @@
 import { 
-  X, CheckCircle, Printer, User, Package
+  X, CheckCircle, Printer, User, Package, Paperclip, Loader2, Download, FileText
 } from "lucide-react";
-import { type JSX } from "react";
-import type { PurchaseOrder } from "../../../services/purchaseOrderServices";
+import { useState, useEffect, type JSX } from "react";
+import { purchaseOrderService, type PurchaseOrder, type Attachment } from "../../../services/purchaseOrderServices";
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -19,6 +19,41 @@ export const OrderDetailModal = ({
   onApprove, 
   onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
+
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAttachments = async () => {
+      if (!order?.purchaseOrderId) return;
+      
+      setIsLoadingAttachments(true);
+      setAttachments([]); 
+
+      try {
+        const data = await purchaseOrderService.getAttachmentsByPO(order.purchaseOrderId);
+        if (isMounted) {
+          setAttachments(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch attachments:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingAttachments(false);
+        }
+      }
+    };
+
+    if (isOpen) {
+      fetchAttachments();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, order?.purchaseOrderId]);
 
   if (!isOpen || !order) return null;
 
@@ -60,14 +95,8 @@ export const OrderDetailModal = ({
           <title>Purchase_Order_${order.code}</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
-            /* Ép trình duyệt in cả background colors (màu nền của badge, table header) */
-            body { 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact; 
-            }
-            @media print {
-              @page { margin: 15mm; }
-            }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @media print { @page { margin: 15mm; } }
           </style>
         </head>
         <body class="p-8 bg-white text-black">
@@ -91,7 +120,7 @@ export const OrderDetailModal = ({
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
-    }, 100);
+    }, 2000);
   };
 
   return (
@@ -234,6 +263,52 @@ export const OrderDetailModal = ({
                         <p><span className="font-bold text-gray-700">Note:</span> {order.note || "N/A"}</p>
                     </div>
                 </div>
+
+                <div>
+                    <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2 border-t border-gray-100 pt-6">
+                        <Paperclip className="w-4 h-4 text-blue-500" /> Attached Documents
+                    </h3>
+                    
+                    {isLoadingAttachments ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Loading attachments...
+                        </div>
+                    ) : attachments.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {attachments.map(att => (
+                                <div key={att.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-blue-200 transition-colors group">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded flex items-center justify-center flex-shrink-0">
+                                            <FileText className="w-4 h-4" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-gray-900 truncate" title={att.fileName}>{att.fileName}</p>
+                                            <p className="text-xs text-gray-500">
+                                              {att.category} • {new Date(att.createdAt).toLocaleDateString('vi-VN')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <a 
+                                        href={att.fileUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-2 text-gray-400 hover:text-blue-600 
+                                        hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                        title="Download / View"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-sm text-gray-500 italic p-6 bg-gray-50 rounded-lg border border-gray-100 border-dashed text-center flex flex-col items-center justify-center">
+                            <Paperclip className="w-6 h-6 mb-2 opacity-20" />
+                            No documents attached to this order.
+                        </div>
+                    )}
+                </div>
+
             </div>
         </div>
 

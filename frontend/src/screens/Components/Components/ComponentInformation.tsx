@@ -44,14 +44,14 @@ export const ComponentInformation = (): JSX.Element => {
     try {
       const [compResponse, invResponse] = await Promise.all([
         componentService.getAllComponents({ search: searchTerm, page, limit }),
-        InventoryServices.getInventoryReport(),
+        InventoryServices.getConsolidatedInventory({ limit: 5000 }),
       ]);
 
       const compData = (compResponse as any).data || compResponse || [];
       const totalItems = (compResponse as any).total || compData.length || 0;
       setTotal(totalItems);
 
-      const invData = Array.isArray(invResponse) ? invResponse : (invResponse as any).data || [];
+      const invData = invResponse?.data || [];
 
       const mergedComponents = compData.map((comp: Component) => {
         const stockInfo = invData.find((inv: any) => inv.componentId === comp.componentId);
@@ -67,7 +67,7 @@ export const ComponentInformation = (): JSX.Element => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, page]);
+  }, [searchTerm, page, limit]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Warehouse as WarehouseIcon, ClipboardCheck, ArrowRightLeft, Truck } from "lucide-react";
 
-import { WarehouseInformation } from "./components/WarehouseInfomation";
+import { WarehouseInformation } from "./components/WarehouseInformation";
 import { Stocktaking } from "./components/Stocktaking";
 import { ImportExport } from "./components/ImportExport";
 import { TransferStock } from "./components/TransferStock";
