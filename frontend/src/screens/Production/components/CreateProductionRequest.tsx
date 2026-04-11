@@ -17,6 +17,7 @@ import { ProductionRequestServices, type ProductionRequest } from "../../../serv
 import { CreateNewProductionRequestModal } from "./CreateNewProductionRequestModal";
 import { UpdateProductionRequestModal } from "./UpdateProductionRequestModal";
 import { ProductionRequestDetailModal } from "./ProductionRequestDetailModal";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 export const CreateProductionRequest = (): JSX.Element => {
   const [requests, setRequests] = useState<ProductionRequest[]>([]);
@@ -26,13 +27,14 @@ export const CreateProductionRequest = (): JSX.Element => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
   const [selectedViewId, setSelectedViewId] = useState<number | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [message, setMessage] = useState("");
 
   const fetchRequests = async () => {
     setIsLoading(true);
     try {
       const response = await ProductionRequestServices.getAllProductionRequests();
-      //@ts-expect-error have data
-      const dataArray = Array.isArray(response) ? response : response.data || [];
+      const dataArray = Array.isArray(response) ? response : (response as any).data || [];
       setRequests(dataArray);
     } catch (error) {
       console.error("Failed to load production requests:", error);
@@ -45,7 +47,6 @@ export const CreateProductionRequest = (): JSX.Element => {
     fetchRequests();
   }, []);
 
-  // --- Filtering ---
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
       const searchLower = searchQuery.toLowerCase();
@@ -60,20 +61,7 @@ export const CreateProductionRequest = (): JSX.Element => {
     });
   }, [requests, searchQuery, filterStatus]);
 
-  const handleCreateNew = () => {
-    setIsNewModalOpen(true);
-  };
-
-  const handleViewDetails = (id: number) => {
-    setSelectedViewId(id);
-  };
-
-  const handleUpdate = (id: number) => {
-    setSelectedUpdateId(id);
-  };
-
-  // --- UI Helpers ---
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString('vi-VN');
   };
@@ -100,17 +88,14 @@ export const CreateProductionRequest = (): JSX.Element => {
       case 'HIGH': return 'text-red-600 font-bold';
       case 'MEDIUM': return 'text-yellow-600 font-bold';
       case 'LOW': return 'text-green-600 font-medium';
-      default: return 'text-gray-600';
+      default: return 'text-gray-600 font-medium';
     }
   };
 
   return (
     <div className="flex flex-col gap-6 pb-12">
-      
-      {/* --- Header & Toolbar --- */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
         
-        {/* Title Area */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-lg">
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -120,14 +105,13 @@ export const CreateProductionRequest = (): JSX.Element => {
             <p className="text-sm text-gray-500 mt-1">Manage MRP checks, material reservations, and manufacturing queues.</p>
           </div>
           <button 
-            onClick={handleCreateNew}
+            onClick={() => setIsNewModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" /> New Request
           </button>
         </div>
 
-        {/* Filter Area */}
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
             <div className="relative w-80">
@@ -159,7 +143,6 @@ export const CreateProductionRequest = (): JSX.Element => {
           </div>
         </div>
 
-        {/* --- Table Area --- */}
         <div className="flex-1 overflow-x-auto min-h-[400px]">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
@@ -175,7 +158,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                   <th className="p-4 border-b border-gray-200 text-right">Quantity</th>
                   <th className="p-4 border-b border-gray-200 text-center">Priority</th>
                   <th className="p-4 border-b border-gray-200 text-center">Status</th>
-                  <th className="p-4 border-b border-gray-200">Request Date</th>
+                  <th className="p-4 border-b border-gray-200">Due Date</th>
                   <th className="p-4 border-b border-gray-200 text-center">Actions</th>
                 </tr>
               </thead>
@@ -203,19 +186,19 @@ export const CreateProductionRequest = (): JSX.Element => {
                         {getStatusBadge(req.status)}
                       </td>
                       <td className="p-4 text-gray-600 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400" /> {formatDate(req.requestDate)}
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" /> {formatDate(req.dueDate)}
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            onClick={() => handleViewDetails(req.productionRequestId)}
+                            onClick={() => setSelectedViewId(req.productionRequestId)}
                             className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handleUpdate(req.productionRequestId)}
+                            onClick={() => setSelectedUpdateId(req.productionRequestId)}
                             className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
                             title="Update / Recheck"
                           >
@@ -244,7 +227,15 @@ export const CreateProductionRequest = (): JSX.Element => {
       <CreateNewProductionRequestModal 
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
-        onSuccess={() => fetchRequests()} 
+        onSuccess={() => {
+          fetchRequests();
+          setShowSuccess(true);
+          setMessage("Production Request created successfully!");
+          setTimeout(() => {
+            setShowSuccess(false);
+            setMessage("");
+          }, 3000);
+        }} 
       />
 
       <UpdateProductionRequestModal
@@ -259,6 +250,8 @@ export const CreateProductionRequest = (): JSX.Element => {
         onClose={() => setSelectedViewId(null)}
         requestId={selectedViewId}
       />
+
+      <SuccessNotification isVisible={showSuccess} message={message}/>
     </div>
   );
 };

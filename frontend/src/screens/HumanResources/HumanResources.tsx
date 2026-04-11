@@ -3,8 +3,8 @@ import { useState, useEffect, useCallback, type JSX } from "react";
 
 import { AddEmployeeModal } from "./components/AddEmployeeModal";
 import { EditEmployeeModal } from "./components/EditEmployeeModal";
-import { SuccessNotification } from "../UserAndSystem/components/SuccessNotification";
 import { DeleteEmployeeModal } from "./components/DeleteEmployeeModal";
+import { SuccessNotification } from "../Notification/SuccessNotification";
 
 import { employeeService, type Employee } from "../../services/employeeServices";
 import { Roles } from "./components/Roles";

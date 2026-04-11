@@ -10,7 +10,9 @@ import {
   Send,
   ChevronLeft,
   ChevronRight,
-  PackagePlus
+  XCircle,
+  StopCircle,
+  AlertTriangle
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
@@ -31,6 +33,14 @@ export const ComponentOrders = (): JSX.Element => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
 
+  const [actionModal, setActionModal] = useState<{
+    isOpen: boolean;
+    type: 'REJECT' | 'CANCEL' | 'FORCE_CLOSE';
+    orderId: number | null;
+  }>({ isOpen: false, type: 'CANCEL', orderId: null });
+  const [actionReason, setActionReason] = useState("");
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
   useEffect(() => {
     setPage(1);
   }, [searchQuery, filterStatus]);
@@ -39,10 +49,8 @@ export const ComponentOrders = (): JSX.Element => {
     setIsLoading(true);
     try {
       const params: { page: number; limit: number; search?: string; status?: string } = { 
-        page, 
-        limit 
+        page, limit 
       };
-      
       if (searchQuery.trim()) params.search = searchQuery;
       if (filterStatus !== "All") params.status = filterStatus;
 
@@ -76,9 +84,18 @@ export const ComponentOrders = (): JSX.Element => {
     }
   };
 
-  const handleUpdate = (id: number) => {
-    setSelectedUpdateId(id);
-  }
+  const handleUpdate = (id: number) => setSelectedUpdateId(id);
+
+  const handleSubmitDraft = async (id: number) => {
+    if (window.confirm("Submit this order for approval?")) {
+      try {
+        await purchaseOrderService.submitPO(id);
+        fetchOrders();
+      } catch (error: any) {
+        alert(error?.response?.data?.message || "Failed to submit.");
+      }
+    }
+  };
 
   const handleApprove = async (id: number) => {
     if (window.confirm("Are you sure you want to approve this order?")) {
@@ -96,36 +113,55 @@ export const ComponentOrders = (): JSX.Element => {
   const checkApprove = (id: number) => {
     const userStr = localStorage.getItem("user");
     if (!userStr) return alert("User not found!");
-
     const user = JSON.parse(userStr);
     const hasPermission = user.roles.some(
       (role: { roleId: number; roleName: string }) => 
         role.roleName === "Production Manager" || role.roleName === "System Admin"
     );
-
     if (hasPermission) {
       handleApprove(id);
     } else {
       alert("You do not have permission to approve orders.");
     }
-  }
+  };
 
-  const handleSendToSupplier = async (id: number) => {
-    if (window.confirm("Send this Purchase Order to the supplier?")) {
+  const handleMarkAsOrdered = async (id: number) => {
+    if (window.confirm("Mark this Purchase Order as Ordered (Sent to supplier)?")) {
       try {
         await purchaseOrderService.sendToSupplier(id);
-        alert("Sent to supplier successfully!");
         fetchOrders();
       } catch (error: any) {
-        alert(error?.response?.data?.message || "Failed to send to supplier.");
+        alert(error?.response?.data?.message || "Failed to update status.");
       }
     }
-  }
-
-  const handleReceiveGoods = async (id: number) => {
-    console.log(id);
-    alert("Tính năng Nhận Hàng (Receive Goods) yêu cầu chọn kho và số lượng cho từng mã. Vui lòng tạo ReceiveGoodsModal để gọi API.");
   };
+
+  const openActionModal = (orderId: number, type: 'REJECT' | 'CANCEL' | 'FORCE_CLOSE') => {
+    setActionModal({ isOpen: true, type, orderId });
+    setActionReason("");
+  };
+
+  const handleConfirmActionWithReason = async () => {
+    if (!actionModal.orderId || !actionReason.trim()) return;
+
+    setIsProcessingAction(true);
+    try {
+      if (actionModal.type === 'REJECT' || actionModal.type === 'CANCEL') {
+        await purchaseOrderService.cancelPO(actionModal.orderId, { note: actionReason });
+        alert(`Order ${actionModal.type.toLowerCase()}ed successfully.`);
+      } else if (actionModal.type === 'FORCE_CLOSE') {
+        alert(`Force Close order ${actionModal.orderId} with reason: ${actionReason}.\n\n(Lưu ý: Cần thêm API forceClosePO vào Backend để đổi sang COMPLETED)`);
+      }
+      
+      fetchOrders();
+      setActionModal({ isOpen: false, type: 'CANCEL', orderId: null });
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Action failed.");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
@@ -222,7 +258,7 @@ export const ComponentOrders = (): JSX.Element => {
                         ${Number(order.totalAmount).toLocaleString()}
                       </td>
                       <td className="p-4 text-gray-700">{order.employee?.fullName || "System"}</td>
-                      <td className="p-4 flex items-center justify-center gap-1">
+                      <td className="p-4 flex items-center justify-center gap-1.5">
                         
                         <button 
                           onClick={() => handleViewDetails(order.purchaseOrderId)}
@@ -232,43 +268,51 @@ export const ComponentOrders = (): JSX.Element => {
                           <Eye className="w-4 h-4" />
                         </button>
                         
-                        {(order.status === "DRAFT" || order.status === "PENDING") && (
-                          <button 
-                            onClick={() => handleUpdate(order.purchaseOrderId)}
-                            className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
-                            title="Edit Order"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                        {order.status === "DRAFT" && (
+                          <>
+                            <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Order">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleSubmitDraft(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit for Approval">
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                         
                         {order.status === 'PENDING' && (
-                          <button 
-                              onClick={() => checkApprove(order.purchaseOrderId)}
-                              className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
-                              title="Approve Order"
-                          >
-                              <CheckCircle className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors cursor-pointer" title="View/Edit Details">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => checkApprove(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" title="Approve Order">
+                                <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => openActionModal(order.purchaseOrderId, 'REJECT')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Reject Order">
+                                <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
 
                         {order.status === 'APPROVED' && (
-                          <button 
-                              onClick={() => handleSendToSupplier(order.purchaseOrderId)}
-                              className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" 
-                              title="Send to Supplier"
-                          >
-                              <Send className="w-4 h-4" />
+                          <>
+                            <button onClick={() => handleMarkAsOrdered(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Mark as Ordered">
+                                <Send className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order">
+                                <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+
+                        {order.status === 'ORDERED' && (
+                          <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order (Supplier Out of Stock)">
+                              <XCircle className="w-4 h-4" />
                           </button>
                         )}
 
-                        {(order.status === 'ORDERED' || order.status === 'RECEIVING') && (
-                          <button 
-                              onClick={() => handleReceiveGoods(order.purchaseOrderId)}
-                              className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors cursor-pointer" 
-                              title="Receive Goods"
-                          >
-                              <PackagePlus className="w-4 h-4" />
+                        {order.status === 'RECEIVING' && (
+                          <button onClick={() => openActionModal(order.purchaseOrderId, 'FORCE_CLOSE')} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Force Close Order">
+                              <StopCircle className="w-4 h-4 text-orange-500" />
                           </button>
                         )}
                       </td>
@@ -298,7 +342,7 @@ export const ComponentOrders = (): JSX.Element => {
                   <button 
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="p-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="p-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
                       <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -308,7 +352,7 @@ export const ComponentOrders = (): JSX.Element => {
                   <button 
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                       disabled={page >= totalPages}
-                      className="p-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="p-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
                       <ChevronRight className="w-4 h-4" />
                   </button>
@@ -322,8 +366,7 @@ export const ComponentOrders = (): JSX.Element => {
             isOpen={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
             order={selectedOrder} 
-            onApprove={() => handleApprove(selectedOrder.purchaseOrderId)}
-            onUpdateStatus={() => handleReceiveGoods(selectedOrder.purchaseOrderId)}
+            onApprove={() => checkApprove(selectedOrder.purchaseOrderId)}
           />
       )}
 
@@ -333,6 +376,84 @@ export const ComponentOrders = (): JSX.Element => {
           orderId={selectedUpdateId}
           onSuccess={() => fetchOrders()}
       />
+
+      {actionModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-[500px] p-6 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-start gap-4 mb-4">
+              <div
+                className={`p-3 rounded-full flex-shrink-0 ${
+                  actionModal.type === 'FORCE_CLOSE'
+                    ? 'bg-orange-100 text-orange-600'
+                    : 'bg-red-100 text-red-600'
+                }`}
+              >
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {actionModal.type === 'FORCE_CLOSE'
+                    ? 'Force Close Order'
+                    : 'Cancel / Reject Order'}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Are you sure you want to{' '}
+                  {actionModal.type === 'FORCE_CLOSE'
+                    ? 'force close'
+                    : 'cancel / reject'}{' '}
+                  this order? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                placeholder="Please enter the reason (e.g., Supplier out of stock, order canceled due to pricing issues...)"
+                rows={4}
+                className="w-full p-3 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() =>
+                  setActionModal({
+                    isOpen: false,
+                    type: 'CANCEL',
+                    orderId: null,
+                  })
+                }
+                disabled={isProcessingAction}
+                className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleConfirmActionWithReason}
+                disabled={isProcessingAction || !actionReason.trim()}
+                className={`flex items-center gap-2 px-6 py-2 text-white font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-sm
+                  ${
+                    actionModal.type === 'FORCE_CLOSE'
+                      ? 'bg-orange-600 hover:bg-orange-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }
+                `}
+              >
+                {isProcessingAction && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { useState, type JSX } from "react";
 import { AddUserModal } from "./AddUserModel";
 import { EditUserModal } from "./EditUserModel";
 import { DeleteConfirmModal } from "./DeleteModel";
-import { SuccessNotification } from "./SuccessNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 const users = [
   { id: 1, employeeId: "EMP001", name: "Lam Phan Phuc", email: "lam.phanphuc@prodopsx.com", role: "System Administrator" },

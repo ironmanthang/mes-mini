@@ -7,7 +7,7 @@ import { roleService, type Role } from "../../../services/roleServices";
 import { AddRoleModal } from "./AddRoleModal";
 import { UpdateRoleModal } from "./UpdateRoleModal";
 import { DeleteRoleModal } from "./DeleteRoleModal";
-import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 export const Roles = (): JSX.Element => {
   const [roles, setRoles] = useState<Role[]>([]);

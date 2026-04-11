@@ -14,8 +14,8 @@ import { ProductServices, type Product } from "../../../services/productServices
 import { CreateNewProductModal } from "./CreateNewProductModal";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { UpdateProductModal } from "./UpdateProductModal";
-import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
 import { DeleteProductModal } from "./DeleteProductModal";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 export const Information = (): JSX.Element => {
   const [products, setProducts] = useState<Product[]>([]);

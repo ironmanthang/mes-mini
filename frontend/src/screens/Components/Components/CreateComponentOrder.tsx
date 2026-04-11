@@ -6,8 +6,9 @@ import { useState, useEffect, type JSX, useRef } from "react";
 
 import { supplierService, type Supplier, type SupplierComponent } from "../../../services/supplierServices";
 import { purchaseOrderService } from "../../../services/purchaseOrderServices";
-import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface OrderRow {
   id: number;
@@ -50,6 +51,8 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [message, setMessage] = useState("");
 
   const [warehousesList, setWarehousesList] = useState<Warehouse[]>([]);
+  const [showWarning, setShowWarning] = useState(false);
+  const [messageWarning, setMessageWarning] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,8 +103,22 @@ export const CreateComponentOrder = (): JSX.Element => {
     setRows([]);
   };
 
+  useEffect(() => {
+    if (showWarning) {
+      const timer = setTimeout(() => {
+        setShowWarning(false);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showWarning])
+
   const addRow = () => {
-    if (!selectedSupplierId) return alert("Please select a supplier first.");
+    if (!selectedSupplierId) {
+      setMessageWarning("Please select a supplier first.");
+      setShowWarning(true);
+      return;
+    }
     setRows([
       ...rows,
       { id: Date.now(), componentId: 0, componentName: "", quantity: 1, unitPrice: 0, total: 0 }
@@ -160,10 +177,26 @@ export const CreateComponentOrder = (): JSX.Element => {
   };
 
   const handleSave = async (submitStatus: 'DRAFT' | 'PENDING') => {
-    if (!selectedSupplierId) return alert("Please select a supplier.");
-    if (!selectedWarehouseId) return alert("Please select a destination warehouse.");
-    if (rows.length === 0) return alert("Please add at least one component.");
-    if (rows.some(r => r.componentId === 0)) return alert("Please select components for all rows.");
+    if (!selectedSupplierId) {
+      setShowWarning(true);
+      setMessageWarning("Please select a supplier");
+      return;
+    }
+    if (!selectedWarehouseId) {
+      setShowWarning(true);
+      setMessageWarning("Please select a destination warehouse");
+      return;
+    }
+    if (rows.length === 0) {
+      setShowWarning(true);
+      setMessageWarning("Please add at least one component");
+      return;
+    }
+    if (rows.some(r => r.componentId === 0)) {
+      setShowWarning(true);
+      setMessageWarning("Please select components for all rows");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -610,6 +643,7 @@ export const CreateComponentOrder = (): JSX.Element => {
       </div>
 
       <SuccessNotification isVisible={showSuccess} message={message}/>
+      <WarningNotification isVisible={showWarning} message={messageWarning} onClose={() => {setShowWarning(false);}}/>
     </div>
   );
 };

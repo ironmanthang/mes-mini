@@ -16,15 +16,35 @@ export const ProductionRequestDetailModal = ({ isOpen, onClose, requestId }: Pro
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && requestId) {
+    let isMounted = true;
+
+    const fetchDetails = async () => {
+      if (!requestId) return;
+      
       setIsLoading(true);
-      ProductionRequestServices.getProductionRequestById(requestId)
-        .then(data => setRequestData(data))
-        .catch(err => console.error("Failed to load request details", err))
-        .finally(() => setIsLoading(false));
-    } else {
       setRequestData(null);
+
+      try {
+        const data = await ProductionRequestServices.getProductionRequestById(requestId);
+        if (isMounted) {
+          setRequestData(data);
+        }
+      } catch (err) {
+        console.error("Failed to load request details", err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    if (isOpen) {
+      fetchDetails();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, requestId]);
 
   const formatDate = (dateStr?: string | null) => {
@@ -58,6 +78,50 @@ export const ProductionRequestDetailModal = ({ isOpen, onClose, requestId }: Pro
     }
   };
 
+  const handlePrint = () => {
+    const printContent = document.getElementById("printable-order-content");
+    if (!printContent) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=800");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Purchase_Order_${requestData?.code}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @media print { @page { margin: 15mm; } }
+          </style>
+        </head>
+        <body class="p-8 bg-white text-black">
+          <div class="mb-8 pb-4 border-b-2 border-gray-800 flex justify-between items-end">
+             <div>
+               <h1 class="text-3xl font-bold text-gray-900">PURCHASE ORDER</h1>
+               <p class="text-gray-500 mt-1">Code: <span class="text-black font-bold">${requestData?.code}</span></p>
+             </div>
+             <div class="text-right text-sm text-gray-500">
+               <p>Date Printed: ${new Date().toLocaleDateString('vi-VN')}</p>
+             </div>
+          </div>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 2000);
+  };
+
   if (!isOpen || !requestId) return null;
 
   return (
@@ -80,7 +144,7 @@ export const ProductionRequestDetailModal = ({ isOpen, onClose, requestId }: Pro
           </button>
         </div>
 
-        <div className="p-8 overflow-y-auto space-y-8 flex-1">
+        <div className="p-8 overflow-y-auto space-y-8 flex-1" id="printable-order-content">
           {isLoading ? (
             <div className="flex justify-center items-center h-40">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -165,7 +229,9 @@ export const ProductionRequestDetailModal = ({ isOpen, onClose, requestId }: Pro
         </div>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-end gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer transition-colors shadow-sm">
+            <button className="flex items-center gap-2 px-4 py-2 bg-white 
+            border border-gray-300 text-gray-700 font-medium rounded-lg 
+            hover:bg-gray-100 cursor-pointer transition-colors shadow-sm" onClick={handlePrint}>
                 <Printer className="w-4 h-4" /> Print Request
             </button>
             <button onClick={onClose} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 transition-colors shadow-sm cursor-pointer">

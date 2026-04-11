@@ -27,10 +27,21 @@ export interface ProductionRequest {
         code: string;
         unit: string;
     };
-    salesOrderDetail: string | null;
+    salesOrderDetail: {
+        salesOrder: {
+            code: string;
+        }
+    } | null;
     employee: {
         fullName: string;
     }
+}
+
+export interface PaginatedProductionRequests {
+    data: ProductionRequest[];
+    total: number;
+    page: number;
+    limit: number;
 }
 
 export interface CreateProductionRequest {
@@ -39,7 +50,7 @@ export interface CreateProductionRequest {
     priority?: PRPriority;
     dueDate?: string;
     soDetailId?: number;
-    note?: string;
+    note: string;
 }
 
 export interface DraftPurchaseOrderResponse {
@@ -58,40 +69,36 @@ export interface DraftPurchaseOrderResponse {
     }[];
 }
 
-export interface ProductionRequestById {
-    productionRequestId: number;
-    requestDate: string;
-    quantity: number;
-    employeeId: number;
-    productId: number;
-    createdAt: string;
-    updatedAt: string;
-    priority: PRPriority;
-    code: string;
-    soDetailId: number | null;
-    status: PRStatus;
-    dueDate: string | null;
-    note: string;
-    product: {
-        productId: number;
-        productName: string;
-        categoryId: number | null;
-        createdAt: string;
-        updatedAt: string;
-        code: string;
-        unit: string;
-    }
-    salesOrderDetail: string | null;
-    employee: {
-        fullName: string;
-    }
-    workOrderFulfillments: [];
-    purchaseOrderDetails: [];
+export interface ProductionRequestById extends ProductionRequest {
+    workOrderFulfillments: {
+        workOrder: any;
+    }[];
+    purchaseOrderDetails: {
+        component: {
+            componentId: number;
+            componentName: string;
+            code: string;
+            unit: string;
+        };
+        purchaseOrder: {
+            code: string;
+            status: string;
+        };
+    }[];
+    details: {
+        component: {
+            code: string;
+            componentName: string;
+            unit: string;
+        };
+        quantityPerUnit: number;
+        totalRequired: number;
+    }[];
 }
 
 export const ProductionRequestServices = {
     getAllProductionRequests: async (query?: { page?: number; limit?: number; status?: string }) => {
-        const response = await api.get<ProductionRequest[]>("/production-requests", { params: query });
+        const response = await api.get<PaginatedProductionRequests>("/production-requests", { params: query });
         return response.data;
     },
 
@@ -101,7 +108,7 @@ export const ProductionRequestServices = {
     },
 
     createNewProductionRequest: async (data: CreateProductionRequest) => {
-        const response = await api.post<ProductionRequest>("/production-requests", data);
+        const response = await api.post<{ mrpResult: any } & ProductionRequest>("/production-requests", data);
         return response.data;
     },
 

@@ -11,16 +11,14 @@ interface NewSalesOrderModalProps {
 }
 
 export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrderModalProps): JSX.Element | null => {
-  // --- Data States ---
   const [agentsList, setAgentsList] = useState<Agent[]>([]);
   const [productList, setProductList] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- Form States ---
   const [agentId, setAgentId] = useState<number | "">("");
   const [orderDate] = useState(new Date().toISOString().split('T')[0]);
   const [expectedShipDate, setExpectedShipDate] = useState("");
-  const [priority, setPriority] = useState<string>("MEDIUM"); // Sửa thành chữ HOA để khớp Enum backend
+  const [priority, setPriority] = useState<string>("MEDIUM");
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
   const [deliveryTerms, setDeliveryTerms] = useState("FOB");
   const [note, setNote] = useState("");
@@ -31,7 +29,6 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
 
   const [rows, setRows] = useState([{ productId: 0, quantity: 1, salePrice: 0 }]);
 
-  // --- Fetch Initial Data ---
   useEffect(() => {
     if (isOpen) {
       AgentServices.getAllAgents()
@@ -52,7 +49,6 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
     }
   }, [isOpen]);
 
-  // --- Handlers ---
   const handleAddRow = () => {
     setRows([...rows, { productId: 0, quantity: 1, salePrice: 0 }]);
   };
@@ -75,11 +71,9 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
     setRows(newRows);
   };
 
-  // --- Calculations ---
   const subtotal = rows.reduce((sum, row) => sum + (row.quantity * row.salePrice), 0);
   const grandTotal = subtotal - discount + tax + agentShippingPrice;
 
-  // --- Submit ---
   const handleSubmit = async (statusTarget: "DRAFT" | "PENDING_APPROVAL") => {
     if (!agentId) return alert("Please select an Agent/Customer.");
     if (!expectedShipDate) return alert("Please set an Expected Delivery Date.");
@@ -87,19 +81,18 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
 
     setIsSubmitting(true);
     try {
-      // Đã SỬA payload khớp 100% với CreateSalesOrder (Xóa code, sửa shippingCost thành agentShippingPrice)
       const payload: CreateSalesOrder = {
         agentId: Number(agentId),
         orderDate,
         expectedShipDate,
         discount,
         tax,
-        agentShippingPrice: agentShippingPrice, // Đã đổi tên
+        agentShippingPrice: agentShippingPrice,
         paymentTerms,
         deliveryTerms,
         note,
         status: statusTarget,
-        priority, // Sẽ gửi đi dạng "HIGH", "MEDIUM", "LOW"
+        priority,
         details: rows.map(r => ({
           productId: r.productId,
           quantity: r.quantity,
@@ -127,16 +120,13 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div className="bg-white w-[900px] max-h-[90vh] flex flex-col rounded-lg shadow-xl animate-in fade-in zoom-in duration-200">
         
-        {/* Header */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
           <h2 className="text-xl font-bold text-gray-900">New Sales Order</h2>
           <button onClick={onClose}><X className="w-5 h-5 text-gray-400 hover:text-blue-600 cursor-pointer transition-colors" /></button>
         </div>
 
-        {/* Body */}
         <div className="p-8 overflow-y-auto space-y-8 flex-1">
             
-            {/* 1. General Info */}
             <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700">Agent / Customer <span className="text-red-500">*</span></label>
@@ -169,7 +159,6 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
                 </div>
             </div>
 
-            {/* 2. Order Items */}
             <div className="space-y-2">
                 <div className="flex justify-between items-center">
                     <label className="text-sm font-bold text-gray-700">Order Items</label>
@@ -225,9 +214,7 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
                 </div>
             </div>
 
-            {/* 3. Financials & Terms */}
             <div className="grid grid-cols-2 gap-8">
-                {/* Terms */}
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-600 uppercase">Payment Terms</label>
@@ -253,7 +240,6 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
                     </div>
                 </div>
 
-                {/* Totals */}
                 <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 flex flex-col justify-between space-y-3">
                     <div className="flex justify-between items-center text-sm text-gray-600">
                         <span>Subtotal</span>
@@ -284,7 +270,6 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
 
         </div>
 
-        {/* Footer Actions */}
         <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-end gap-3">
             <button onClick={onClose} disabled={isSubmitting} className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 cursor-pointer disabled:opacity-50">
                 Cancel

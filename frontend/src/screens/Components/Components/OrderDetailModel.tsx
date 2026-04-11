@@ -9,7 +9,6 @@ interface OrderDetailModalProps {
   onClose: () => void;
   order: PurchaseOrder | null;
   onApprove: () => void;
-  onUpdateStatus: () => void;
 }
 
 export const OrderDetailModal = ({ 
@@ -17,7 +16,6 @@ export const OrderDetailModal = ({
   onClose, 
   order, 
   onApprove, 
-  onUpdateStatus 
 }: OrderDetailModalProps): JSX.Element | null => {
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -327,15 +325,6 @@ export const OrderDetailModal = ({
             >
               <CheckCircle className="w-4 h-4" /> Approve Order
             </button>
-          )}
-
-          {(order.status === 'ORDERED' || order.status === 'RECEIVING') && (
-             <button 
-                onClick={onUpdateStatus}
-                className="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
-             >
-               <Package className="w-4 h-4" /> Receive Goods
-             </button>
           )}
         </div>
       </div>

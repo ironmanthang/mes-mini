@@ -17,7 +17,7 @@ import { AddComponentModal } from "./AddComponentModal";
 import { componentService, type Component } from "../../../services/componentServices";
 import { InventoryServices } from "../../../services/inventoryServices";
 import { DeleteComponentModal } from "./DeleteComponentModal";
-import { SuccessNotification } from "../../UserAndSystem/components/SuccessNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 export const ComponentInformation = (): JSX.Element => {
   const [components, setComponents] = useState<Component[]>([]);
