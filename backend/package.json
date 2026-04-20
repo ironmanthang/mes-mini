@@ -11,6 +11,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:seed:dev": "prisma db seed",
+    "db:seed:prod": "tsx prisma/scripts/seed.prod.ts",
     "export": "scripts\\export.bat",
     "prisma-studio": "prisma studio --url=\"postgresql://user:Th1s_is_a_V3ry-S3cur3-P4ss@localhost:5432/mydatabase\" --browser none",
     "test": "jest --detectOpenHandles",

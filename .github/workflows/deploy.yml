@@ -6,6 +6,26 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: 'Choose migration/deploy mode'
+        type: choice
+        required: true
+        default: migrate-and-deploy
+        options:
+          - migrate-only
+          - migrate-and-deploy
+          - reset-seed-and-deploy
+      confirm_reset:
+        description: 'Required for destructive mode: type RESET_PRODUCTION_DB'
+        type: string
+        required: false
+      seed_command:
+        description: 'Seed command used after reset (default: npm run db:seed:prod)'
+        type: string
+        required: false
+        default: npm run db:seed:prod
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -23,6 +43,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Apply Pending Migrations (Safe)
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_mode == 'migrate-only' || github.event.inputs.deploy_mode == 'migrate-and-deploy'
+        working-directory: backend
+        run: npm run db:migrate
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Guard Destructive Reset Confirmation
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mode == 'reset-seed-and-deploy' && github.event.inputs.confirm_reset != 'RESET_PRODUCTION_DB'
+        run: |
+          echo "Destructive reset refused. To continue, set confirm_reset to RESET_PRODUCTION_DB."
+          exit 1
+
+      - name: Reset Production Database (Dangerous)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mode == 'reset-seed-and-deploy' && github.event.inputs.confirm_reset == 'RESET_PRODUCTION_DB'
+        working-directory: backend
+        run: npx prisma migrate reset --force --skip-seed
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Guard Seed Command
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mode == 'reset-seed-and-deploy' && github.event.inputs.confirm_reset == 'RESET_PRODUCTION_DB' && github.event.inputs.seed_command == ''
+        run: |
+          echo "seed_command is required for reset-seed-and-deploy (example: npm run db:seed:prod)."
+          exit 1
+
+      - name: Run Seed Command After Reset
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mode == 'reset-seed-and-deploy' && github.event.inputs.confirm_reset == 'RESET_PRODUCTION_DB' && github.event.inputs.seed_command != ''
+        working-directory: backend
+        run: ${{ github.event.inputs.seed_command }}
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          PROD_SEED_DEFAULT_PASSWORD: ${{ secrets.PROD_SEED_DEFAULT_PASSWORD }}
+
       - name: Google Auth
         id: auth
         uses: google-github-actions/auth@v2
@@ -33,9 +99,11 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Authorize Docker push
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_mode != 'migrate-only'
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
       - name: Build and Push Container
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_mode != 'migrate-only'
         run: |
           cd backend
           docker build \
@@ -45,6 +113,7 @@ jobs:
           docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.REPO_NAME }}:latest
 
       - name: Deploy to Cloud Run
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_mode != 'migrate-only'
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE }}
