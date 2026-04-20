@@ -34,8 +34,8 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await employeeService.getAllEmployees();
-      setEmployees(response.data);
+      const employeesData = await employeeService.getAllEmployees();
+      setEmployees(employeesData);
     } catch (error) {
       console.error("Failed to fetch employees:", error);
     } finally {

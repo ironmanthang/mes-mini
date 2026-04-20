@@ -259,7 +259,7 @@ async function seedRolePermissions(): Promise<void> {
         PROD_MGR: [
             PERM.PO_READ, PERM.PO_APPROVE, PERM.PO_CANCEL,
             PERM.SO_READ, PERM.SO_APPROVE, PERM.SO_CANCEL,
-            PERM.PR_READ, PERM.PR_CREATE, PERM.PR_UPDATE, PERM.PR_CANCEL, PERM.PR_LINK_PO,
+            PERM.PR_READ, PERM.PR_CREATE, PERM.PR_UPDATE, PERM.PR_APPROVE, PERM.PR_CANCEL, PERM.PR_LINK_PO,
             PERM.WO_READ, PERM.WO_CREATE, PERM.WO_UPDATE, PERM.WO_COMPLETE,
             PERM.LINE_READ, PERM.LINE_CREATE, PERM.LINE_UPDATE, PERM.LINE_DELETE,
             PERM.QC_READ, PERM.WH_STOCK_READ,
@@ -1188,7 +1188,8 @@ async function seedDemoPurchaseOrders(): Promise<void> {
                                     componentId: detail.componentId,
                                     poDetailId: detail.poDetailId,
                                     warehouseId: mainWh.warehouseId,
-                                    quantity: detail.quantityReceived
+                                    initialQuantity: detail.quantityReceived,
+                                    currentQuantity: detail.quantityReceived
                                 }
                             });
                         } catch (e: any) {
@@ -1222,7 +1223,7 @@ async function seedDemoSalesOrders(): Promise<void> {
     }
 
     const soSeeds: SOSeed[] = [
-        { code: 'SO-2026-901', agentCode: 'AGT-002', status: SalesOrderStatus.DRAFT, priority: Priority.MEDIUM, approved: false,
+        { code: 'SO-2026-901', agentCode: 'AGT-002', status: SalesOrderStatus.APPROVED, priority: Priority.MEDIUM, approved: false,
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 5, price: 15000000, shipped: 0 }] },
         { code: 'SO-2026-902', agentCode: 'AGT-003', status: SalesOrderStatus.PENDING_APPROVAL, priority: Priority.HIGH, approved: false,
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 10, price: 14500000, shipped: 0 }] },
@@ -1319,7 +1320,7 @@ async function seedDemoProductionRequests(): Promise<void> {
             soDetailId: so908?.details[0]?.soDetailId || null, note: 'MTO from SO-2026-908' },
         { code: 'PR-20260310-0006', productCode: 'PROD-GAMING-PC', qty: 10, status: ProductionRequestStatus.CANCELLED, priority: Priority.LOW,
             soDetailId: null, note: 'Manual Request (MTS); Cancelled: Forecast revised down' },
-        { code: 'PR-20260310-0007', productCode: 'PROD-MONITOR-M1', qty: 25, status: ProductionRequestStatus.PARTIALLY_FULFILLED, priority: Priority.MEDIUM,
+        { code: 'PR-20260310-0007', productCode: 'PROD-MONITOR-M1', qty: 25, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.MEDIUM,
             soDetailId: null, note: 'Manual Request (MTS) — partial WO created' },
         { code: 'PR-20260310-0008', productCode: 'PROD-LAPTOP-X1', qty: 50, status: ProductionRequestStatus.FULFILLED, priority: Priority.HIGH,
             soDetailId: null, note: 'Manual Request (MTS) — fully converted to WO' },
@@ -1347,7 +1348,7 @@ async function seedDemoProductionRequests(): Promise<void> {
                 status: pr.status,
                 priority: pr.priority,
                 employeeId: manager.employeeId,
-                requestDate: new Date(2026, 2, 10),
+                createdAt: new Date(2026, 2, 10),
                 soDetailId: pr.soDetailId,
                 note: pr.note,
                 details: { create: detailsData },

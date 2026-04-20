@@ -1,143 +1,139 @@
-> [!CAUTION]
-> **OUTDATED (2026-03-17):** This document predates the MTS-only pivot. 
-> The source of truth is now [docs/05_mts_dispatch_flows.md](cci:7://file:///d:/program/mes-mini/docs/05_mts_dispatch_flows.md:0:0-0:0).
-> This file will be revised. Do NOT use it for implementation decisions.
+# Production Request: Business Requirements (Current Codebase State)
 
-# Production Request: Business & Technical Logic (SSOT)
 
-> **Feature:** Production Request
-> **Role:** Single Source of Truth (SSOT) for the "How and Why" of the Production Request module.
-> **Audience:** Backend Developers, Architects, and AI Agents.
+## Module Boundaries
+- **In scope**: Creating PRs, draft management, submission and feasibility checks, approval, cancellation, requirement calculation, and PO drafting support.
+- **In scope (stable)**: Automatic PR status changes triggered by Purchase Order receive flow.
+- **In scope (provisional)**: Work Order-driven PR status transitions are documented as current implementation only and are pending refactor.
+- **Out of scope**: Direct PR-to-WO conversion API in PR routes (currently commented out and not active).
 
----
+## Active API Surface
+- **GET `/api/production-requests`**: List PRs with pagination and optional status filter.
+- **POST `/api/production-requests`**: Create PR as draft by default, or submit immediately when `asDraft=false`.
+- **PUT `/api/production-requests/:id`**: Update draft PR fields.
+- **GET `/api/production-requests/:id`**: Get PR detail with fulfillments, PO links, and computed scheduling fields.
+- **PUT `/api/production-requests/:id/submit`**: Submit draft for feasibility decision.
+- **PUT `/api/production-requests/:id/approve`**: Approve pending PR (with self-approval block).
+- **PUT `/api/production-requests/:id/recheck`**: Re-check WAITING_MATERIAL feasibility from PR snapshot.
+- **GET `/api/production-requests/:id/draft-purchase-order`**: Return shortage-only component list for PO prefill.
+- **PUT `/api/production-requests/:id/cancel`**: Cancel PR when cancellation guards pass.
+- **GET `/api/production-requests/:id/requirements`**: Return MRP result for existing PR using snapshot logic.
 
-## 1. The Core Philosophy
-Production Requests (PR) act as the **Buffer Zone** between Customer Demand (Sales) and Factory Execution (Work Orders). We do not automate creation; we provide the data for a Manager to decide.
+## Permission Matrix (Route Layer)
+- **PR_READ**: `GET /`, `GET /:id`, `GET /:id/requirements`.
+- **PR_CREATE**: `POST /`.
+- **PR_UPDATE**: `PUT /:id`, `PUT /:id/submit`, `PUT /:id/recheck`.
+- **PR_APPROVE**: `PUT /:id/approve`.
+- **PR_LINK_PO**: `GET /:id/draft-purchase-order`.
+- **PR_CANCEL**: `PUT /:id/cancel`.
 
----
+## Core Data And Statuses
+- **Primary entity**: `ProductionRequest` with fields for quantity, product, creator, optional approver, optional Sales Order detail link, note, and lifecycle status.
+- **Status enum**: `DRAFT`, `PENDING`, `WAITING_MATERIAL`, `APPROVED`, `IN_PROGRESS`, `FULFILLED`, `CANCELLED`.
+- **Snapshot entity**: `ProductionRequestDetail` stores frozen per-component requirement data at submit time.
 
-## 2. The "Traffic Light" System (State Machine)
+## Business Rules For Create And Draft
+- **Quantity guard**: Quantity must be greater than zero.
+- **BOM guard**: Product must exist and have at least one BOM row.
+- **Code generation**: PR code uses `PR-YYYYMMDD-XXXX`, with retry on uniqueness collision.
+- **MTS tagging**: If no `soDetailId`, note is auto-prefixed with `Manual Request (MTS)`.
+- **Default mode**: `asDraft` defaults to true, so create stores `DRAFT` unless explicitly submitted.
 
-The system calculates feasibility in two phases to optimize performance.
+## Sales Order Linked Rules
+- **SO detail existence**: `soDetailId` must exist.
+- **SO status guard**: Linked Sales Order must be `APPROVED` or `IN_PROGRESS`.
+- **Product match guard**: PR `productId` must match linked SO detail product.
+- **Quantity guard**: PR quantity cannot exceed remaining SO demand (`quantity - quantityShipped`).
+- **Uniqueness guard**: Only one non-cancelled PR can exist for the same SO detail.
+- **Coverage timing**: SO-linked guards are enforced on create, draft update, and submit.
 
-### Phase 1: The Fast Check (Dashboard Load)
-To avoid N+1 query bottlenecks, the **Warehouse Dashboard** provides a real-time aggregate of:
-*   **🟢 GREEN (Above Safe Stock):** `Finished Goods >= minStockLevel`.
-*   **🔴 RED (Low Stock Alert):** `Finished Goods < minStockLevel`.
-    *   *Action:* Production Manager creates a **Production Request** based on these alerts.
+## Submission And Feasibility Logic
+- **Submit source**: Submit runs through a transactional helper that re-loads PR and checks `DRAFT` status.
+- **Snapshot creation**: Submit writes `ProductionRequestDetail` rows from current BOM requirement calculation.
+- **Feasibility decision**: MRP `canProduce=true` sets `PENDING`; otherwise sets `WAITING_MATERIAL`.
+- **Atomicity**: Status update and snapshot creation occur in one transaction.
+- **Immediate submit path**: `POST /` with `asDraft=false` creates DRAFT then submits in same transaction.
 
-### Phase 2: The Deep Check (On-Demand)
-The **Production Dashboard** shows existing pending requests. Before creating a new one, the PM triggers a BOM feasibility check.
-*   **🟡 YELLOW (Capable to Promise):** `Component Stock` sufficient for production.
-    *   *Action:* Manager clicks **"Request Production"** -> Status becomes `APPROVED`.
-*   **🔴 RED (Material Shortage):** `Component Stock` insufficient.
-    *   *Action:* Manager clicks **"Request Production"** -> Status becomes `WAITING_MATERIAL`.
+## MRP Calculation Model
+- **Live BOM mode**: `calculateRequirements` uses current product BOM and current component stock.
+- **Snapshot mode**: `calculateFromSnapshot` uses frozen `ProductionRequestDetail` rows for existing PRs.
+- **Fallback mode**: If legacy PR has no snapshot rows, system falls back to live BOM calculation.
+- **Requirements endpoint**: `GET /:id/requirements` always calls snapshot-oriented path.
 
-### Other States
-*   **🔵 BLUE (Make-to-Stock / MTS):** A PR created without a `SalesOrderId`. Used for replenishment.
-*   **🟣 PARTIALLY_FULFILLED:** When some Work Orders are linked but the full quantity isn't yet in production.
+## Recheck And Draft PO Behavior
+- **Recheck eligibility**: Only `WAITING_MATERIAL` PRs can be rechecked.
+- **Recheck actor guard**: Allowed for creator, `PROD_MGR`, or `SYS_ADMIN`.
+- **Recheck outcome**: If shortages cleared, status transitions to `PENDING`; otherwise stays `WAITING_MATERIAL`.
+- **Draft PO eligibility**: Only `WAITING_MATERIAL` PRs can call draft PO endpoint.
+- **Draft PO output**: Returns shortage subset only (`missingQuantity > 0`), not full requirement list.
+- **Important nuance**: Draft PO result can be `components: []` while PR is still `WAITING_MATERIAL` until explicit recheck is triggered.
 
----
+## Approval Behavior
+- **Approval eligibility**: Only `PENDING` PR can be approved.
+- **Two-person rule**: Creator cannot approve their own PR.
+- **Approval write**: Sets status `APPROVED`, `approverId`, and `approvedAt` timestamp.
+- **Approval notification**: Sends notification to creator with type currently set to `PO_APPROVED`.
 
-## 3. Backend Logic: The "How & Why"
+## Cancellation Behavior
+- **Cancel actor guard**: Allowed for creator, `PROD_MGR`, or `SYS_ADMIN`.
+- **Cancel status guard**: Cannot cancel if already `FULFILLED` or `CANCELLED`.
+- **Work Order guard**: Any existing work-order fulfillment relation blocks PR cancellation.
+- **Note behavior**: Cancellation reason is appended to note when provided.
+- **PO traceability**: If linked PO details exist, warning with linked PO codes is appended to note.
+- **Cancel write**: Final status becomes `CANCELLED`.
 
-### A. MTO vs. MTS Logic
-We support both **Make-to-Order** (linked to `soDetailId`) and **Make-to-Stock** (independent).
-*   **Why?** Small factories often combine small customer orders with extra "buffer" stock to fill a production batch efficiently.
-*   **Constraint:** An MTO PR is strictly locked to its Sales Order line item to ensure traceability.
+## Visibility And Retrieval Rules
+- **Draft isolation in list**: Users can see all non-draft PRs plus only their own draft PRs.
+- **Draft isolation by id**: Non-creator cannot view another user's draft PR.
+- **List ordering**: Sorted by `createdAt DESC`.
+- **List pagination**: Uses shared pagination utility (`page`, `limit`, `skip`).
+- **Detail enrichments**: Single PR response includes `fulfilledQuantity` and `remainingQtyToSchedule`.
 
-### B. Atomic ID Generation (`PR-YYYYMMDD-XXXX`)
-PR codes are generated using a Date-based prefix and a random 4-digit suffix.
-*   **Engineering Note:** To prevent race conditions during high-volume creation, the service uses a **Retry Loop (3 attempts)**. If a `P2002` unique constraint error occurs on the `code` field, it regenerates and retries.
+## Cross-Module PR Status Side Effects
+- **Work Order createBulk (provisional)**: For `APPROVED` PRs, status can move immediately to `IN_PROGRESS` or `FULFILLED` based on scheduled fulfillment quantity.
+- **Work Order start (provisional)**: Moves linked PR from `APPROVED` to `IN_PROGRESS` when work starts.
+- **Work Order complete (provisional)**: Recomputes completed fulfillment totals; sets PR to `FULFILLED` when completed total meets PR quantity.
+- **Work Order cancel (provisional)**: Recomputes linked PR status to `APPROVED`, `IN_PROGRESS`, or `FULFILLED` from remaining active fulfillments.
+- **Purchase Order receive**: For linked `WAITING_MATERIAL` PRs, full receipt of linked PO details moves PR to `PENDING` and notifies `PRO_MANAGER` role.
+- **Sales Order cancel side effect**: Linked active PRs are not auto-cancelled; system appends alert note for manual review.
 
-### C. The MRP "Lazy" Check
-The `createRequest` method runs `MrpService.calculateRequirements` **before** database insertion.
-*   **Why?** We want the status (`APPROVED` vs `WAITING_MATERIAL`) to be deterministic at the moment of creation.
-*   **Concurrency Trap:** Between the "Check" and the "Save," stock could be taken by another user. We use database transactions to ensure that if a request is `APPROVED`, it has a valid claim on components at that microsecond.
+## Reliability Note For Work Order Integration
+- **Current status**: Work Order-related PR transitions above reflect what current code does, not final business policy.
+- **Known issue**: WO logic is incorrect/incomplete and plans a dedicated revisit.
+- **Documentation rule**: Treat WO bullets as temporary implementation notes until WO refactor is complete.
+- **Update trigger**: After WO refactor, this section must be revised before calling the behavior final.
 
-### D. Partial Fulfillment & Split Batches
-A single `ProductionRequest` can be fulfilled by multiple `WorkOrders`.
-*   **Data Model:** Tracked via the `WorkOrderFulfillment` junction table.
-*   **Naming Convention:** We use `AllocatedQuantity` in the `ComponentStock` table. This represents components "earmarked" for a Work Order that haven't physically left the warehouse yet.
+## Primary User Flows
+### Flow: Draft-first planning
+- **Step**: User creates PR with default `asDraft=true`.
+- **System result**: PR saved in `DRAFT` without frozen requirement snapshot.
+- **Step**: Creator edits draft fields as needed.
+- **System result**: Draft can be updated only by creator while still in `DRAFT`.
+- **Step**: Creator submits draft.
+- **System result**: Snapshot is frozen and status becomes `PENDING` or `WAITING_MATERIAL`.
 
----
+### Flow: Immediate submit
+- **Step**: User creates PR with `asDraft=false`.
+- **System result**: System creates draft and submits atomically in one transaction.
+- **Outcome**: User receives PR in `PENDING` or `WAITING_MATERIAL` with snapshot details.
 
-## 4. Architectural Gotchas (Technical Reference)
+### Flow: Material shortage recovery
+- **Step**: PR lands in `WAITING_MATERIAL`.
+- **Step**: User requests draft PO data to see shortage-only component list.
+- **Step**: Procurement receives goods through PO receiving process.
+- **System result**: PR may be auto-moved to `PENDING` after full linked receipt.
+- **Step**: User can run explicit recheck to confirm transition if needed.
 
-> [!IMPORTANT]
-> **Separation of Creator/Approver:** For Sales Orders, the creator cannot approve. However, for **Production Requests**, we allow the Production Manager to both create and "Approve" (by releasing to WO) because speed is prioritized over financial audit in the shop-floor loop.
+### Flow: Approval to execution
+- **Step**: Approver with `PR_APPROVE` approves `PENDING` PR.
+- **System result**: PR becomes `APPROVED` with approver metadata.
+- **Step**: Planner creates one or more work orders against approved PR.
+- **System result (provisional)**: PR can shift to `IN_PROGRESS` or `FULFILLED` based on current WO scheduling and execution logic.
 
-### Race Condition Mitigation
-In `SalesOrderService.approveSO`, we use a **Hard Stock Reservation (FIFO)**. 
-- Specific `SerialNumbers` (ProductInstances) are tagged with the `salesOrderId` immediately.
-- This prevents a common MES bug where two salesmen "see" the same 1 remaining unit and both promise it to different customers.
 
-### Missing API Gaps
-*   **Serial Picker:** Currently, the frontend lacks an endpoint to query *available* serial numbers reserved for a specific SO.
-*   **Wastage Buffer:** The current BOM explosion assumes 100% yield. In electronics (SMT), we should eventually add a `% Wastage` factor to raw material requirements.
+## Current Non-Goals And Known Gaps
+- **Inactive endpoint**: PR `convert-to-work-order` endpoint remains commented out.
+- **Update validation gap**: `PUT /:id` has no Joi validator attached at route level.
+- **Status timing nuance**: PR can transition during WO creation, not only when WO starts.
+- **WO reliability gap**: WO-driven PR status transitions are known unstable and should be treated as tentative until refactor.
 
----
-
-## 5. BOM Structure Constraints
-
-> [!WARNING]
-> **Component-Only BOM Policy:** In this system, a Bill of Materials (BOM) strictly consists of **Components** (`Component` entity) only. 
-
-*   **No Nested Products:** You **cannot** add a `Product` as a component of another `Product`.
-*   **Architectural Reason:** To maintain simplicity in our "Lite MES," we differentiate between "Raw Materials/Components" (which are purchased and stored in boxes/lots) and "Finished Goods" (which are assembled onto serializers). 
-*   **Database Enforcement:** The `bill_of_materials` table schema only permits a `productId` to `componentId` relationship.
-
-If a product requires another assembly, that assembly must be defined as a **Component** in the system if it is managed as a stockable raw material, or the production flow must be flattened.
-
----
-
-## 6. BOM Snapshotting — The Frozen Contract
-
-> [!IMPORTANT]
-> **Implemented 2026-03-12.** This is one of the most critical architectural decisions in the system. Read this before touching any PR-related service.
-
-### The Problem It Solves
-Before snapshotting, `ProductionRequest` calculated material requirements dynamically from the live `BillOfMaterial` table. If an engineer edited the BOM *after* a PR was created (e.g., swapping Component A for Component B), the shop floor would receive a **phantom shortage** on a PR that was already committed. This is a classic MES data integrity failure.
-
-### The Solution: Freeze at Creation Time
-When a `ProductionRequest` is created, the MRP result is **atomically persisted** into the `ProductionRequestDetail` table. This "frozen snapshot" becomes the immutable contract for that PR's lifecycle.
-
-```
-bill_of_materials (live, editable)
-       │
-       │ read ONCE at PR creation
-       ▼
-production_request_details (frozen, immutable per PR)
-       │
-       ├── recheckFeasibility()
-       ├── draftPurchaseOrder()
-       ├── calculateForRequest() / GET /:id/requirements
-       └── materialRequestService.createFromWorkOrder()
-```
-
-### Rule: Which Function Reads What
-
-| Function | Reads From | Reason |
-|---|---|---|
-| `createRequest` | Master `BillOfMaterial` | Once only — to create the snapshot |
-| `recheckFeasibility` | `ProductionRequestDetail` (snapshot) | Must honour original commitment |
-| `draftPurchaseOrder` | `ProductionRequestDetail` (snapshot) | Shortages relative to original commitment |
-| `calculateForRequest` | `ProductionRequestDetail` (snapshot) | Live MRP view of an existing PR |
-| `createFromWorkOrder` | `ProductionRequestDetail` (snapshot) | Uses `fulfillment.quantity × detail.quantityPerUnit` aggregation |
-| `calculateRequirements` | Master `BillOfMaterial` | Generic planning tool — no PR context |
-
-### Aggregation Formula for Material Requests
-A Work Order can fulfill multiple PRs. When creating a `MaterialExportRequest`, the quantity per component is:
-```
-qty = Σ (fulfillment.quantity × snapshot.quantityPerUnit)  grouped by componentId
-```
-This correctly scopes materials to the WO's partial fulfillment, not the full PR total.
-
-### Graceful Fallback (Legacy Data)
-PRs created before snapshotting was implemented have no `ProductionRequestDetail` rows. Both `mrpService.calculateFromSnapshot()` and `materialRequestService.createFromWorkOrder()` detect this (empty `details` array) and fall back to master BOM, so existing data is not broken.
-
-### Implementation Reference
-- **Migration:** `20260312050436_add_pr_details`
-- **Schema model:** `ProductionRequestDetail` in `schema.prisma`
-- **Key method:** `mrpService.calculateFromSnapshot(prId)` in `mrpService.ts`
-- **Full record:** `docs/features/production_request/03_bom_snapshotting.md`

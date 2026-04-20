@@ -1,5 +1,6 @@
 import prisma from '../../common/lib/prisma.js';
 import InventoryService from '../../warehouse-ops/inventory/inventoryService.js';
+import { Prisma } from '../../generated/prisma/index.js';
 
 export interface MaterialRequirement {
     componentId: number;
@@ -30,9 +31,15 @@ class MrpService {
      *   - Creating a new Production Request
      *   - Checking feasibility for a Sales Order / Work Order (not yet committed)
      */
-    async calculateRequirements(productId: number, quantityToProduce: number, requestId?: number): Promise<MrpResult> {
+    async calculateRequirements(
+        productId: number,
+        quantityToProduce: number,
+        requestId?: number,
+        tx?: Prisma.TransactionClient
+    ): Promise<MrpResult> {
+        const db = tx || prisma;
         // 1. Fetch Product & BOM
-        const product = await prisma.product.findUnique({
+        const product = await db.product.findUnique({
             where: { productId },
             include: {
                 bom: {
@@ -56,7 +63,7 @@ class MrpService {
 
         // 2. Fetch Current Stock Levels for all components in BOM
         const componentIds = product.bom.map(b => b.componentId);
-        const stockMap = await this._buildStockMap(componentIds);
+        const stockMap = await this._buildStockMap(componentIds, tx);
 
         // 3. Calculate Logic
         const requirements: MaterialRequirement[] = [];
@@ -103,8 +110,9 @@ class MrpService {
      * WHY: If master BOM changes after a PR is created, we must honour the frozen
      * requirements, not the updated BOM. This prevents ghost shortages/surpluses.
      */
-    async calculateFromSnapshot(productionRequestId: number): Promise<MrpResult> {
-        const pr = await prisma.productionRequest.findUnique({
+    async calculateFromSnapshot(productionRequestId: number, tx?: Prisma.TransactionClient): Promise<MrpResult> {
+        const db = tx || prisma;
+        const pr = await db.productionRequest.findUnique({
             where: { productionRequestId },
             include: {
                 product: true,
@@ -119,11 +127,11 @@ class MrpService {
         if (!pr.details || pr.details.length === 0) {
             // Fallback: PR was created before snapshotting was implemented.
             // Gracefully degrade to master BOM calculation so old PRs still work.
-            return this.calculateRequirements(pr.productId, pr.quantity, pr.productionRequestId);
+            return this.calculateRequirements(pr.productId, pr.quantity, pr.productionRequestId, tx);
         }
 
         const componentIds = pr.details.map(d => d.componentId);
-        const stockMap = await this._buildStockMap(componentIds);
+        const stockMap = await this._buildStockMap(componentIds, tx);
 
         const requirements: MaterialRequirement[] = [];
         let canProduce = true;
@@ -160,8 +168,8 @@ class MrpService {
      * Run MRP for an existing Production Request — uses the snapshot when available.
      * This is the endpoint handler target for GET /:id/requirements.
      */
-    async calculateForRequest(productionRequestId: number): Promise<MrpResult> {
-        return this.calculateFromSnapshot(productionRequestId);
+    async calculateForRequest(productionRequestId: number, tx?: Prisma.TransactionClient): Promise<MrpResult> {
+        return this.calculateFromSnapshot(productionRequestId, tx);
     }
 
     // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────
@@ -169,8 +177,8 @@ class MrpService {
     /**
      * Build a Map<componentId, availableStock> across all warehouses.
      */
-    private async _buildStockMap(componentIds: number[]): Promise<Map<number, number>> {
-        return InventoryService.getBulkComponentStock(componentIds);
+    private async _buildStockMap(componentIds: number[], tx?: Prisma.TransactionClient): Promise<Map<number, number>> {
+        return InventoryService.getBulkComponentStock(componentIds, undefined, tx);
     }
 }
 

@@ -90,53 +90,6 @@ router.post('/:id/bom', bomAuth, validate(addBomComponentSchema), addBomComponen
 router.put('/:id/bom/:componentId', bomAuth, validate(updateBomComponentSchema), updateBomComponent);
 router.delete('/:id/bom/:componentId', bomAuth, removeBomComponent);
 
-// --- Production Feasibility Routes ---
-/**
- * @swagger
- * /api/products/{id}/production-context:
- *   get:
- *     summary: Get proactive production context (Stock vs Demand)
- *     tags: [Products]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Suggested production quantity based on stock and demand
- */
-router.get('/:id/production-context',
-    authorize(PERM.PRODUCT_READ),
-    getProductProductionContext
-);
-
-/**
- * @swagger
- * /api/products/{id}/production-feasibility:
- *   post:
- *     summary: Run live BOM feasibility check
- *     tags: [Products]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [quantity]
- *             properties:
- *               quantity: { type: integer, example: 50 }
- *     responses:
- *       200:
- *         description: Feasibility report (canProduce + requirements)
- */
 /**
  * @swagger
  * tags:

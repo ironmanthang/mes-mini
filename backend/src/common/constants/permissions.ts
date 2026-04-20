@@ -43,6 +43,7 @@ export const PERM = {
     PR_UPDATE:            'PR_UPDATE',           // Edit production requests
     PR_CANCEL:            'PR_CANCEL',           // Cancel production requests
     PR_LINK_PO:           'PR_LINK_PO',          // Link PR to a Purchase Order
+    PR_APPROVE:           'PR_APPROVE',          // Approve production requests (two-man rule)
 
     // ── Work Orders ───────────────────────────────────────────────────────────
     WO_READ:              'WO_READ',             // View Work Orders

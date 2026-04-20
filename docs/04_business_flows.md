@@ -98,14 +98,15 @@ Any state → CANCELLED
    - **Context (`GET /api/products/:id/production-context`)**: Shows Current Stock, Min Level, and Pending Sales Demand to suggest an optimal production quantity.
    - **Live Feasibility (`POST /api/products/:id/production-feasibility`)**: Performs a real-time BOM explosion and checks component availability across all warehouses *before* the request is saved.
 4. **Logic**:
-   - If components are sufficient → PR is ready for Work Order creation.
+   - If components are sufficient → PR becomes `PENDING` and awaits approval.
    - If components are insufficient → PR is flagged as **WAITING_MATERIAL**. PM must procure components first (Flow 3).
-5. Once Work Orders are created and completed, the PR transitions through its lifecycle.
+5. Once materials are ready and the PR is approved, Work Orders can be created and completed, and the PR transitions through its lifecycle.
 
 ### Status Lifecycle
 ```
-APPROVED → WAITING_MATERIAL (if component shortage)
-APPROVED → PARTIALLY_FULFILLED (some WOs completed) → FULFILLED (all WOs completed)
+DRAFT → PENDING → APPROVED
+      → WAITING_MATERIAL → PENDING
+APPROVED → PARTIALLY_FULFILLED → FULFILLED
 Any state → CANCELLED
 ```
 

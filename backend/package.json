@@ -12,7 +12,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "export": "scripts\\export.bat",
-    "prisma-studio": "set DIRECT_URL=postgresql://user:Th1s_is_a_V3ry-S3cur3-P4ss@localhost:5432/mydatabase && prisma studio",
+    "prisma-studio": "prisma studio --url=\"postgresql://user:Th1s_is_a_V3ry-S3cur3-P4ss@localhost:5432/mydatabase\" --browser none",
     "test": "jest --detectOpenHandles",
     "postinstall": "prisma generate"
   },
@@ -56,7 +56,7 @@
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "prisma": {

@@ -462,11 +462,11 @@ router.delete('/:id/attachments/:attachmentId',
  *                 description: Each element represents one physical box received = one ComponentLot
  *                 items:
  *                   type: object
- *                   required: [componentId, quantity, warehouseId]
- *                   properties:
- *                     componentId: { type: integer, example: 1 }
- *                     quantity: { type: integer, example: 50, description: "Units in this box" }
- *                     warehouseId: { type: integer, example: 1 }
+*                   required: [componentId, initialQuantity, warehouseId]
+*                   properties:
+*                     componentId: { type: integer, example: 1 }
+*                     initialQuantity: { type: integer, example: 50, description: "Units in this box" }
+*                     warehouseId: { type: integer, example: 1 }
  *     responses:
  *       200:
  *         description: Goods received. ComponentLot(s) created with lotCode. Status updated to RECEIVING or COMPLETED. PO_RECEIVED notification sent.
@@ -477,15 +477,16 @@ router.delete('/:id/attachments/:attachmentId',
  *               properties:
  *                 message: { type: string, example: "Goods Received Successfully" }
  *                 purchaseOrder: { type: object, description: "The updated PO object" }
- *                 generatedLots:
- *                   type: array
- *                   description: "The list of newly generated lot codes and quantities"
- *                   items:
- *                     type: object
- *                     properties:
- *                       lotCode: { type: string, example: "LOT-260329-001" }
- *                       componentId: { type: integer }
- *                       quantity: { type: integer }
+*                 generatedLots:
+*                   type: array
+*                   description: "The list of newly generated lot codes and quantities"
+*                   items:
+*                     type: object
+*                     properties:
+*                       lotCode: { type: string, example: "LOT-260329-001" }
+*                       componentId: { type: integer }
+*                       initialQuantity: { type: integer }
+*                       currentQuantity: { type: integer }
  *       400:
  *         description: Logic error (wrong status, received more than ordered, empty items, component not in PO)
  *       403:
@@ -516,11 +517,12 @@ router.delete('/:id/attachments/:attachmentId',
  *               type: array
  *               items:
  *                 type: object
- *                 properties:
- *                   lotCode: { type: string }
- *                   componentId: { type: integer }
- *                   quantity: { type: integer }
- *                   component: { type: object, properties: { componentName: { type: string }, code: { type: string } } }
+*                 properties:
+*                   lotCode: { type: string }
+*                   componentId: { type: integer }
+*                   initialQuantity: { type: integer }
+*                   currentQuantity: { type: integer }
+*                   component: { type: object, properties: { componentName: { type: string }, code: { type: string } } }
  *                   warehouse: { type: object, properties: { warehouseName: { type: string }, code: { type: string } } }
  *       404:
  *         description: Purchase Order not found.

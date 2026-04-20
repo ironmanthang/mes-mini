@@ -28,9 +28,10 @@ model Employee {
   approvedMaterialReqs   MaterialExportRequest[] @relation("Approver")
   createdMaterialReqs    MaterialExportRequest[] @relation("Requester")
   notifications          Notification[]
-  createdProductionReqs  ProductionRequest[]
+  createdProductionReqs  ProductionRequest[] @relation("PRCreator")
   approvedPurchaseOrders PurchaseOrder[]         @relation("POApprover")
   createdPurchaseOrders  PurchaseOrder[]         @relation("POCreator")
+  approvedProductionReqs ProductionRequest[]     @relation("PRApprover")
   attachments            Attachment[]
   performedQualityChecks QualityCheck[]
   approvedSalesOrders    SalesOrder[]            @relation("SOApprover")
@@ -252,7 +253,8 @@ model ComponentLot {
   componentId         Int                 @map("component_id")
   poDetailId          Int                 @map("po_detail_id")
   warehouseId         Int                 @map("warehouse_id")
-  quantity            Int
+  initialQuantity     Int                 @map("initial_quantity")
+  currentQuantity     Int                 @map("current_quantity")
   receivedAt          DateTime            @default(now()) @map("received_at")
   createdAt           DateTime            @default(now()) @map("created_at")
 
@@ -310,7 +312,6 @@ model SalesOrderDetail {
 
 model ProductionRequest {
   productionRequestId   Int                     @id @default(autoincrement()) @map("production_request_id")
-  requestDate           DateTime                @default(now()) @map("request_date")
   quantity              Int
   employeeId            Int                     @map("employee_id")
   productId             Int                     @map("product_id")
@@ -322,7 +323,10 @@ model ProductionRequest {
   status                ProductionRequestStatus
   dueDate               DateTime?               @map("due_date")
   note                  String?
-  employee              Employee                @relation(fields: [employeeId], references: [employeeId])
+  employee              Employee                @relation("PRCreator", fields: [employeeId], references: [employeeId])
+  approver              Employee?               @relation("PRApprover", fields: [approverId], references: [employeeId])
+  approverId            Int?                    @map("approver_id")
+  approvedAt            DateTime?               @map("approved_at")
   product               Product                 @relation(fields: [productId], references: [productId])
   salesOrderDetail      SalesOrderDetail?       @relation(fields: [soDetailId], references: [soDetailId])
   workOrderFulfillments WorkOrderFulfillment[]
@@ -702,9 +706,11 @@ enum PurchaseOrderStatus {
 }
 
 enum ProductionRequestStatus {
-  APPROVED
+  DRAFT
+  PENDING
   WAITING_MATERIAL
-  PARTIALLY_FULFILLED
+  APPROVED
+  IN_PROGRESS
   FULFILLED
   CANCELLED
 }
@@ -770,6 +776,7 @@ enum NotificationType {
   SO_APPROVED
   SO_SHIPPED
   PR_APPROVED
+  PR_UNBLOCKED
   WO_COMPLETED
   LOW_STOCK
   MATERIAL_ISSUED

@@ -693,7 +693,7 @@ class PurchaseOrderService {
     }
 
 
-    async receiveGoods(poId: string | number, items: { componentId: number; quantity: number; warehouseId: number }[], userId: number) {
+    async receiveGoods(poId: string | number, items: { componentId: number; initialQuantity: number; warehouseId: number }[], userId: number) {
         const id = typeof poId === 'string' ? parseInt(poId) : poId;
 
         // Fetch PO outside transaction for notification data (po.code, po.employeeId)
@@ -706,7 +706,7 @@ class PurchaseOrderService {
         // This solves the stale JS memory issue when multiple boxes of the same component are passed.
         const aggregatedReceipts = new Map<number, number>();
         for (const item of items) {
-            aggregatedReceipts.set(item.componentId, (aggregatedReceipts.get(item.componentId) || 0) + item.quantity);
+            aggregatedReceipts.set(item.componentId, (aggregatedReceipts.get(item.componentId) || 0) + item.initialQuantity);
         }
 
         const result = await prisma.$transaction(async (tx) => {
@@ -762,9 +762,9 @@ class PurchaseOrderService {
                         purchaseOrderId: id,
                         componentId: item.componentId,
                         // Guard: ensures we do not over-receive via concurrent race condition
-                        quantityReceived: { lte: detail.quantityOrdered - item.quantity }
+                        quantityReceived: { lte: detail.quantityOrdered - item.initialQuantity }
                     },
-                    data: { quantityReceived: { increment: item.quantity } }
+                    data: { quantityReceived: { increment: item.initialQuantity } }
                 });
 
                 if (updateRes.count === 0) {
@@ -782,11 +782,11 @@ class PurchaseOrderService {
                             componentId: item.componentId
                         }
                     },
-                    update: { quantity: { increment: item.quantity } },
+                    update: { quantity: { increment: item.initialQuantity } },
                     create: {
                         warehouseId: item.warehouseId,
                         componentId: item.componentId,
-                        quantity: item.quantity
+                        quantity: item.initialQuantity
                     }
                 });
 
@@ -794,7 +794,7 @@ class PurchaseOrderService {
                 await tx.inventoryTransaction.create({
                     data: {
                         transactionType: 'IMPORT_PO',
-                        quantity: item.quantity,
+                        quantity: item.initialQuantity,
                         componentId: item.componentId,
                         warehouseId: item.warehouseId,
                         employeeId: userId,
@@ -811,7 +811,8 @@ class PurchaseOrderService {
                         componentId: item.componentId,
                         poDetailId: detail.poDetailId,
                         warehouseId: item.warehouseId,
-                        quantity: item.quantity
+                        initialQuantity: item.initialQuantity,
+                        currentQuantity: item.initialQuantity
                     }
                 });
 
@@ -819,7 +820,8 @@ class PurchaseOrderService {
                 generatedLots.push({
                     lotCode: newLot.lotCode,
                     componentId: newLot.componentId,
-                    quantity: newLot.quantity
+                    initialQuantity: newLot.initialQuantity,
+                    currentQuantity: newLot.currentQuantity
                 });
             }
 
@@ -839,26 +841,36 @@ class PurchaseOrderService {
 
             // ── Unblock Production Requests if relevant ──
             const prIds = [...new Set(updatedDetails.map(d => d.productionRequestId).filter(id => id != null))] as number[];
-            
+
             if (prIds.length > 0) {
                 const waitingPRs = await tx.productionRequest.findMany({
-                    where: { 
+                    where: {
                         productionRequestId: { in: prIds },
-                        status: ProductionRequestStatus.WAITING_MATERIAL 
+                        status: ProductionRequestStatus.WAITING_MATERIAL
                     }
                 });
+
+                const NotificationService = (await import('../../notifications/notificationService.js')).default;
 
                 for (const pr of waitingPRs) {
                     const linkedDetails = await tx.purchaseOrderDetail.findMany({
                         where: { productionRequestId: pr.productionRequestId }
                     });
-                    
+
                     const prFullyReceived = linkedDetails.length > 0 && linkedDetails.every(d => d.quantityReceived >= d.quantityOrdered);
-                    
+
                     if (prFullyReceived) {
-                        await tx.productionRequest.update({
+                        const updated = await tx.productionRequest.update({
                             where: { productionRequestId: pr.productionRequestId },
-                            data: { status: ProductionRequestStatus.APPROVED }
+                            data: { status: ProductionRequestStatus.PENDING }
+                        });
+
+                        await NotificationService.notifyByRole('PRO_MANAGER', {
+                            type: NotificationType.PR_UNBLOCKED,
+                            title: 'Production Request Ready for Approval',
+                            message: `Materials fully received for PR ${pr.code}. Pending your approval.`,
+                            relatedEntityType: 'ProductionRequest',
+                            relatedEntityId: pr.productionRequestId
                         });
                     }
                 }

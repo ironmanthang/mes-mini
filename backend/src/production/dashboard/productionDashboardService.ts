@@ -1,7 +1,5 @@
 import prisma from '../../common/lib/prisma.js';
 
-// ─── Response Types ────────────────────────────────────────────────
-
 interface PendingProductionRequest {
     code: string;
     productName: string;
@@ -20,19 +18,14 @@ interface ProductionDashboardResponse {
         count: number;
         requests: PendingProductionRequest[];
     };
-    // ── STUBBED: null = "feature not implemented yet" ──
     activeWorkOrders: number | null;
     qcPassRate: number | null;
     costPerUnit: CostPerUnit | null;
 }
 
-// ─── Service ───────────────────────────────────────────────────────
-
 class ProductionDashboardService {
 
     async getMetrics(): Promise<ProductionDashboardResponse> {
-        // Only pending Production Requests are live data.
-        // WO, QC, and Cost are stubbed until those flows are implemented.
         const pendingPRs = await prisma.productionRequest.findMany({
             where: {
                 status: { in: ['APPROVED', 'WAITING_MATERIAL'] }
@@ -45,8 +38,8 @@ class ProductionDashboardService {
                 product: { select: { productName: true } }
             },
             orderBy: [
-                { priority: 'asc' },  // HIGH first (alphabetical: HIGH < LOW < MEDIUM)
-                { requestDate: 'asc' }
+                { priority: 'asc' },
+                { createdAt: 'asc' }
             ],
             take: 20
         });

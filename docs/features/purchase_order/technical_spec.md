@@ -88,7 +88,7 @@ The system performs 4 operations atomically within a database transaction:
 *   The sequence resets daily. Lot codes are unique system-wide.
 
 ### 4.3 PR Auto-Unblocking
-If a received item is linked to a `ProductionRequest` (PR), the system checks if all materials for that PR have arrived. If fulfilled, the PR status is automatically upgraded (e.g., `WAITING_MATERIAL` → `APPROVED`), unblocking the production line.
+If a received item is linked to a `ProductionRequest` (PR), the system checks if all materials for that PR have arrived. If fulfilled, the PR status is automatically upgraded (e.g., `WAITING_MATERIAL` → `PENDING`), unblocking the production line.
 
 ---
 

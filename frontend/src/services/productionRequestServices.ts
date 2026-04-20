@@ -1,7 +1,7 @@
 import api from "./api";
 
 export type PRPriority = 'HIGH' | 'MEDIUM' | 'LOW';
-export type PRStatus = 'WAITING_MATERIAL' | 'APPROVED' | 'IN_PROGRESS' | 'FULFILLED' | 'CANCELLED';
+export type PRStatus = 'DRAFT' | 'PENDING' | 'WAITING_MATERIAL' | 'APPROVED' | 'IN_PROGRESS' | 'FULFILLED' | 'CANCELLED';
 
 export interface ProductionRequest {
     productionRequestId: number;
@@ -51,6 +51,7 @@ export interface CreateProductionRequest {
     dueDate?: string;
     soDetailId?: number;
     note: string;
+    asDraft?: boolean;
 }
 
 export interface DraftPurchaseOrderResponse {
@@ -108,7 +109,7 @@ export const ProductionRequestServices = {
     },
 
     createNewProductionRequest: async (data: CreateProductionRequest) => {
-        const response = await api.post<{ mrpResult: any } & ProductionRequest>("/production-requests", data);
+        const response = await api.post<ProductionRequest & { mrpResult?: any }>("/production-requests", data);
         return response.data;
     },
 

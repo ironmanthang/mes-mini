@@ -1,4 +1,5 @@
 import prisma from '../../common/lib/prisma.js';
+import { Prisma } from '../../generated/prisma/index.js';
 
 interface InventoryQuery {
     page?: number;
@@ -189,8 +190,13 @@ class InventoryService {
     }
 
     // 4. Shared API for other slices: Bulk Component Stock
-    async getBulkComponentStock(componentIds: number[], warehouseId?: number): Promise<Map<number, number>> {
-        const stockAgg = await prisma.componentStock.groupBy({
+    async getBulkComponentStock(
+        componentIds: number[],
+        warehouseId?: number,
+        tx?: Prisma.TransactionClient
+    ): Promise<Map<number, number>> {
+        const db = tx || prisma;
+        const stockAgg = await db.componentStock.groupBy({
             by: ['componentId'],
             where: {
                 componentId: { in: componentIds },

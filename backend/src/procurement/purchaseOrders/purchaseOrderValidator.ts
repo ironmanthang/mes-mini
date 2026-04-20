@@ -92,7 +92,7 @@ export const receiveGoodsSchema = Joi.object({
     items: Joi.array().items(
         Joi.object({
             componentId: Joi.number().integer().required(),
-            quantity: Joi.number().integer().min(1).required(),
+            initialQuantity: Joi.number().integer().min(1).required(),
             warehouseId: Joi.number().integer().required()
         })
     ).min(1).required().messages({

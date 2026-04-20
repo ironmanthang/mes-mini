@@ -171,11 +171,11 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
         if (hasShortage) {
             setShowWarningPopup(true);
         } else {
-            executeCreateAPI();
+            executeCreateAPI(false);
         }
     };
 
-    const executeCreateAPI = async () => {
+    const executeCreateAPI = async (asDraft: boolean) => {
         setShowWarningPopup(false);
         setIsSubmitting(true);
         try {
@@ -185,7 +185,8 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
                 priority,
                 dueDate: new Date(dueDate).toISOString(),
                 soDetailId: soDetailId ? Number(soDetailId) : undefined,
-                note
+                note,
+                asDraft
             });
             onSuccess();
             onClose();
@@ -197,7 +198,18 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
     };
 
     const handleSaveDraft = () => {
-        alert("Tính năng 'Lưu Nháp' đang được cập nhật phía Backend. Vui lòng bấm 'Create Request' để tạo chính thức.");
+        if (!productId || !quantity || !dueDate) {
+            setShowWarning(true);
+            setMessageWarning("Please fill in the Product Information, Quantity, and Deadline completely.");
+            return;
+        }
+        if (requestType === 'MTO' && !soDetailId) {
+            setShowWarning(true);
+            setMessageWarning("Please select a linked Sales Order for the MTO request.");
+            return;
+        }
+
+        executeCreateAPI(true);
     };
 
     if (!isOpen) return null;
@@ -403,7 +415,7 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
                               Cancel
                           </button>
                           <button 
-                              onClick={executeCreateAPI}
+                              onClick={() => executeCreateAPI(false)}
                               className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-md cursor-pointer transition-colors flex items-center gap-2"
                           >
                               <CheckCircle className="w-4 h-4"/> Continue Creating

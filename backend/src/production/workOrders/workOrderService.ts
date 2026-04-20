@@ -1,6 +1,11 @@
 import prisma from '../../common/lib/prisma.js';
-import { WorkOrderStatus } from '../../generated/prisma/index.js';
+import { WorkOrderStatus, ProductionRequestStatus, ProductInstanceStatus, InventoryTransactionType } from '../../generated/prisma/index.js';
 import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
+
+type UpdatableProductionRequestStatus =
+    | typeof ProductionRequestStatus.APPROVED
+    | typeof ProductionRequestStatus.IN_PROGRESS
+    | typeof ProductionRequestStatus.FULFILLED;
 
 interface CreateWorkOrderData {
     productionRequestId: number;
@@ -58,8 +63,8 @@ class WorkOrderService {
         if (requests.some(r => r.productId !== firstProductId)) {
             throw new Error("Cannot group requests for different products.");
         }
-        if (requests.some(r => r.status !== 'APPROVED' && r.status !== 'PARTIALLY_FULFILLED')) {
-            throw new Error("All requests must be APPROVED or PARTIALLY_FULFILLED.");
+        if (requests.some(r => r.status !== ProductionRequestStatus.APPROVED)) {
+            throw new Error("All requests must be APPROVED.");
         }
 
         // 3. Calculate Total Quantity
@@ -68,7 +73,7 @@ class WorkOrderService {
         let earliestDueDate: Date | null = null; // Track earliest due date
 
         // Prepare status updates map
-        const statusUpdates: { id: number, status: 'APPROVED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' }[] = [];
+        const statusUpdates: { id: number, status: UpdatableProductionRequestStatus }[] = [];
 
         for (const req of requests) {
             // Track Earliest Due Date logic
@@ -122,11 +127,11 @@ class WorkOrderService {
             // Calculate New Status
             const newTotalFulfilled = previousFulfilled + qtyForThisReq;
 
-            let newStatus: 'APPROVED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' = 'APPROVED';
+            let newStatus: UpdatableProductionRequestStatus = ProductionRequestStatus.APPROVED;
             if (newTotalFulfilled >= req.quantity) {
-                newStatus = 'FULFILLED';
+                newStatus = ProductionRequestStatus.FULFILLED;
             } else if (newTotalFulfilled > 0) {
-                newStatus = 'PARTIALLY_FULFILLED';
+                newStatus = ProductionRequestStatus.IN_PROGRESS;
             }
 
             if (newStatus !== req.status) {
@@ -165,7 +170,7 @@ class WorkOrderService {
                             code,
                             productId: firstProductId,
                             quantity: totalQuantity,
-                            status: 'PLANNED',
+                            status: WorkOrderStatus.PLANNED,
                             employeeId: userId,
                             productionLineId: productionLineId || null,
                             // TODO: Use targetDate once Prisma Client is properly regenerated in all environments
@@ -266,26 +271,42 @@ class WorkOrderService {
     }
 
     async startWorkOrder(id: number, userId: number) {
-        const wo = await prisma.workOrder.findUnique({ where: { workOrderId: id } });
+        const wo = await prisma.workOrder.findUnique({
+            where: { workOrderId: id },
+            include: { workOrderFulfillments: true }
+        });
         if (!wo) throw new Error("Work Order not found");
 
-        if (wo.status !== 'PLANNED') throw new Error("Only PLANNED orders can be started.");
+        if (wo.status !== WorkOrderStatus.PLANNED) throw new Error("Only PLANNED orders can be started.");
 
-        // 1. Create Material Export Request (The "Feeder")
-        // logic moved to MaterialRequestService as requested in Plan
         try {
             await MaterialRequestService.createFromWorkOrder(id, userId);
         } catch (e) {
             throw new Error(`Cannot start Work Order (Material Request Failed): ${(e as Error).message}`);
         }
 
-        // 2. Update Status
-        return prisma.workOrder.update({
-            where: { workOrderId: id },
-            data: {
-                status: 'IN_PROGRESS',
-                startDate: new Date()
+        return prisma.$transaction(async (tx) => {
+            const updated = await tx.workOrder.update({
+                where: { workOrderId: id },
+                data: {
+                    status: WorkOrderStatus.IN_PROGRESS,
+                    startDate: new Date()
+                }
+            });
+
+            for (const f of wo.workOrderFulfillments) {
+                const pr = await tx.productionRequest.findUnique({
+                    where: { productionRequestId: f.productionRequestId }
+                });
+                if (pr && pr.status === ProductionRequestStatus.APPROVED) {
+                    await tx.productionRequest.update({
+                        where: { productionRequestId: f.productionRequestId },
+                        data: { status: ProductionRequestStatus.IN_PROGRESS }
+                    });
+                }
             }
+
+            return updated;
         });
     }
 
@@ -302,7 +323,7 @@ class WorkOrderService {
             });
 
             if (!wo) throw new Error("Work Order not found");
-            if (wo.status !== 'IN_PROGRESS') throw new Error(`Cannot complete. Status is ${wo.status}`);
+            if (wo.status !== WorkOrderStatus.IN_PROGRESS) throw new Error(`Cannot complete. Status is ${wo.status}`);
             if (quantityProduced <= 0) throw new Error("Quantity produced must be > 0");
 
             // A. Create Production Batch
@@ -332,7 +353,7 @@ class WorkOrderService {
                         serialNumber,
                         productId: wo.productId,
                         productionBatchId: batch.productionBatchId,
-                        status: 'IN_STOCK',
+                        status: ProductInstanceStatus.IN_STOCK,
                         warehouseId: warehouseId,
                     }
                 });
@@ -340,7 +361,7 @@ class WorkOrderService {
                 // C. Log Inventory Transaction (Per Item for Traceability)
                 await tx.inventoryTransaction.create({
                     data: {
-                        transactionType: 'IMPORT_PRODUCTION',
+                        transactionType: InventoryTransactionType.IMPORT_PRODUCTION,
                         quantity: 1, // Individual Unit
                         productInstanceId: instance.productInstanceId,
                         warehouseId: warehouseId,
@@ -351,10 +372,40 @@ class WorkOrderService {
             }
 
             // D. Update Work Order Status
-            return await tx.workOrder.update({
+            const completedWO = await tx.workOrder.update({
                 where: { workOrderId: id },
-                data: { status: 'COMPLETED' }
+                data: { status: WorkOrderStatus.COMPLETED }
             });
+
+            // E. Check PR fulfillment — transition to FULFILLED if all WOs collectively fulfill the PR
+            const fulfillments = await tx.workOrderFulfillment.findMany({
+                where: { workOrderId: id }
+            });
+
+            for (const f of fulfillments) {
+                const pr = await tx.productionRequest.findUnique({
+                    where: { productionRequestId: f.productionRequestId }
+                });
+                if (!pr) continue;
+
+                const allFulfillments = await tx.workOrderFulfillment.findMany({
+                    where: { productionRequestId: f.productionRequestId },
+                    include: { workOrder: true }
+                });
+
+                const totalFulfilled = allFulfillments
+                    .filter(ff => ff.workOrder.status === WorkOrderStatus.COMPLETED)
+                    .reduce((sum, ff) => sum + ff.quantity, 0);
+
+                if (totalFulfilled >= pr.quantity && pr.status !== ProductionRequestStatus.FULFILLED) {
+                    await tx.productionRequest.update({
+                        where: { productionRequestId: f.productionRequestId },
+                        data: { status: ProductionRequestStatus.FULFILLED }
+                    });
+                }
+            }
+
+            return completedWO;
         });
     }
 
@@ -378,7 +429,8 @@ class WorkOrderService {
             if (!wo) throw new Error("Work Order not found");
 
             // Validate status
-            if (['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status)) {
+            const terminalStatuses: WorkOrderStatus[] = [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED];
+            if (terminalStatuses.includes(wo.status)) {
                 throw new Error(`Cannot cancel Work Order in status ${wo.status}`);
             }
 
@@ -387,7 +439,7 @@ class WorkOrderService {
             await tx.workOrder.update({
                 where: { workOrderId: id },
                 data: {
-                    status: 'CANCELLED',
+                    status: WorkOrderStatus.CANCELLED,
                     note: noteUpdate
                 }
             });
@@ -405,23 +457,22 @@ class WorkOrderService {
                 // Calculate Valid Fulfilled Quantity (excluding THIS cancelled WO and any other cancelled ones)
                 const activeFulfillments = pr.workOrderFulfillments.filter(f =>
                     f.workOrderId !== id && // Exclude current being cancelled
-                    f.workOrder.status !== 'CANCELLED' // Exclude historically cancelled
+                    f.workOrder.status !== WorkOrderStatus.CANCELLED // Exclude historically cancelled
                 );
 
                 const validFulfilledQty = activeFulfillments.reduce((sum, f) => sum + f.quantity, 0);
 
-                let newStatus: 'APPROVED' | 'PARTIALLY_FULFILLED' | 'FULFILLED' = 'APPROVED';
+                let newStatus: UpdatableProductionRequestStatus = ProductionRequestStatus.APPROVED;
 
                 if (validFulfilledQty >= pr.quantity) {
-                    newStatus = 'FULFILLED';
+                    newStatus = ProductionRequestStatus.FULFILLED;
                 } else if (validFulfilledQty > 0) {
-                    newStatus = 'PARTIALLY_FULFILLED';
+                    newStatus = ProductionRequestStatus.IN_PROGRESS;
                 } else {
-                    newStatus = 'APPROVED'; // Back to approved
+                    newStatus = ProductionRequestStatus.APPROVED;
                 }
 
                 if (pr.status !== newStatus) {
-                    // Fix: Check status constraints (not strict here, just update)
                     await tx.productionRequest.update({
                         where: { productionRequestId: pr.productionRequestId },
                         data: { status: newStatus }

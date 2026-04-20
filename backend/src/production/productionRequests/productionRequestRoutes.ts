@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import {
     createRequest,
+    updateDraft,
+    submitRequest,
+    approveRequest,
     getAllRequests,
     getRequestById,
     recheckFeasibility,
     draftPurchaseOrder,
     cancelRequest,
     getRequirements,
-    convertRequestsToWorkOrder
+    // convertRequestsToWorkOrder  // TODO: API not ready yet - waiting for work order rework
 } from './productionRequestController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -29,10 +32,11 @@ router.post('/',
     createRequest
 );
 
-router.post('/convert-to-work-order',
-    authorize(PERM.WO_CREATE),
-    convertRequestsToWorkOrder
-);
+// router.post('/convert-to-work-order',
+//     authorize(PERM.WO_CREATE),
+//     convertRequestsToWorkOrder)
+//   // TODO: API not ready yet - waiting for work order rework
+// );
 
 router.get('/:id/requirements',
     authorize(PERM.PR_READ),
@@ -47,6 +51,21 @@ router.put('/:id/recheck',
 router.get('/:id/draft-purchase-order',
     authorize(PERM.PR_LINK_PO),
     draftPurchaseOrder
+);
+
+router.put('/:id',
+    authorize(PERM.PR_UPDATE),
+    updateDraft
+);
+
+router.put('/:id/submit',
+    authorize(PERM.PR_UPDATE),
+    submitRequest
+);
+
+router.put('/:id/approve',
+    authorize(PERM.PR_APPROVE),
+    approveRequest
 );
 
 router.put('/:id/cancel',
@@ -76,7 +95,8 @@ router.get('/:id',
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [APPROVED, WAITING_MATERIAL, PARTIALLY_FULFILLED, FULFILLED, CANCELLED] }
+ *         schema: { type: string, enum: [DRAFT, PENDING, WAITING_MATERIAL, APPROVED, IN_PROGRESS, FULFILLED, CANCELLED] }
+ *         description: Filter by Production Request status
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
@@ -107,12 +127,12 @@ router.get('/:id',
  *             properties:
  *               productId: 
  *                 type: integer
- *                 example: 1
+ *                 example: 3
  *                 description: "The ID of the product to manufacture"
  *               quantity: 
  *                 type: integer
  *                 minimum: 1
- *                 example: 50
+ *                 example: 5
  *               priority: 
  *                 type: string
  *                 enum: [HIGH, MEDIUM, LOW]
@@ -131,9 +151,127 @@ router.get('/:id',
  *                 type: string
  *                 maxLength: 500
  *                 example: "Urgent production for Q4 deadline."
+ *               asDraft:
+ *                 type: boolean
+ *                 default: true
+ *                 example: true
+ *                 description: "Optional. If false, the request is submitted immediately; otherwise it is saved as a draft."
+ *           examples:
+ *             saveAsDraft:
+ *               summary: Save as draft (default behavior)
+ *               value:
+ *                 productId: 1
+ *                 quantity: 5
+ *                 priority: "MEDIUM"
+ *                 dueDate: "2026-12-31T23:59:59Z"
+ *                 soDetailId: 4
+ *                 note: "Urgent production for Q5 deadline."
+ *                 asDraft: true
+ *             submitImmediately:
+ *               summary: Create and submit immediately
+ *               value:
+ *                 productId: 3
+ *                 quantity: 5
+ *                 priority: "HIGH"
+ *                 dueDate: "2026-12-31T23:59:59Z"
+ *                 soDetailId: 3
+ *                 note: "Submit right away for planning."
+ *                 asDraft: false
  *     responses:
  *       201:
- *         description: Created with status APPROVED or WAITING_MATERIAL
+ *         description: Created successfully (DRAFT if saved as draft, otherwise submitted to PENDING or WAITING_MATERIAL)
+ */
+
+/**
+ * @swagger
+ * /api/production-requests/{id}:
+ *   put:
+ *     summary: Update a draft Production Request
+ *     tags: [Production Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               productId:
+ *                 type: integer
+ *                 description: Optional new product ID (must have BOM)
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *                 description: Optional new quantity
+ *               priority:
+ *                 type: string
+ *                 enum: [HIGH, MEDIUM, LOW]
+ *               dueDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Optional due date
+ *               soDetailId:
+ *                 type: integer
+ *                 description: Optional linked Sales Order Detail ID
+ *               note:
+ *                 type: string
+ *                 maxLength: 500
+ *                 description: Optional note
+ *           examples:
+ *             updateDraftPayload:
+ *               value:
+ *                 quantity: 120
+ *                 priority: "HIGH"
+ *                 dueDate: "2026-12-28T09:00:00Z"
+ *                 note: "Revised after sales confirmation."
+ *     responses:
+ *       200:
+ *         description: Draft updated successfully
+ *       400:
+ *         description: Invalid input or request is not editable
+ */
+
+/**
+ * @swagger
+ * /api/production-requests/{id}/submit:
+ *   put:
+ *     summary: Submit a draft Production Request for feasibility check
+ *     tags: [Production Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Submitted successfully (status becomes PENDING or WAITING_MATERIAL)
+ *       400:
+ *         description: Invalid state or validation error
+ */
+
+/**
+ * @swagger
+ * /api/production-requests/{id}/approve:
+ *   put:
+ *     summary: Approve a pending Production Request
+ *     tags: [Production Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Request approved successfully
+ *       403:
+ *         description: Forbidden (missing role, self-approval, or invalid state)
  */
 
 /**
@@ -150,7 +288,7 @@ router.get('/:id',
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Re-check result (may transition to APPROVED)
+ *         description: Re-check result (may transition to PENDING)
  */
 
 /**
@@ -230,37 +368,51 @@ router.get('/:id',
  *         description: Production Request not found
  */
 
-/**
- * @swagger
- * /api/production-requests/convert-to-work-order:
- *   post:
- *     summary: Convert approved Production Requests into a Work Order
- *     tags: [Production Requests]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [requestIds]
- *             properties:
- *               requestIds:
- *                 type: array
- *                 items: { type: integer }
- *                 description: "Array of Production Request IDs to bundle into a Work Order"
- *               quantities:
- *                 type: array
- *                 items: { type: integer }
- *                 description: "Corresponding quantities for each request (optional, defaults to full quantity)"
- *               productionLineId:
- *                 type: integer
- *                 description: "Target production line ID"
- *     responses:
- *       201:
- *         description: Work Order created successfully
- *       400:
- *         description: Validation error (wrong status, missing data, etc.)
- */
+// /**
+//  * @swagger
+//  * /api/production-requests/convert-to-work-order:
+//  *   post:
+//  *     summary: Convert approved Production Requests into a Work Order
+//  *     tags: [Production Requests]
+//  *     security: [{ bearerAuth: [] }]
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             required: [requestIds]
+//  *             properties:
+//  *               requestIds:
+//  *                 type: array
+//  *                 items: { type: integer }
+//  *                 description: "Array of Production Request IDs to bundle into a Work Order"
+//  *               quantities:
+//  *                 type: object
+//  *                 additionalProperties:
+//  *                   type: integer
+//  *                   minimum: 1
+//  *                 description: "Optional map of requestId -> quantity to produce (for split/partial fulfillment). If omitted, each request uses its remaining quantity."
+//  *               productionLineId:
+//  *                 type: integer
+//  *                 description: "Target production line ID"
+//  *           examples:
+//  *             groupedDefault:
+//  *               value:
+//  *                 requestIds: [101, 102]
+//  *                 productionLineId: 2
+//  *             groupedWithSplit:
+//  *               value:
+//  *                 requestIds: [101, 102]
+//  *                 quantities:
+//  *                   "101": 40
+//  *                   "102": 25
+//  *                 productionLineId: 2
+//  *     responses:
+//  *       201:
+//  *         description: Work Order created successfully
+//  *       400:
+//  *         description: Validation error (wrong status, missing data, etc.)
+//  */
 
 export default router;
