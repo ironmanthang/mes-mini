@@ -69,7 +69,7 @@ jobs:
       - name: Reset Production Database (Dangerous)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_mode == 'reset-seed-and-deploy' && github.event.inputs.confirm_reset == 'RESET_PRODUCTION_DB'
         working-directory: backend
-        run: npx prisma migrate reset --force --skip-seed
+        run: npx prisma migrate reset --force
         env:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
