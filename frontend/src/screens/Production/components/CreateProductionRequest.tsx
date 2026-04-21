@@ -185,8 +185,10 @@ export const CreateProductionRequest = (): JSX.Element => {
                       <td className="p-4 text-center">
                         {getStatusBadge(req.status)}
                       </td>
-                      <td className="p-4 text-gray-600 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400" /> {formatDate(req.dueDate)}
+                      <td className="p-4 text-gray-600">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <Calendar className="w-3.5 h-3.5 text-gray-400" /> {formatDate(req.dueDate)}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">

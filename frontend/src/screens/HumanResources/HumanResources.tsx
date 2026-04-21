@@ -34,14 +34,14 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const employeesData = await employeeService.getAllEmployees();
+      const employeesData = await employeeService.getAllEmployees({ search: debouncedTerm });
       setEmployees(employeesData);
     } catch (error) {
       console.error("Failed to fetch employees:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [debouncedTerm]);
 
   useEffect(() => {
     fetchEmployees();
@@ -57,16 +57,6 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
-
-  const filteredEmployees = employees.filter((emp) => {
-    const term = debouncedTerm.toLowerCase();
-    return (
-      emp.fullName.toLowerCase().includes(term) ||
-      emp.username.toLowerCase().includes(term) ||
-      emp.employeeId.toString().includes(term) ||
-      (emp.phoneNumber && emp.phoneNumber.includes(term))
-    );
-  });
 
   const handleSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -193,8 +183,8 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map((emp) => (
+                      {employees.length > 0 ? (
+                        employees.map((emp) => (
                           <tr key={emp.employeeId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4">
                               <input
@@ -222,6 +212,8 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
                               <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                                   emp.status === 'ACTIVE' 
                                   ? 'bg-green-100 text-green-700' 
+                                  : emp.status === 'INACTIVE'
+                                  ? 'bg-yellow-100 text-yellow-700'
                                   : 'bg-red-100 text-red-700'
                               }`}>
                                   {emp.status}

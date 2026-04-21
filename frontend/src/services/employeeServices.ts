@@ -1,7 +1,5 @@
 import api from "./api";
 
-// --- 1. Định nghĩa Types (Interfaces) dựa trên Swagger ---
-
 export interface Role {
   roleId: number;
   roleName: string;
@@ -53,8 +51,7 @@ export interface UpdateEmployeeRequest {
 
 
 export const employeeService = {
-  getAllEmployees: async (search?: string) => {
-    const params = search ? { search } : {};
+  getAllEmployees: async (params? : { search?: string; page?: number; limit?: number }) => {
     const response = await api.get<Employee[]>("/employees", { params });
     return response.data;
   },
