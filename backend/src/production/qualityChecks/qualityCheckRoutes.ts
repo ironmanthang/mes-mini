@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { createCheck, getByProduct, getByWorkOrder } from './qualityController.js';
+import { createCheck, getByProduct, getByWorkOrder } from './qualityCheckController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
-import { createCheckSchema } from './qualityValidator.js';
+import { createCheckSchema } from './qualityCheckValidator.js';
 import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
@@ -45,11 +45,10 @@ router.get('/work-order/:woId',
  *         application/json:
  *           schema:
  *             type: object
- *             required: [productId, passed]
+ *             required: [serialNumber, result]
  *             properties:
- *               workOrderId: { type: integer }
- *               productId: { type: integer }
- *               passed: { type: boolean, description: "True = PASSED, False = FAILED" }
+ *               serialNumber: { type: string }
+ *               result: { type: string, enum: ['PASSED', 'FAILED'] }
  *               checkDate: { type: string, format: date-time }
  *               notes: { type: string }
  *     responses:

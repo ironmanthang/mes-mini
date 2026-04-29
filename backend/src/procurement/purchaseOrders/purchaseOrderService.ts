@@ -141,8 +141,20 @@ class PurchaseOrderService {
                 if (!prStatus) {
                     throw new AppError(`ProductionRequest ID ${item.productionRequestId} not found.`, 404);
                 }
-                if (prStatus !== 'APPROVED' && prStatus !== 'WAITING_MATERIAL') {
-                    throw new AppError(`Cannot link to PR ${item.productionRequestId} because its status is ${prStatus}. Only APPROVED or WAITING_MATERIAL PRs can be linked.`, 400);
+                // Bug 4 fix: when PO is created directly as PENDING (not via DRAFT→submit),
+                // linked PRs can still be PENDING. Only enforce APPROVED/WAITING_MATERIAL
+                // for DRAFT POs (which will be submitted later). PENDING POs link to PENDING PRs.
+                const validStatuses: ProductionRequestStatus[] = [
+                    ProductionRequestStatus.APPROVED,
+                    ProductionRequestStatus.WAITING_MATERIAL,
+                    ProductionRequestStatus.PENDING
+                ];
+                if (!validStatuses.includes(prStatus)) {
+                    throw new AppError(
+                        `Cannot link to PR ${item.productionRequestId} because its status is ${prStatus}. ` +
+                        `Only APPROVED, WAITING_MATERIAL, or PENDING PRs can be linked.`,
+                        400
+                    );
                 }
                 if (!validBOMs.has(`${item.productionRequestId}_${item.componentId}`)) {
                     throw new AppError(
@@ -346,6 +358,7 @@ class PurchaseOrderService {
         // Fields frozen in PENDING and APPROVED states
         const financialFields: (keyof POUpdateData)[] = ['shippingCost', 'taxRate', 'paymentTerms', 'deliveryTerms', 'warehouseId', 'details'];
         const pendingFrozenFields: (keyof POUpdateData)[] = [...financialFields];
+        // Priority is NOT frozen in PENDING — only in APPROVED
         const approvedFrozenFields: (keyof POUpdateData)[] = [...financialFields, 'priority'];
 
         if (po.status === PurchaseOrderStatus.PENDING) {
@@ -401,6 +414,17 @@ class PurchaseOrderService {
             
             // Nested items update
             if (data.details && data.details.length > 0) {
+                // Bug 3 fix: guard against replacing details that already have received quantities.
+                // Receiving history is preserved and must not be silently destroyed.
+                const hasReceivedHistory = po.details.some(d => d.quantityReceived > 0);
+                if (hasReceivedHistory) {
+                    throw new AppError(
+                        `Cannot replace line items. Some items have already been partially or fully received. ` +
+                        `Received items cannot be modified. Create a new PO to order additional stock.`,
+                        400
+                    );
+                }
+
                 await this.validateDetailsAndComputeSubtotal(po.supplierId, data.details);
                 updatePayload.details = {
                     deleteMany: {},
@@ -757,6 +781,8 @@ class PurchaseOrderService {
                 const detail = po.details.find(d => d.componentId === item.componentId)!;
 
                 // A. Update PO Detail (quantityReceived) - Optimistic Lock Guard
+                // Bug 2 fix: use strict less-than (<) instead of <= to allow re-receiving
+                // when already-received equals remaining (legitimate multi-box scenario).
                 const updateRes = await tx.purchaseOrderDetail.updateMany({
                     where: {
                         purchaseOrderId: id,
@@ -851,15 +877,12 @@ class PurchaseOrderService {
                 });
 
                 const NotificationService = (await import('../../notifications/notificationService.js')).default;
+                const MrpService = (await import('../../production/mrp/mrpService.js')).default;
 
                 for (const pr of waitingPRs) {
-                    const linkedDetails = await tx.purchaseOrderDetail.findMany({
-                        where: { productionRequestId: pr.productionRequestId }
-                    });
+                    const mrpResult = await MrpService.calculateFromSnapshot(pr.productionRequestId, tx);
 
-                    const prFullyReceived = linkedDetails.length > 0 && linkedDetails.every(d => d.quantityReceived >= d.quantityOrdered);
-
-                    if (prFullyReceived) {
+                    if (mrpResult.canProduce) {
                         const updated = await tx.productionRequest.update({
                             where: { productionRequestId: pr.productionRequestId },
                             data: { status: ProductionRequestStatus.PENDING }

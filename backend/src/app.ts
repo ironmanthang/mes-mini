@@ -18,9 +18,10 @@ import salesDashboardRoutes from './sales/dashboard/salesDashboardRoutes.js';
 import productionRoutes from './production/productionRoutes.js';
 import warehouseOpsRoutes from './warehouse-ops/warehouseRoutes.js';
 import notificationRoutes from './notifications/notificationRoutes.js';
-import qualityRoutes from './production/quality/qualityRoutes.js';
+import qualityRoutes from './production/qualityChecks/qualityCheckRoutes.js';
 import productionRequestRoutes from './production/productionRequests/productionRequestRoutes.js';
 import workOrderRoutes from './production/workOrders/workOrderRoutes.js';
+import publicWarrantyRoutes from './public/warranties/warrantyRoutes.js';
 
 const app: Express = express();
 
@@ -55,6 +56,7 @@ app.use('/api/production', productionRoutes);
 app.use('/api/warehouse-ops', warehouseOpsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/quality', qualityRoutes);
+app.use('/api/public/warranties', publicWarrantyRoutes);
 
 
 const swaggerUiOptions = {

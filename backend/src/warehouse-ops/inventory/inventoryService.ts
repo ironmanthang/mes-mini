@@ -63,7 +63,7 @@ class InventoryService {
     // 2. Unified Low Stock Details (The Drill-down API)
     async getLowStockDetails(warehouseId?: number) {
         // A. Handle Products
-        const productWhere: any = { status: 'IN_STOCK' };
+        const productWhere: any = { status: 'IN_STOCK_SALES' };
         if (warehouseId) productWhere.warehouseId = warehouseId;
 
         const productStockCounts = await prisma.productInstance.groupBy({
@@ -130,7 +130,7 @@ class InventoryService {
             });
             if (!product) throw new Error('Product not found');
 
-            const where: any = { productId: id, status: 'IN_STOCK' };
+            const where: any = { productId: id, status: 'IN_STOCK_SALES' };
             if (warehouseId) where.warehouseId = warehouseId;
 
             const countsByWarehouse = await prisma.productInstance.groupBy({
@@ -216,7 +216,7 @@ class InventoryService {
             by: ['productId'],
             where: {
                 productId: { in: productIds },
-                status: 'IN_STOCK',
+                status: 'IN_STOCK_SALES',
                 ...(warehouseId ? { warehouseId } : {})
             },
             _count: { productId: true }

@@ -10,12 +10,24 @@ export const createWorkOrder = async (req: Request, res: Response): Promise<void
     }
 };
 
+export const updateWorkOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = parseInt(String(req.params.id));
+        const result = await WorkOrderService.updateWorkOrder(id, req.body);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
 export const getAllWorkOrders = async (req: Request, res: Response): Promise<void> => {
     try {
         const result = await WorkOrderService.getALlWO(req.query as any);
         res.status(200).json(result);
     } catch (error) {
-        res.status(500).json({ message: (error as Error).message });
+        const message = (error as Error).message;
+        const statusCode = message.startsWith('Invalid Work Order status') ? 400 : 500;
+        res.status(statusCode).json({ message });
     }
 };
 
@@ -47,7 +59,17 @@ export const startWorkOrder = async (req: Request, res: Response): Promise<void>
     try {
         const id = parseInt(String(req.params.id));
         const result = await WorkOrderService.startWorkOrder(id, req.user!.employeeId);
-        res.status(200).json({ message: "Work Order Started & Material Request Created", result });
+        res.status(200).json({ message: "Work Order Started", result });
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
+export const releaseWorkOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = parseInt(String(req.params.id));
+        const result = await WorkOrderService.releaseWorkOrder(id);
+        res.status(200).json({ message: 'Work Order Released', result });
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
     }
@@ -56,14 +78,23 @@ export const startWorkOrder = async (req: Request, res: Response): Promise<void>
 export const completeWorkOrder = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(String(req.params.id));
-        const { quantityProduced } = req.body;
+        const { quantityProduced, batchCode, expiryDate, warehouseId } = req.body;
 
         if (!quantityProduced || quantityProduced <= 0) {
             res.status(400).json({ message: "Quantity Produced must be > 0" });
             return;
         }
 
-        const result = await WorkOrderService.completeWorkOrder(id, quantityProduced, req.user!.employeeId);
+        const parsedExpiryDate = expiryDate ? new Date(expiryDate) : undefined;
+
+        const result = await WorkOrderService.completeWorkOrder(
+            id,
+            quantityProduced,
+            req.user!.employeeId,
+            batchCode,
+            parsedExpiryDate,
+            warehouseId
+        );
         res.status(200).json({ message: "Work Order Completed", result });
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });

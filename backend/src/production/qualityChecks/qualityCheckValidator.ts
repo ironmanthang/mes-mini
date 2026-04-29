@@ -1,9 +1,8 @@
 import { Joi } from '../../common/validators/common.js';
 
 export const createCheckSchema = Joi.object({
-    workOrderId: Joi.number().optional(),
-    productId: Joi.number().required(),
+    serialNumber: Joi.string().required(),
     checkDate: Joi.date().iso().default(Date.now),
-    passed: Joi.boolean().required(),
+    result: Joi.string().valid('PASSED', 'FAILED').required(),
     notes: Joi.string().allow('', null).optional()
 });

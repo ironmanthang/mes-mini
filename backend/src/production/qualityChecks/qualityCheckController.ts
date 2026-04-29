@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import QualityCheckService from './qualityService.js';
+import QualityCheckService from './qualityCheckService.js';
 
 export const createCheck = async (req: Request, res: Response): Promise<void> => {
     try {

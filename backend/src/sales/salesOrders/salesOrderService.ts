@@ -1,5 +1,5 @@
 import prisma from '../../common/lib/prisma.js';
-import { NotificationType, SalesOrderStatus, Priority, Prisma } from '../../generated/prisma/index.js';
+import { NotificationType, SalesOrderStatus, Priority, Prisma, ProductInstanceStatus } from '../../generated/prisma/index.js';
 
 interface SODetailItem {
     productId: number;
@@ -45,7 +45,7 @@ class SalesOrderService {
         return prisma.productInstance.count({
             where: {
                 productId: productId,
-                status: 'IN_STOCK'
+                status: ProductInstanceStatus.IN_STOCK_SALES
             }
         });
     }
@@ -60,7 +60,7 @@ class SalesOrderService {
             by: ['productId'],
             where: {
                 productId: { in: productIds },
-                status: 'IN_STOCK'
+                status: ProductInstanceStatus.IN_STOCK_SALES
             },
             _count: {
                 productId: true
@@ -188,10 +188,10 @@ class SalesOrderService {
             });
 
             // 5. Update with Correct Code (Step 2: Now we have the ID)
-            // Logic: If user clicked "Save & Submit" (PENDING_APPROVAL), generate official SO- Code immediately.
+            // Logic: If user clicked "Save & Submit" (PENDING), generate official SO- Code immediately.
             //        If user clicked "Save Draft" (DRAFT), generate D- Code.
             let finalCode: string;
-            if (status === SalesOrderStatus.PENDING_APPROVAL) {
+            if (status === SalesOrderStatus.PENDING) {
                 finalCode = await this.generateSOCode();
             } else {
                 finalCode = this.generateDraftCode(tempSO.salesOrderId);
@@ -245,7 +245,7 @@ class SalesOrderService {
             if (!so) throw new Error("Sales Order not found");
 
             // BUSINESS RULE: Locked after Approval
-            if (so.status !== SalesOrderStatus.DRAFT && so.status !== SalesOrderStatus.PENDING_APPROVAL) {
+            if (so.status !== SalesOrderStatus.DRAFT && so.status !== SalesOrderStatus.PENDING) {
                 throw new Error(`State Lock: Cannot edit order in ${so.status} status.`);
             }
 
@@ -496,7 +496,7 @@ class SalesOrderService {
             });
 
             if (!so) throw new Error("Order not found");
-            if (so.status !== SalesOrderStatus.PENDING_APPROVAL) throw new Error(`Process Violation: Cannot approve order in ${so.status} status.`);
+if (so.status !== SalesOrderStatus.PENDING) throw new Error(`Process Violation: Cannot approve order in ${so.status} status.`);
 
             if (so.employeeId === approverId) {
                 throw new Error("Audit Violation: You cannot approve your own Sales Order.");
@@ -513,7 +513,7 @@ class SalesOrderService {
                 const availableStockCount = await tx.productInstance.count({
                     where: {
                         productId: detail.productId,
-                        status: 'IN_STOCK',
+                        status: ProductInstanceStatus.IN_STOCK_SALES,
                         salesOrderId: null
                     }
                 });
@@ -575,7 +575,7 @@ class SalesOrderService {
         await prisma.salesOrder.update({
             where: { salesOrderId: id },
             data: {
-                status: SalesOrderStatus.PENDING_APPROVAL,
+                status: SalesOrderStatus.PENDING,
                 code: newCode
             }
         });
@@ -588,7 +588,7 @@ class SalesOrderService {
         const so = await prisma.salesOrder.findUnique({ where: { salesOrderId: id } });
 
         if (!so) throw new Error("Order not found");
-        if (so.status !== SalesOrderStatus.PENDING_APPROVAL) throw new Error(`Cannot reject. Current status is ${so.status}`);
+            if (so.status !== SalesOrderStatus.PENDING) throw new Error(`Cannot reject. Current status is ${so.status}`);
         if (so.employeeId === rejecterId) throw new Error("You cannot reject your own order.");
 
         const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -657,31 +657,92 @@ class SalesOrderService {
                     throw new Error(`Over-shipment: Attempting to ship ${quantityToShip} but only ${remaining} remain.`);
                 }
 
-                for (const serial of item.serialNumbers) {
-                    const instance = await tx.productInstance.findUnique({
-                        where: { serialNumber: serial }
-                    });
+                // --- GENERATE PICK LIST FOR VALIDATION ---
+                // 1. Find all IN_STOCK_SALES instances for this product
+                const allAvailable = await tx.productInstance.findMany({
+                    where: { productId: item.productId, status: ProductInstanceStatus.IN_STOCK_SALES, salesOrderId: null },
+                    include: {
+                        productionBatch: {
+                            include: {
+                                workOrder: {
+                                    include: {
+                                        workOrderFulfillments: {
+                                            include: {
+                                                productionRequest: {
+                                                    include: { salesOrderDetail: true }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    orderBy: { receivedAt: 'asc' }
+                });
 
-                    if (!instance) throw new Error(`Serial ${serial} not found.`);
-                    if (instance.productId !== item.productId) throw new Error(`Serial ${serial} mismatch for Product ID ${item.productId}.`);
+                // 2. Filter eligible and separate into MTO vs MTS
+                const mtoEligible: typeof allAvailable = [];
+                const mtsEligible: typeof allAvailable = [];
 
-                    // Ensure we only ship what is In Stock
-                    if (instance.status !== 'IN_STOCK') {
-                        throw new Error(`Serial ${serial} is in invalid state for shipping: ${instance.status}`);
+                for (const inst of allAvailable) {
+                    let isMTOForThisSO = false;
+                    let isBlocked = false;
+
+                    const prs = inst.productionBatch.workOrder.workOrderFulfillments.map(f => f.productionRequest);
+                    for (const pr of prs) {
+                        const linkedSOId = pr.salesOrderDetail?.salesOrderId;
+                        if (linkedSOId === id) {
+                            isMTOForThisSO = true;
+                            break;
+                        } else if (linkedSOId) {
+                            // Check status of other SO
+                            const otherSO = await tx.salesOrder.findUnique({ where: { salesOrderId: linkedSOId } });
+                            if (otherSO && (otherSO.status === SalesOrderStatus.IN_PROGRESS || otherSO.status === SalesOrderStatus.PARTIALLY_SHIPPED)) {
+                                isBlocked = true;
+                            }
+                        }
                     }
 
-                    // A. Update Status
-                    await tx.productInstance.update({
-                        where: { serialNumber: serial },
-                        data: { status: 'SHIPPED', salesOrderId: id }
+                    if (isMTOForThisSO) {
+                        mtoEligible.push(inst);
+                    } else if (!isBlocked) {
+                        mtsEligible.push(inst);
+                    }
+                }
+
+                // 3. Select top N (quantityToShip)
+                const allowedInstances = [...mtoEligible, ...mtsEligible].slice(0, quantityToShip);
+                const allowedSerials = allowedInstances.map(inst => inst.serialNumber);
+
+                // --- VALIDATE SCANNED SERIALS ---
+                for (const serial of item.serialNumbers) {
+                    if (!allowedSerials.includes(serial)) {
+                        throw new Error(`FIFO/Allocation Violation: Serial ${serial} is not eligible. Please pick according to the exact FIFO pick list: ${allowedSerials.join(', ')}.`);
+                    }
+
+                    // A. Atomic Update Status
+                    const updated = await tx.productInstance.updateMany({
+                        where: { 
+                            serialNumber: serial, 
+                            status: ProductInstanceStatus.IN_STOCK_SALES,
+                            salesOrderId: null
+                        },
+                        data: { status: ProductInstanceStatus.SHIPPED, salesOrderId: id }
                     });
+
+                    if (updated.count === 0) {
+                        throw new Error(`Serial ${serial} was already shipped or is no longer in stock. Concurrent modification detected.`);
+                    }
+
+                    const inst = allowedInstances.find(i => i.serialNumber === serial)!;
 
                     // B. Log Transaction
                     await tx.inventoryTransaction.create({
                         data: {
                             transactionType: 'EXPORT_SALES',
                             quantity: 1,
-                            productInstanceId: instance.productInstanceId,
+                            productInstanceId: inst.productInstanceId,
                             warehouseId,
                             employeeId: userId,
                             note: `Shipped for SO ${so.code}`
@@ -701,7 +762,7 @@ class SalesOrderService {
             // 5. Check Completion
             const updatedDetails = await tx.salesOrderDetail.findMany({ where: { salesOrderId: id } });
             const allShipped = updatedDetails.every(d => d.quantityShipped >= d.quantity);
-            const newStatus = allShipped ? SalesOrderStatus.COMPLETED : SalesOrderStatus.IN_PROGRESS;
+            const newStatus = allShipped ? SalesOrderStatus.SHIPPED : SalesOrderStatus.IN_PROGRESS;
 
             await tx.salesOrder.update({
                 where: { salesOrderId: id },
@@ -727,7 +788,7 @@ class SalesOrderService {
             if (!so) throw new Error("Order not found");
 
             // 1. Status Validation
-            const ALLOWED_STATUSES: SalesOrderStatus[] = [SalesOrderStatus.PENDING_APPROVAL, SalesOrderStatus.APPROVED, SalesOrderStatus.IN_PROGRESS];
+            const ALLOWED_STATUSES: SalesOrderStatus[] = [SalesOrderStatus.PENDING, SalesOrderStatus.APPROVED, SalesOrderStatus.IN_PROGRESS];
             if (!ALLOWED_STATUSES.includes(so.status)) {
                 // Drafts should be deleted, not cancelled. Shipped/Completed cannot be cancelled.
                 throw new Error(`Cannot cancel order in ${so.status} status.`);
@@ -744,7 +805,7 @@ class SalesOrderService {
             if (stockHoldingStatuses.includes(so.status)) {
                 // Find all linked instances for this SO and unlink them
                 await tx.productInstance.updateMany({
-                    where: { salesOrderId: id, status: 'IN_STOCK' }, // Just in case any were casually linked
+                    where: { salesOrderId: id, status: 'IN_STOCK_SALES' }, // Just in case any were casually linked
                     data: {
                         salesOrderId: null
                     }

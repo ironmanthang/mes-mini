@@ -1,11 +1,14 @@
 import prisma from '../../common/lib/prisma.js';
-import { WorkOrderStatus, ProductionRequestStatus, ProductInstanceStatus, InventoryTransactionType } from '../../generated/prisma/index.js';
+import {
+    WorkOrderStatus,
+    ProductionRequestStatus,
+    ProductInstanceStatus,
+    InventoryTransactionType,
+    MaterialRequestStatus,
+    SalesOrderStatus,
+    WarehouseType
+} from '../../generated/prisma/index.js';
 import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
-
-type UpdatableProductionRequestStatus =
-    | typeof ProductionRequestStatus.APPROVED
-    | typeof ProductionRequestStatus.IN_PROGRESS
-    | typeof ProductionRequestStatus.FULFILLED;
 
 interface CreateWorkOrderData {
     productionRequestId: number;
@@ -72,9 +75,6 @@ class WorkOrderService {
         const fulfillmentsData: any[] = [];
         let earliestDueDate: Date | null = null; // Track earliest due date
 
-        // Prepare status updates map
-        const statusUpdates: { id: number, status: UpdatableProductionRequestStatus }[] = [];
-
         for (const req of requests) {
             // Track Earliest Due Date logic
             // @ts-ignore
@@ -123,27 +123,12 @@ class WorkOrderService {
                 productionRequestId: req.productionRequestId,
                 quantity: qtyForThisReq
             });
-
-            // Calculate New Status
-            const newTotalFulfilled = previousFulfilled + qtyForThisReq;
-
-            let newStatus: UpdatableProductionRequestStatus = ProductionRequestStatus.APPROVED;
-            if (newTotalFulfilled >= req.quantity) {
-                newStatus = ProductionRequestStatus.FULFILLED;
-            } else if (newTotalFulfilled > 0) {
-                newStatus = ProductionRequestStatus.IN_PROGRESS;
-            }
-
-            if (newStatus !== req.status) {
-                statusUpdates.push({ id: req.productionRequestId, status: newStatus });
-            }
         }
 
         if (totalQuantity <= 0) throw new Error("Total quantity must be > 0");
 
         // 4. Material Availability Check (Just-in-Time Reservation Check)
         // We do NOT reserve yet (that happens at Release), but we check if we CAN.
-        const product = requests[0].product;
         // Dynamic Import MrpService to calculate needs
         const MrpService = (await import('../mrp/mrpService.js')).default;
         const mrpResult = await MrpService.calculateRequirements(firstProductId, totalQuantity);
@@ -170,7 +155,7 @@ class WorkOrderService {
                             code,
                             productId: firstProductId,
                             quantity: totalQuantity,
-                            status: WorkOrderStatus.PLANNED,
+                            status: WorkOrderStatus.DRAFT,
                             employeeId: userId,
                             productionLineId: productionLineId || null,
                             // TODO: Use targetDate once Prisma Client is properly regenerated in all environments
@@ -189,14 +174,6 @@ class WorkOrderService {
                                 productionRequest: { connect: { productionRequestId: f.productionRequestId } },
                                 quantity: f.quantity
                             }
-                        });
-                    }
-
-                    // 7. Update Production Request Status logic
-                    for (const update of statusUpdates) {
-                        await tx.productionRequest.update({
-                            where: { productionRequestId: update.id },
-                            data: { status: update.status }
                         });
                     }
 
@@ -228,7 +205,13 @@ class WorkOrderService {
         const { page, limit, skip } = getPaginationParams(query);
 
         const where: any = {};
-        if (query.status) where.status = query.status;
+        if (query.status) {
+            const status = String(query.status).toUpperCase();
+            if (!Object.values(WorkOrderStatus).includes(status as WorkOrderStatus)) {
+                throw new Error(`Invalid Work Order status: ${query.status}`);
+            }
+            where.status = status as WorkOrderStatus;
+        }
 
         const [data, total] = await Promise.all([
             prisma.workOrder.findMany({
@@ -261,7 +244,7 @@ class WorkOrderService {
                 productionBatches: {
                     include: { productInstances: true }
                 },
-                materialRequests: {
+                materialRequest: {
                     include: { details: true }
                 }
             }
@@ -270,23 +253,115 @@ class WorkOrderService {
         return wo;
     }
 
-    async startWorkOrder(id: number, userId: number) {
-        const wo = await prisma.workOrder.findUnique({
-            where: { workOrderId: id },
-            include: { workOrderFulfillments: true }
-        });
-        if (!wo) throw new Error("Work Order not found");
-
-        if (wo.status !== WorkOrderStatus.PLANNED) throw new Error("Only PLANNED orders can be started.");
-
-        try {
-            await MaterialRequestService.createFromWorkOrder(id, userId);
-        } catch (e) {
-            throw new Error(`Cannot start Work Order (Material Request Failed): ${(e as Error).message}`);
+    async updateWorkOrder(id: number, data: {
+        productionLineId?: number;
+        targetSalesWarehouseId?: number;
+        targetErrorWarehouseId?: number;
+        note?: string;
+    }) {
+        const wo = await prisma.workOrder.findUnique({ where: { workOrderId: id } });
+        if (!wo) throw new Error('Work Order not found.');
+        if (wo.status !== WorkOrderStatus.DRAFT) {
+            throw new Error(`Only DRAFT Work Orders can be updated. Current status: ${wo.status}`);
         }
 
+        const updatePayload: any = {};
+
+        if (data.productionLineId !== undefined) {
+            const line = await prisma.productionLine.findUnique({ where: { productionLineId: data.productionLineId } });
+            if (!line) throw new Error(`Production Line ID ${data.productionLineId} not found.`);
+            updatePayload.productionLineId = data.productionLineId;
+        }
+
+        if (data.targetSalesWarehouseId !== undefined) {
+            const wh = await prisma.warehouse.findUnique({ where: { warehouseId: data.targetSalesWarehouseId } });
+            if (!wh) throw new Error(`Warehouse ID ${data.targetSalesWarehouseId} not found.`);
+            if (wh.warehouseType !== WarehouseType.SALES) {
+                throw new Error(`Target Sales Warehouse must be SALES type. Got: ${wh.warehouseType}`);
+            }
+            updatePayload.targetSalesWarehouseId = data.targetSalesWarehouseId;
+        }
+
+        if (data.targetErrorWarehouseId !== undefined) {
+            const wh = await prisma.warehouse.findUnique({ where: { warehouseId: data.targetErrorWarehouseId } });
+            if (!wh) throw new Error(`Warehouse ID ${data.targetErrorWarehouseId} not found.`);
+            if (wh.warehouseType !== WarehouseType.ERROR) {
+                throw new Error(`Target Error Warehouse must be ERROR type. Got: ${wh.warehouseType}`);
+            }
+            updatePayload.targetErrorWarehouseId = data.targetErrorWarehouseId;
+        }
+
+        if (data.note !== undefined) updatePayload.note = data.note;
+
+        return prisma.workOrder.update({
+            where: { workOrderId: id },
+            data: updatePayload,
+            include: {
+                product: true,
+                productionLine: { select: { lineName: true, location: true } },
+                targetSalesWarehouse: { select: { warehouseName: true, code: true } },
+                targetErrorWarehouse: { select: { warehouseName: true, code: true } }
+            }
+        });
+    }
+
+    async releaseWorkOrder(id: number) {
+        const wo = await prisma.workOrder.findUnique({
+            where: { workOrderId: id }
+        });
+
+        if (!wo) throw new Error('Work Order not found');
+        if (wo.status !== WorkOrderStatus.DRAFT) {
+            throw new Error(`Only DRAFT orders can be released. Current status is ${wo.status}`);
+        }
+
+        // ── Release Gate: QC Routing must be configured ──
+        if (!wo.targetSalesWarehouseId) {
+            throw new Error('Cannot release: targetSalesWarehouseId is not configured. Update the Work Order with a SALES warehouse for QC PASSED routing.');
+        }
+        if (!wo.targetErrorWarehouseId) {
+            throw new Error('Cannot release: targetErrorWarehouseId is not configured. Update the Work Order with an ERROR warehouse for QC FAILED routing.');
+        }
+
+        return prisma.workOrder.update({
+            where: { workOrderId: id },
+            data: { status: WorkOrderStatus.RELEASED }
+        });
+    }
+
+    async startWorkOrder(id: number, userId: number) {
         return prisma.$transaction(async (tx) => {
-            const updated = await tx.workOrder.update({
+            const wo = await tx.workOrder.findUnique({
+                where: { workOrderId: id },
+                include: {
+                    workOrderFulfillments: {
+                        include: {
+                            productionRequest: {
+                                select: {
+                                    productionRequestId: true,
+                                    salesOrderDetail: {
+                                        select: { salesOrderId: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!wo) throw new Error("Work Order not found");
+            if (wo.status !== WorkOrderStatus.RELEASED) {
+                throw new Error(`Only RELEASED orders can be started. Current status is ${wo.status}`);
+            }
+
+            let materialRequest;
+            try {
+                materialRequest = await MaterialRequestService.createFromWorkOrder(id, userId, tx);
+            } catch (e) {
+                throw new Error(`Cannot start Work Order (Material Request Failed): ${(e as Error).message}`);
+            }
+
+            const updatedWorkOrder = await tx.workOrder.update({
                 where: { workOrderId: id },
                 data: {
                     status: WorkOrderStatus.IN_PROGRESS,
@@ -294,19 +369,41 @@ class WorkOrderService {
                 }
             });
 
-            for (const f of wo.workOrderFulfillments) {
-                const pr = await tx.productionRequest.findUnique({
-                    where: { productionRequestId: f.productionRequestId }
+            const linkedProductionRequestIds = [
+                ...new Set(wo.workOrderFulfillments.map(f => f.productionRequestId))
+            ];
+            if (linkedProductionRequestIds.length > 0) {
+                await tx.productionRequest.updateMany({
+                    where: {
+                        productionRequestId: { in: linkedProductionRequestIds },
+                        status: ProductionRequestStatus.APPROVED
+                    },
+                    data: { status: ProductionRequestStatus.IN_PROGRESS }
                 });
-                if (pr && pr.status === ProductionRequestStatus.APPROVED) {
-                    await tx.productionRequest.update({
-                        where: { productionRequestId: f.productionRequestId },
-                        data: { status: ProductionRequestStatus.IN_PROGRESS }
-                    });
-                }
             }
 
-            return updated;
+            const linkedSalesOrderIds = [
+                ...new Set(
+                    wo.workOrderFulfillments
+                        .map(f => f.productionRequest.salesOrderDetail?.salesOrderId)
+                        .filter((salesOrderId): salesOrderId is number => salesOrderId != null)
+                )
+            ];
+
+            if (linkedSalesOrderIds.length > 0) {
+                await tx.salesOrder.updateMany({
+                    where: {
+                        salesOrderId: { in: linkedSalesOrderIds },
+                        status: SalesOrderStatus.APPROVED
+                    },
+                    data: { status: SalesOrderStatus.IN_PROGRESS }
+                });
+            }
+
+            return {
+                workOrder: updatedWorkOrder,
+                materialRequest
+            };
         });
     }
 
@@ -319,23 +416,52 @@ class WorkOrderService {
         return await prisma.$transaction(async (tx) => {
             const wo = await tx.workOrder.findUnique({
                 where: { workOrderId: id },
-                include: { product: true }
+                include: {
+                    product: true,
+                    materialRequest: {
+                        select: {
+                            requestId: true,
+                            status: true
+                        }
+                    }
+                }
             });
 
             if (!wo) throw new Error("Work Order not found");
             if (wo.status !== WorkOrderStatus.IN_PROGRESS) throw new Error(`Cannot complete. Status is ${wo.status}`);
             if (quantityProduced <= 0) throw new Error("Quantity produced must be > 0");
+            if (quantityProduced > wo.quantity) {
+                throw new Error(`Quantity produced (${quantityProduced}) cannot exceed planned quantity (${wo.quantity}).`);
+            }
+
+            const hasIssuedMaterial = wo.materialRequest?.status === MaterialRequestStatus.ISSUED;
+            if (!hasIssuedMaterial) {
+                throw new Error("Cannot complete Work Order: linked Material Request must be ISSUED.");
+            }
+
+            const hasPendingMaterial = wo.materialRequest?.status === MaterialRequestStatus.PENDING;
+            if (hasPendingMaterial) {
+                throw new Error("Cannot complete Work Order while a linked Material Request is still PENDING.");
+            }
 
             // A. Create Production Batch
             // Batch Configuration: Use custom code if provided, else generate
-            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const productionDate = new Date();
+            const dateStr = productionDate.toISOString().slice(0, 10).replace(/-/g, '');
             const batchCode = customBatchCode || `BATCH-${wo.code}-${dateStr}`;
+
+            let finalExpiryDate = expiryDate || null;
+            if (!finalExpiryDate && wo.product.shelfLifeDays) {
+                const calculatedDate = new Date(productionDate);
+                calculatedDate.setDate(calculatedDate.getDate() + wo.product.shelfLifeDays);
+                finalExpiryDate = calculatedDate;
+            }
 
             const batch = await tx.productionBatch.create({
                 data: {
                     batchCode,
-                    productionDate: new Date(),
-                    expiryDate: expiryDate || null,
+                    productionDate,
+                    expiryDate: finalExpiryDate,
                     workOrderId: id,
                     // productionLineId: 1 // Optional
                 }
@@ -353,7 +479,7 @@ class WorkOrderService {
                         serialNumber,
                         productId: wo.productId,
                         productionBatchId: batch.productionBatchId,
-                        status: ProductInstanceStatus.IN_STOCK,
+                        status: ProductInstanceStatus.PENDING_QC,
                         warehouseId: warehouseId,
                     }
                 });
@@ -377,34 +503,6 @@ class WorkOrderService {
                 data: { status: WorkOrderStatus.COMPLETED }
             });
 
-            // E. Check PR fulfillment — transition to FULFILLED if all WOs collectively fulfill the PR
-            const fulfillments = await tx.workOrderFulfillment.findMany({
-                where: { workOrderId: id }
-            });
-
-            for (const f of fulfillments) {
-                const pr = await tx.productionRequest.findUnique({
-                    where: { productionRequestId: f.productionRequestId }
-                });
-                if (!pr) continue;
-
-                const allFulfillments = await tx.workOrderFulfillment.findMany({
-                    where: { productionRequestId: f.productionRequestId },
-                    include: { workOrder: true }
-                });
-
-                const totalFulfilled = allFulfillments
-                    .filter(ff => ff.workOrder.status === WorkOrderStatus.COMPLETED)
-                    .reduce((sum, ff) => sum + ff.quantity, 0);
-
-                if (totalFulfilled >= pr.quantity && pr.status !== ProductionRequestStatus.FULFILLED) {
-                    await tx.productionRequest.update({
-                        where: { productionRequestId: f.productionRequestId },
-                        data: { status: ProductionRequestStatus.FULFILLED }
-                    });
-                }
-            }
-
             return completedWO;
         });
     }
@@ -423,59 +521,164 @@ class WorkOrderService {
         return await prisma.$transaction(async (tx) => {
             const wo = await tx.workOrder.findUnique({
                 where: { workOrderId: id },
-                include: { workOrderFulfillments: true }
+                include: {
+                    materialRequest: {
+                        select: {
+                            requestId: true,
+                            status: true
+                        }
+                    },
+                    workOrderFulfillments: {
+                        include: {
+                            productionRequest: {
+                                select: {
+                                    productionRequestId: true,
+                                    salesOrderDetail: {
+                                        select: { salesOrderId: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
             if (!wo) throw new Error("Work Order not found");
 
             // Validate status
-            const terminalStatuses: WorkOrderStatus[] = [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED];
-            if (terminalStatuses.includes(wo.status)) {
+            const cancellableStatuses: WorkOrderStatus[] = [
+                WorkOrderStatus.DRAFT,
+                WorkOrderStatus.RELEASED,
+                WorkOrderStatus.IN_PROGRESS
+            ];
+            if (!cancellableStatuses.includes(wo.status)) {
                 throw new Error(`Cannot cancel Work Order in status ${wo.status}`);
             }
 
-            // 1. Update WO Status
-            const noteUpdate = reason ? `${wo.note ? wo.note + '; ' : ''}Cancelled: ${reason}` : wo.note;
+            if (wo.status === WorkOrderStatus.IN_PROGRESS && (!reason || !reason.trim())) {
+                throw new Error("Cancellation reason is required when cancelling an IN_PROGRESS Work Order.");
+            }
+
+            // 1. Cancel linked open Material Requests (PENDING only)
+            const pendingRequestIds = wo.materialRequest && wo.materialRequest.status === MaterialRequestStatus.PENDING
+                ? [wo.materialRequest.requestId] : [];
+
+            if (pendingRequestIds.length > 0) {
+                await tx.materialRequest.updateMany({
+                    where: {
+                        requestId: { in: pendingRequestIds },
+                        status: MaterialRequestStatus.PENDING
+                    },
+                    data: {
+                        status: MaterialRequestStatus.CANCELLED,
+                        note: 'Auto-cancelled because parent Work Order was cancelled.'
+                    }
+                });
+            }
+
+            const issuedRequestIds = wo.materialRequest && wo.materialRequest.status === MaterialRequestStatus.ISSUED
+                ? [wo.materialRequest.requestId] : [];
+
+            const reasonText = reason?.trim();
+            const noteParts: string[] = [];
+            if (wo.note) noteParts.push(wo.note);
+            if (reasonText) noteParts.push(`Cancelled: ${reasonText}`);
+            if (issuedRequestIds.length > 0) {
+                noteParts.push(`Issued material request(s) kept as irreversible consumption: ${issuedRequestIds.join(', ')}`);
+            }
+
+            // 2. Update WO status
             await tx.workOrder.update({
                 where: { workOrderId: id },
                 data: {
                     status: WorkOrderStatus.CANCELLED,
-                    note: noteUpdate
+                    note: noteParts.length > 0 ? noteParts.join('; ') : undefined
                 }
             });
 
-            // 2. Revert Production Request Status
-            for (const fulfillment of wo.workOrderFulfillments) {
-                // Get the PR and ALL its ACTIVE fulfillments
-                const pr = await tx.productionRequest.findUnique({
-                    where: { productionRequestId: fulfillment.productionRequestId },
-                    include: { workOrderFulfillments: { include: { workOrder: true } } }
+            // 3. Recalculate linked Production Request status (keep terminal locks)
+            const linkedProductionRequestIds = [
+                ...new Set(wo.workOrderFulfillments.map(f => f.productionRequestId))
+            ];
+
+            if (linkedProductionRequestIds.length > 0) {
+                const linkedProductionRequests = await tx.productionRequest.findMany({
+                    where: { productionRequestId: { in: linkedProductionRequestIds } },
+                    include: {
+                        workOrderFulfillments: {
+                            include: {
+                                workOrder: {
+                                    select: { status: true }
+                                }
+                            }
+                        }
+                    }
                 });
 
-                if (!pr) continue;
+                for (const pr of linkedProductionRequests) {
+                    if (pr.status === ProductionRequestStatus.FULFILLED || pr.status === ProductionRequestStatus.CANCELLED) {
+                        continue;
+                    }
 
-                // Calculate Valid Fulfilled Quantity (excluding THIS cancelled WO and any other cancelled ones)
-                const activeFulfillments = pr.workOrderFulfillments.filter(f =>
-                    f.workOrderId !== id && // Exclude current being cancelled
-                    f.workOrder.status !== WorkOrderStatus.CANCELLED // Exclude historically cancelled
-                );
+                    const hasInProgressWorkOrder = pr.workOrderFulfillments.some(
+                        fulfillment => fulfillment.workOrder.status === WorkOrderStatus.IN_PROGRESS
+                    );
 
-                const validFulfilledQty = activeFulfillments.reduce((sum, f) => sum + f.quantity, 0);
+                    const nextStatus = hasInProgressWorkOrder
+                        ? ProductionRequestStatus.IN_PROGRESS
+                        : ProductionRequestStatus.APPROVED;
 
-                let newStatus: UpdatableProductionRequestStatus = ProductionRequestStatus.APPROVED;
+                    if (pr.status !== nextStatus) {
+                        await tx.productionRequest.update({
+                            where: { productionRequestId: pr.productionRequestId },
+                            data: { status: nextStatus }
+                        });
+                    }
+                }
+            }
 
-                if (validFulfilledQty >= pr.quantity) {
-                    newStatus = ProductionRequestStatus.FULFILLED;
-                } else if (validFulfilledQty > 0) {
-                    newStatus = ProductionRequestStatus.IN_PROGRESS;
-                } else {
-                    newStatus = ProductionRequestStatus.APPROVED;
+            // 4. Roll back linked Sales Order from IN_PROGRESS -> APPROVED when no PR remains IN_PROGRESS
+            const linkedSalesOrderIds = [
+                ...new Set(
+                    wo.workOrderFulfillments
+                        .map(f => f.productionRequest.salesOrderDetail?.salesOrderId)
+                        .filter((salesOrderId): salesOrderId is number => salesOrderId != null)
+                )
+            ];
+
+            if (linkedSalesOrderIds.length > 0) {
+                const productionRequestsForLinkedSalesOrders = await tx.productionRequest.findMany({
+                    where: {
+                        salesOrderDetail: {
+                            salesOrderId: { in: linkedSalesOrderIds }
+                        }
+                    },
+                    include: {
+                        salesOrderDetail: {
+                            select: { salesOrderId: true }
+                        }
+                    }
+                });
+
+                const salesOrdersWithInProgressRequests = new Set<number>();
+                for (const pr of productionRequestsForLinkedSalesOrders) {
+                    const salesOrderId = pr.salesOrderDetail?.salesOrderId;
+                    if (salesOrderId != null && pr.status === ProductionRequestStatus.IN_PROGRESS) {
+                        salesOrdersWithInProgressRequests.add(salesOrderId);
+                    }
                 }
 
-                if (pr.status !== newStatus) {
-                    await tx.productionRequest.update({
-                        where: { productionRequestId: pr.productionRequestId },
-                        data: { status: newStatus }
+                const rollbackSalesOrderIds = linkedSalesOrderIds.filter(
+                    salesOrderId => !salesOrdersWithInProgressRequests.has(salesOrderId)
+                );
+
+                if (rollbackSalesOrderIds.length > 0) {
+                    await tx.salesOrder.updateMany({
+                        where: {
+                            salesOrderId: { in: rollbackSalesOrderIds },
+                            status: SalesOrderStatus.IN_PROGRESS
+                        },
+                        data: { status: SalesOrderStatus.APPROVED }
                     });
                 }
             }

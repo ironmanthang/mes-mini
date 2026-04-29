@@ -50,7 +50,7 @@ jobs:
 
       - name: Install Backend Dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install
 
       - name: Apply Pending Migrations (Safe)
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_mode == 'migrate-only' || github.event.inputs.deploy_mode == 'migrate-and-deploy'

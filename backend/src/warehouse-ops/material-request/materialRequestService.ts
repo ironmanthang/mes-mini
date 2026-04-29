@@ -1,5 +1,16 @@
 import prisma from '../../common/lib/prisma.js';
-import { RequestStatus, NotificationType } from '../../generated/prisma/index.js';
+import {
+    MaterialRequestStatus,
+    NotificationType,
+    InventoryTransactionType,
+    Prisma
+} from '../../generated/prisma/index.js';
+
+export interface LotConsumption {
+    componentId: number;
+    lotCode: string;
+    quantity: number;
+}
 
 class MaterialRequestService {
 
@@ -22,8 +33,26 @@ class MaterialRequestService {
      *   FALLBACK: If a PR has no snapshot (created before this feature), we fall back
      *   to the master BOM for that fulfillment to avoid breaking existing data.
      */
-    async createFromWorkOrder(workOrderId: number, userId: number) {
-        const wo = await prisma.workOrder.findUnique({
+    async createFromWorkOrder(workOrderId: number, _userId: number, tx?: Prisma.TransactionClient) {
+        const db = tx || prisma;
+
+        const existingPendingRequest = await db.materialRequest.findFirst({
+            where: {
+                workOrderId,
+                status: MaterialRequestStatus.PENDING
+            },
+            include: {
+                details: {
+                    include: { component: true }
+                }
+            }
+        });
+
+        if (existingPendingRequest) {
+            return existingPendingRequest;
+        }
+
+        const wo = await db.workOrder.findUnique({
             where: { workOrderId },
             include: {
                 product: true,
@@ -57,7 +86,7 @@ class MaterialRequestService {
                 } else {
                     // Fallback path: PR has no snapshot (legacy data).
                     // Use master BOM × fulfillment quantity.
-                    const bom = await prisma.billOfMaterial.findMany({
+                    const bom = await db.billOfMaterial.findMany({
                         where: { productId: pr.productId }
                     });
                     for (const item of bom) {
@@ -70,7 +99,7 @@ class MaterialRequestService {
         } else {
             // ── No linked PRs: standalone WO (Make-to-Stock, not linked to any PR) ──
             // Fall back to master BOM × WO quantity.
-            const bom = await prisma.billOfMaterial.findMany({
+            const bom = await db.billOfMaterial.findMany({
                 where: { productId: wo.productId },
                 include: { component: true }
             });
@@ -90,12 +119,11 @@ class MaterialRequestService {
 
         const code = `MAT-REQ-${wo.code}`;
 
-        return await prisma.materialExportRequest.create({
+        return await db.materialRequest.create({
             data: {
                 code,
                 workOrderId,
-                requesterId: userId,
-                status: 'PENDING',
+                status: MaterialRequestStatus.PENDING,
                 details: {
                     create: Array.from(componentTotals.entries()).map(([componentId, quantity]) => ({
                         componentId,
@@ -107,21 +135,107 @@ class MaterialRequestService {
         });
     }
 
-    // 2. Warehouse Staff Approves -> Deducts Stock from specified Warehouse
-    async approveRequest(requestId: number, approverId: number, warehouseId: number) {
-        return await prisma.$transaction(async (tx) => {
-            const req = await tx.materialExportRequest.findUnique({
+    // Step 1. Warehouse staff validates sufficiency before issuing stock
+    async validateRequest(requestId: number, warehouseId: number) {
+        const req = await prisma.materialRequest.findUnique({
+            where: { requestId },
+            include: {
+                details: {
+                    include: {
+                        component: {
+                            select: {
+                                code: true,
+                                componentName: true,
+                                unit: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!req) throw new Error('Request not found');
+        if (req.status !== MaterialRequestStatus.PENDING) {
+            throw new Error(`Cannot validate. Status is ${req.status}`);
+        }
+
+        const lineChecks = await Promise.all(req.details.map(async (detail) => {
+            const stock = await prisma.componentStock.findUnique({
+                where: {
+                    warehouseId_componentId: {
+                        warehouseId,
+                        componentId: detail.componentId
+                    }
+                }
+            });
+
+            const available = stock?.quantity || 0;
+            const missingQuantity = Math.max(detail.quantity - available, 0);
+
+            const availableLots = await prisma.componentLot.findMany({
+                where: { 
+                    warehouseId, 
+                    componentId: detail.componentId,
+                    currentQuantity: { gt: 0 }
+                },
+                select: {
+                    lotCode: true,
+                    currentQuantity: true
+                }
+            });
+
+            return {
+                componentId: detail.componentId,
+                componentCode: detail.component.code,
+                componentName: detail.component.componentName,
+                unit: detail.component.unit,
+                requiredQuantity: detail.quantity,
+                availableQuantity: available,
+                missingQuantity,
+                isSufficient: missingQuantity === 0,
+                availableLots
+            };
+        }));
+
+        return {
+            requestId: req.requestId,
+            code: req.code,
+            status: req.status,
+            warehouseId,
+            canIssue: lineChecks.every(line => line.isSufficient),
+            lines: lineChecks
+        };
+    }
+
+    // Step 2. Complete issue and deduct stock atomically
+    async completeRequest(requestId: number, approverId: number, warehouseId: number, consumedLots: LotConsumption[]) {
+        const completionResult = await prisma.$transaction(async (tx) => {
+            const req = await tx.materialRequest.findUnique({
                 where: { requestId },
                 include: { details: true }
             });
 
             if (!req) throw new Error("Request not found");
-            if (req.status !== 'PENDING') throw new Error(`Cannot approve. Status is ${req.status}`);
+            if (req.status !== MaterialRequestStatus.PENDING) throw new Error(`Cannot complete issue. Status is ${req.status}`);
 
-            // A. Check & Deduct Stock
+            // A. Validate stock sufficiency and Lot mapping
+            const aggregatedLots = new Map<number, number>();
+            for (const lot of consumedLots) {
+                if (lot.quantity <= 0) throw new Error(`Lot ${lot.lotCode} must have a positive consumption quantity.`);
+                const current = aggregatedLots.get(lot.componentId) || 0;
+                aggregatedLots.set(lot.componentId, current + lot.quantity);
+            }
+
             for (const detail of req.details) {
-                // Find stock in Main Warehouse (ID 1 for now)
-                // In real life, we might search across warehouses or pick specific batch
+                const consumedTotal = aggregatedLots.get(detail.componentId) || 0;
+                if (consumedTotal !== detail.quantity) {
+                    throw new Error(
+                        `Lot quantities provided do not match the required amount for Component ID ${detail.componentId}. ` +
+                        `Required: ${detail.quantity}, Provided: ${consumedTotal}`
+                    );
+                }
+
+                // Aggregate check is still good to ensure we don't go negative overall
                 const stock = await tx.componentStock.findUnique({
                     where: {
                         warehouseId_componentId: {
@@ -132,90 +246,140 @@ class MaterialRequestService {
                 });
 
                 if (!stock || stock.quantity < detail.quantity) {
-                    throw new Error(`Insufficient stock for Component ID ${detail.componentId}. Needed: ${detail.quantity}, Available: ${stock?.quantity || 0}`);
+                    throw new Error(`Insufficient aggregate stock for Component ID ${detail.componentId}. Needed: ${detail.quantity}, Available: ${stock?.quantity || 0}`);
                 }
+            }
 
-                // Update Stock
-                await tx.componentStock.update({
+            // A.2 Validate specific Lots
+            for (const lot of consumedLots) {
+                const dbLot = await tx.componentLot.findUnique({
+                    where: { lotCode: lot.lotCode }
+                });
+
+                if (!dbLot) throw new Error(`Lot ${lot.lotCode} does not exist.`);
+                if (dbLot.warehouseId !== warehouseId) throw new Error(`Lot ${lot.lotCode} is not in warehouse ${warehouseId}.`);
+                if (dbLot.componentId !== lot.componentId) throw new Error(`Lot ${lot.lotCode} does not contain Component ID ${lot.componentId}.`);
+                if (dbLot.currentQuantity < lot.quantity) {
+                    throw new Error(`Lot ${lot.lotCode} has insufficient quantity. Needed: ${lot.quantity}, Available: ${dbLot.currentQuantity}`);
+                }
+            }
+
+            // B. Deduct stock and write immutable inventory transactions
+            // 1. Decrement aggregate stock
+            for (const detail of req.details) {
+                const updatedStock = await tx.componentStock.updateMany({
                     where: {
-                        warehouseId_componentId: {
-                            warehouseId,
-                            componentId: detail.componentId
-                        }
+                        warehouseId,
+                        componentId: detail.componentId,
+                        quantity: { gte: detail.quantity }
                     },
                     data: { quantity: { decrement: detail.quantity } }
                 });
 
-                // B. Log Transaction
+                if (updatedStock.count === 0) {
+                    throw new Error(`Concurrent stock update detected for Component ID ${detail.componentId}.`);
+                }
+            }
+
+            // 2. Decrement lots and write lot-specific transactions
+            for (const lot of consumedLots) {
+                const dbLot = await tx.componentLot.update({
+                    where: { lotCode: lot.lotCode },
+                    data: { currentQuantity: { decrement: lot.quantity } },
+                    select: { componentLotId: true }
+                });
+
                 await tx.inventoryTransaction.create({
                     data: {
-                        transactionType: 'EXPORT_PRODUCTION',
-                        quantity: detail.quantity,
-                        componentId: detail.componentId,
+                        transactionType: InventoryTransactionType.EXPORT_PRODUCTION,
+                        quantity: lot.quantity,
+                        componentId: lot.componentId,
+                        componentLotId: dbLot.componentLotId,
                         warehouseId,
                         employeeId: approverId,
                         materialReqId: requestId,
-                        note: `Issued for Request ${req.code}`
+                        note: `Issued for Request ${req.code}.`
                     }
                 });
             }
 
-            // C. Update Request Status
-            const updatedRequest = await tx.materialExportRequest.update({
+            // C. Mark request as issued
+            const requestAfterIssue = await tx.materialRequest.update({
                 where: { requestId },
                 data: {
-                    status: 'APPROVED',
-                    approverId: approverId
+                    status: MaterialRequestStatus.ISSUED,
+                    completedById: approverId,
+                    completedAt: new Date()
                 }
             });
 
-            // D. Notify the requester that materials have been issued
+            return {
+                requestAfterIssue,
+                issuedRequestCode: req.code
+            };
+        });
+
+        try {
             const NotificationService = (await import('../../notifications/notificationService.js')).default;
             await NotificationService.createNotification({
                 type: NotificationType.MATERIAL_ISSUED,
                 title: 'Materials Issued',
-                message: `Materials for ${req.code} have been issued from warehouse.`,
-                employeeId: req.requesterId,
+                message: `Materials for ${completionResult.issuedRequestCode} have been issued from warehouse.`,
+                employeeId: approverId,
                 relatedEntityType: 'MaterialRequest',
                 relatedEntityId: requestId
             });
+        } catch {
+            // Non-critical side effect; stock transaction has already committed.
+        }
 
-            return updatedRequest;
-        });
+        return completionResult.requestAfterIssue;
     }
+
 
     async getRequests(query: { page?: number; limit?: number; status?: string } = {}) {
         const { getPaginationParams, createPaginatedResponse } = await import('../../common/utils/pagination.js');
         const { page, limit, skip } = getPaginationParams(query);
 
         const where: any = {};
-        if (query.status) where.status = query.status;
+        if (query.status) {
+            const status = String(query.status).toUpperCase();
+            if (!Object.values(MaterialRequestStatus).includes(status as MaterialRequestStatus)) {
+                throw new Error(`Invalid Material Request status: ${query.status}`);
+            }
+            where.status = status as MaterialRequestStatus;
+        }
 
         const [data, total] = await Promise.all([
-            prisma.materialExportRequest.findMany({
+            prisma.materialRequest.findMany({
                 where,
                 skip,
                 take: limit,
                 orderBy: { requestDate: 'desc' },
                 include: {
                     workOrder: { select: { code: true } },
-                    requester: { select: { fullName: true } },
+                    completedBy: { select: { fullName: true } },
                     _count: { select: { details: true } }
                 }
             }),
-            prisma.materialExportRequest.count({ where })
+            prisma.materialRequest.count({ where })
         ]);
 
         return createPaginatedResponse(data, total, page, limit);
     }
 
     async getRequestById(id: number) {
-        const req = await prisma.materialExportRequest.findUnique({
+        const req = await prisma.materialRequest.findUnique({
             where: { requestId: id },
             include: {
                 details: { include: { component: true } },
-                workOrder: true,
-                requester: { select: { fullName: true } }
+                workOrder: {
+                    select: {
+                        code: true,
+                        product: { select: { productName: true, code: true } }
+                    }
+                },
+                completedBy: { select: { fullName: true } }
             }
         });
         if (!req) throw new Error("Request not found");
@@ -226,7 +390,7 @@ class MaterialRequestService {
      * Get formatted data for Dispatch Slip printing
      */
     async getDispatchSlip(id: number) {
-        const req = await prisma.materialExportRequest.findUnique({
+        const req = await prisma.materialRequest.findUnique({
             where: { requestId: id },
             include: {
                 details: {
@@ -246,13 +410,12 @@ class MaterialRequestService {
                         product: { select: { productName: true, code: true } }
                     }
                 },
-                requester: { select: { fullName: true } },
-                approver: { select: { fullName: true } }
+                completedBy: { select: { fullName: true } }
             }
         });
 
         if (!req) throw new Error("Material Request not found");
-        if (req.status !== 'APPROVED') throw new Error("Cannot generate slip for non-approved request");
+        if (req.status !== MaterialRequestStatus.ISSUED) throw new Error("Cannot generate slip for non-issued request");
 
         // Format for printing
         return {
@@ -262,9 +425,9 @@ class MaterialRequestService {
             workOrder: req.workOrder?.code || 'N/A',
             product: req.workOrder?.product?.productName || 'N/A',
             productCode: req.workOrder?.product?.code || 'N/A',
-            requester: req.requester?.fullName || 'N/A',
-            approver: req.approver?.fullName || 'N/A',
-            items: req.details.map(d => ({
+            requester: 'N/A',
+            approver: req.completedBy?.fullName || 'N/A',
+            items: req.details.map((d: any) => ({
                 code: d.component.code,
                 name: d.component.componentName,
                 unit: d.component.unit,

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from '../../src/common/lib/prisma.js';
 import { PERM } from '../../src/common/constants/permissions.js';
-import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType } from '../../src/generated/prisma/index.js';
+import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType, ProductInstanceStatus, MaterialRequestStatus } from '../../src/generated/prisma/index.js';
 
 // ============================================================================
 // 🎛️ CENTRAL CONTROL PANEL
@@ -25,6 +25,7 @@ const SEED_CONFIG = {
     PURCHASE_ORDERS: true,
     SALES_ORDERS: true,
     PRODUCTION_REQUESTS: true,
+    MATERIAL_REQUESTS: true, // NEW: Control for material request seeding
 };
 
 const DEFAULT_PASSWORD = '123456';
@@ -63,9 +64,75 @@ async function main(): Promise<void> {
     if (SEED_CONFIG.PRODUCTION_REQUESTS) await seedDemoProductionRequests();
     if (SEED_CONFIG.PURCHASE_ORDERS) await seedDemoPurchaseOrders();
     
+    // NEW: Seed Material Requests for all WOs
+    if (SEED_CONFIG.MATERIAL_REQUESTS) await seedMaterialRequests();
+
     await seedCodeSequences();
 
     console.log('Seeding Completed.');
+}
+
+// ============================================================================
+// 21. SEED MATERIAL REQUESTS (Rule: WO started/completed must have ISSUED MR)
+// ============================================================================
+async function seedMaterialRequests(): Promise<void> {
+    console.log('...Seeding Material Requests (Rule: WOs must have MRs)');
+    
+    const workOrders = await prisma.workOrder.findMany({
+        where: { status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+        include: { product: { include: { bom: true } } }
+    });
+
+    const whMain = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
+    const admin = await prisma.employee.findFirst({ where: { username: 'admin' } });
+
+    for (const wo of workOrders) {
+        // Create MR if not exists
+        const mrStatus = wo.status === 'COMPLETED' ? MaterialRequestStatus.ISSUED : MaterialRequestStatus.PENDING;
+        
+        const mr = await prisma.materialRequest.upsert({
+            where: { workOrderId: wo.workOrderId },
+            update: { status: mrStatus },
+            create: {
+                code: `MR-${wo.code}`,
+                workOrderId: wo.workOrderId,
+                status: mrStatus,
+                requestDate: new Date(),
+                note: `Auto-seeded for ${wo.code}`
+            }
+        });
+
+        // Create Details
+        for (const b of wo.product.bom) {
+            const qty = b.quantityNeeded * wo.quantity;
+            await prisma.materialRequestDetail.upsert({
+                where: { detailId: -1 }, // Dummy check
+                update: {},
+                create: {
+                    requestId: mr.requestId,
+                    componentId: b.componentId,
+                    quantity: qty
+                }
+            });
+
+            // If ISSUED, create audit transaction
+            if (mrStatus === MaterialRequestStatus.ISSUED && whMain && admin) {
+                await prisma.inventoryTransaction.create({
+                    data: {
+                        transactionDate: new Date(),
+                        quantity: qty,
+                        note: `Issued for ${wo.code}`,
+                        employeeId: admin.employeeId,
+                        warehouseId: whMain.warehouseId,
+                        componentId: b.componentId,
+                        transactionType: InventoryTransactionType.EXPORT_PRODUCTION,
+                        materialReqId: mr.requestId
+                    }
+                });
+            }
+        }
+    }
+    console.log(`   ✓ ${workOrders.length} material requests generated`);
 }
 
 // ============================================================================
@@ -80,6 +147,24 @@ async function seedProductInstances(): Promise<void> {
 
     // We must link instances to a Production Batch (Traceability)
     const admin = await prisma.employee.findFirst();
+    const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
+    const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
+    const line = await prisma.productionLine.findFirst();
+
+    // Create a dummy PR for genealogy (MTS)
+    const pr = await prisma.productionRequest.upsert({
+        where: { code: 'PR-OPENING-STOCK-LAPTOP' },
+        update: {},
+        create: {
+            code: 'PR-OPENING-STOCK-LAPTOP',
+            productId: laptop.productId,
+            quantity: 50,
+            status: ProductionRequestStatus.FULFILLED,
+            priority: Priority.MEDIUM,
+            employeeId: admin?.employeeId || 1,
+            note: 'Opening Stock PR'
+        }
+    });
 
     // Create Dummy Work Order (Required parent for Batch)
     const workOrder = await prisma.workOrder.upsert({
@@ -90,8 +175,18 @@ async function seedProductInstances(): Promise<void> {
             quantity: 50,
             employeeId: admin?.employeeId || 1,
             productId: laptop.productId,
-            status: 'COMPLETED'
+            status: 'COMPLETED',
+            productionLineId: line?.productionLineId,
+            targetSalesWarehouseId: fgWarehouse?.warehouseId,
+            targetErrorWarehouseId: defectWarehouse?.warehouseId
         }
+    });
+
+    // Link WO to PR
+    await prisma.workOrderFulfillment.upsert({
+        where: { workOrderId_productionRequestId: { workOrderId: workOrder.workOrderId, productionRequestId: pr.productionRequestId } },
+        update: {},
+        create: { workOrderId: workOrder.workOrderId, productionRequestId: pr.productionRequestId, quantity: 50 }
     });
 
     // Create Dummy Production Batch
@@ -110,9 +205,10 @@ async function seedProductInstances(): Promise<void> {
         instancesData.push({
             productId: laptop.productId,
             serialNumber: `SN-${new Date().getFullYear()}-LAPTOP-${i.toString().padStart(4, '0')}`,
-            status: 'IN_STOCK' as const, // Force Literal Type
+            status: ProductInstanceStatus.IN_STOCK_SALES,
             unitProductionCost: 1500000, // Mock cost
-            productionBatchId: prodBatch.productionBatchId // REQUIRED LINK
+            productionBatchId: prodBatch.productionBatchId, // REQUIRED LINK
+            warehouseId: fgWarehouse?.warehouseId // FIXED: added warehouse
         });
     }
 
@@ -209,6 +305,8 @@ async function seedPermissions(): Promise<void> {
         ST_READ:           'View stocktakes',
         ST_CREATE:         'Create stocktakes',
         ST_COMPLETE:       'Complete/approve stocktakes',
+        TR_READ:           'View transfer requests',
+        TR_MANAGE:         'Create & complete transfer requests',
         ATTACH_UPLOAD:     'Upload attachments',
         ATTACH_DELETE_ANY: 'Delete any user\'s attachments (admin override)',
         NOTIF_READ:        'Read own notifications',
@@ -265,6 +363,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.QC_READ, PERM.WH_STOCK_READ,
             PERM.MR_READ, PERM.MR_APPROVE,
             PERM.ST_READ, PERM.DASH_READ,
+            PERM.TR_READ,
             PERM.PRODUCT_READ, PERM.PRODUCT_CREATE, PERM.PRODUCT_UPDATE,
             PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
             PERM.SUPPLIER_READ,
@@ -273,6 +372,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.WH_STOCK_READ, PERM.WH_STOCK_ADJUST, PERM.WH_MANAGE,
             PERM.MR_READ, PERM.MR_CREATE, PERM.MR_APPROVE,
             PERM.ST_READ, PERM.ST_CREATE, PERM.ST_COMPLETE,
+            PERM.TR_READ, PERM.TR_MANAGE,
             PERM.PO_RECEIVE, PERM.SO_SHIP,
             PERM.ATTACH_UPLOAD,
             PERM.PRODUCT_READ,
@@ -283,6 +383,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.WO_READ, PERM.WO_UPDATE,
             PERM.LINE_READ, PERM.QC_READ,
             PERM.MR_READ, PERM.MR_CREATE,
+            PERM.TR_READ,
             PERM.PRODUCT_READ, PERM.COMP_READ,
         ],
         PROD_WORKER: [
@@ -649,27 +750,11 @@ async function seedProductionScenarios(): Promise<void> {
         });
 
         // Ensure Warehouse Stock matches "minStockLevel" for this scenario
-        // In a real app, minStockLevel is a threshold, but here we use it as "Current Stock" 
-        // because the seed logic below sets it.
-        // Let's actually set the Warehouse Stock properly.
         const warehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
         const comp = await prisma.component.findUnique({ where: { code: c.code } });
 
-        if (warehouse && comp) {
-            await prisma.componentStock.upsert({
-                where: {
-                    warehouseId_componentId: {
-                        warehouseId: warehouse.warehouseId,
-                        componentId: comp.componentId
-                    }
-                },
-                update: { quantity: c.stock },
-                create: {
-                    warehouseId: warehouse.warehouseId,
-                    componentId: comp.componentId,
-                    quantity: c.stock
-                }
-            });
+        if (warehouse && comp && c.stock > 0) {
+            await injectComponentStock(comp.componentId, warehouse.warehouseId, c.stock, `LOT-SCENARIO-${c.code}`);
         }
     }
 
@@ -787,14 +872,8 @@ async function seedProductionScenarios(): Promise<void> {
     // Put components in warehouse
     const mainWh = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
     if (mainWh) {
-        await prisma.componentStock.upsert({
-            where: { warehouseId_componentId: { warehouseId: mainWh.warehouseId, componentId: screen.componentId } },
-            update: { quantity: 100 }, create: { warehouseId: mainWh.warehouseId, componentId: screen.componentId, quantity: 100 }
-        });
-        await prisma.componentStock.upsert({
-            where: { warehouseId_componentId: { warehouseId: mainWh.warehouseId, componentId: battery.componentId } },
-            update: { quantity: 100 }, create: { warehouseId: mainWh.warehouseId, componentId: battery.componentId, quantity: 100 }
-        });
+        await injectComponentStock(screen.componentId, mainWh.warehouseId, 100, 'LOT-INIT-SCREEN');
+        await injectComponentStock(battery.componentId, mainWh.warehouseId, 100, 'LOT-INIT-BATTERY');
     }
 
     // Link BOM for Smartwatch
@@ -996,11 +1075,7 @@ async function seedDemoComponentStock(): Promise<void> {
     for (const entry of stockEntries) {
         const comp = await prisma.component.findUnique({ where: { code: entry.componentCode } });
         if (comp) {
-            await prisma.componentStock.upsert({
-                where: { warehouseId_componentId: { warehouseId: warehouse.warehouseId, componentId: comp.componentId } },
-                update: { quantity: entry.qty },
-                create: { warehouseId: warehouse.warehouseId, componentId: comp.componentId, quantity: entry.qty }
-            });
+            await injectComponentStock(comp.componentId, warehouse.warehouseId, entry.qty, `LOT-DEMO-${entry.componentCode}`);
         }
     }
     console.log('   ✓ Demo component stock seeded');
@@ -1020,11 +1095,45 @@ async function seedDemoProductInstances(): Promise<void> {
         const product = await prisma.product.findUnique({ where: { code: productCode } });
         if (!product) return;
 
+        const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
+        const line = await prisma.productionLine.findFirst();
+
+        // Create PR for traceability
+        const pr = await prisma.productionRequest.upsert({
+            where: { code: `PR-DEMO-${prefix}` },
+            update: {},
+            create: {
+                code: `PR-DEMO-${prefix}`,
+                productId: product.productId,
+                quantity: count,
+                status: ProductionRequestStatus.FULFILLED,
+                priority: Priority.LOW,
+                employeeId: admin!.employeeId,
+                note: `Demo Opening Stock for ${productCode}`
+            }
+        });
+
         const woCode = `WO-DEMO-${prefix}`;
         const wo = await prisma.workOrder.upsert({
             where: { code: woCode },
             update: {},
-            create: { code: woCode, quantity: count, employeeId: admin!.employeeId, productId: product.productId, status: 'COMPLETED' }
+            create: { 
+                code: woCode, 
+                quantity: count, 
+                employeeId: admin!.employeeId, 
+                productId: product.productId, 
+                status: 'COMPLETED',
+                productionLineId: line?.productionLineId,
+                targetSalesWarehouseId: warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId
+            }
+        });
+
+        // Link WO to PR
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: pr.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: pr.productionRequestId, quantity: count }
         });
 
         const batchCode = `BATCH-DEMO-${prefix}`;
@@ -1040,7 +1149,7 @@ async function seedDemoProductInstances(): Promise<void> {
             instances.push({
                 productId: product.productId,
                 serialNumber: `SN-DEMO-${prefix}-${i.toString().padStart(4, '0')}`,
-                status: 'IN_STOCK' as const,
+                status: ProductInstanceStatus.IN_STOCK_SALES,
                 unitProductionCost: 1200000,
                 productionBatchId: batch.productionBatchId,
                 warehouseId: warehouseId
@@ -1225,13 +1334,13 @@ async function seedDemoSalesOrders(): Promise<void> {
     const soSeeds: SOSeed[] = [
         { code: 'SO-2026-901', agentCode: 'AGT-002', status: SalesOrderStatus.APPROVED, priority: Priority.MEDIUM, approved: false,
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 5, price: 15000000, shipped: 0 }] },
-        { code: 'SO-2026-902', agentCode: 'AGT-003', status: SalesOrderStatus.PENDING_APPROVAL, priority: Priority.HIGH, approved: false,
+        { code: 'SO-2026-902', agentCode: 'AGT-003', status: SalesOrderStatus.PENDING, priority: Priority.HIGH, approved: false,
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 10, price: 14500000, shipped: 0 }] },
         { code: 'SO-2026-903', agentCode: 'AGT-004', status: SalesOrderStatus.APPROVED, priority: Priority.HIGH, approved: true,
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 3, price: 15000000, shipped: 0 }] },
-        { code: 'SO-2026-904', agentCode: 'AGT-005', status: SalesOrderStatus.IN_PROGRESS, priority: Priority.MEDIUM, approved: true,
+        { code: 'SO-2026-904', agentCode: 'AGT-005', status: SalesOrderStatus.PARTIALLY_SHIPPED, priority: Priority.MEDIUM, approved: true, // FIXED: PARTIALLY_SHIPPED
             items: [{ productCode: 'PROD-LAPTOP-X1', qty: 8, price: 14000000, shipped: 3 }] },
-        { code: 'SO-2026-905', agentCode: 'AGT-002', status: SalesOrderStatus.COMPLETED, priority: Priority.LOW, approved: true,
+        { code: 'SO-2026-905', agentCode: 'AGT-002', status: SalesOrderStatus.SHIPPED, priority: Priority.LOW, approved: true,
             items: [{ productCode: 'PROD-GAMING-PC', qty: 2, price: 25000000, shipped: 2 }] },
         { code: 'SO-2026-906', agentCode: 'AGT-006', status: SalesOrderStatus.CANCELLED, priority: Priority.MEDIUM, approved: false,
             note: '[CANCELLED 2026-03-05 by User 6]: Customer withdrew the order.',
@@ -1240,8 +1349,10 @@ async function seedDemoSalesOrders(): Promise<void> {
             items: [{ productCode: 'PROD-TABLET-A1', qty: 20, price: 8000000, shipped: 0 }] },
         { code: 'SO-2026-908', agentCode: 'AGT-004', status: SalesOrderStatus.APPROVED, priority: Priority.HIGH, approved: true,
             items: [{ productCode: 'PROD-DESKTOP-Z5', qty: 5, price: 35000000, shipped: 0 }] },
-        { code: 'SO-2026-909', agentCode: 'AGT-005', status: SalesOrderStatus.PENDING_APPROVAL, priority: Priority.MEDIUM, approved: false,
+        { code: 'SO-2026-909', agentCode: 'AGT-005', status: SalesOrderStatus.PENDING, priority: Priority.MEDIUM, approved: false,
             items: [{ productCode: 'PROD-MONITOR-M1', qty: 10, price: 12000000, shipped: 0 }, { productCode: 'PROD-LAPTOP-X1', qty: 2, price: 15000000, shipped: 0 }] },
+        { code: 'SO-2026-910', agentCode: 'AGT-006', status: SalesOrderStatus.IN_PROGRESS, priority: Priority.HIGH, approved: true, // NEW: IN_PROGRESS with 0 shipped
+            items: [{ productCode: 'PROD-SMARTWATCH', qty: 5, price: 5000000, shipped: 0 }] },
     ];
 
     for (const so of soSeeds) {
@@ -1263,7 +1374,7 @@ async function seedDemoSalesOrders(): Promise<void> {
             });
         }
 
-        await prisma.salesOrder.upsert({
+        const createdSo = await prisma.salesOrder.upsert({
             where: { code: so.code },
             update: {},
             create: {
@@ -1280,8 +1391,31 @@ async function seedDemoSalesOrders(): Promise<void> {
                 approvedAt: so.approved ? new Date() : null,
                 note: so.note || null,
                 details: { create: detailsData },
-            }
+            },
+            include: { details: true }
         });
+
+        // FIXED: Phantom Shipments - Create actual SHIPPED instances linked to SO
+        for (const detail of createdSo.details) {
+            if (detail.quantityShipped > 0) {
+                // Find some available IN_STOCK_SALES items for this product
+                const availableInstances = await prisma.productInstance.findMany({
+                    where: { productId: detail.productId, status: ProductInstanceStatus.IN_STOCK_SALES },
+                    take: detail.quantityShipped
+                });
+
+                if (availableInstances.length > 0) {
+                    await prisma.productInstance.updateMany({
+                        where: { productInstanceId: { in: availableInstances.map(i => i.productInstanceId) } },
+                        data: {
+                            status: ProductInstanceStatus.SHIPPED,
+                            salesOrderId: createdSo.salesOrderId,
+                            warehouseId: null // Left the building
+                        }
+                    });
+                }
+            }
+        }
     }
     console.log(`   ✓ ${soSeeds.length} demo sales orders created`);
 }
@@ -1322,7 +1456,7 @@ async function seedDemoProductionRequests(): Promise<void> {
             soDetailId: null, note: 'Manual Request (MTS); Cancelled: Forecast revised down' },
         { code: 'PR-20260310-0007', productCode: 'PROD-MONITOR-M1', qty: 25, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.MEDIUM,
             soDetailId: null, note: 'Manual Request (MTS) — partial WO created' },
-        { code: 'PR-20260310-0008', productCode: 'PROD-LAPTOP-X1', qty: 50, status: ProductionRequestStatus.FULFILLED, priority: Priority.HIGH,
+        { code: 'PR-20260310-0008', productCode: 'PROD-LAPTOP-X1', qty: 50, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.HIGH, // FIXED: Downgraded to IN_PROGRESS
             soDetailId: null, note: 'Manual Request (MTS) — fully converted to WO' },
     ];
 
@@ -1364,6 +1498,8 @@ async function seedDemoProductionRequests(): Promise<void> {
     const monitor = await prod('PROD-MONITOR-M1');
     const laptop = await prod('PROD-LAPTOP-X1');
     const line = await prisma.productionLine.findFirst();
+    const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
+    const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
 
     if (prPartial && monitor && line) {
         const wo = await prisma.workOrder.upsert({
@@ -1373,6 +1509,8 @@ async function seedDemoProductionRequests(): Promise<void> {
                 code: 'WO-DEMO-PR007', quantity: 10, employeeId: manager.employeeId,
                 productId: monitor.productId, productionLineId: line.productionLineId,
                 status: 'IN_PROGRESS',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId
             }
         });
         await prisma.workOrderFulfillment.upsert({
@@ -1389,7 +1527,9 @@ async function seedDemoProductionRequests(): Promise<void> {
             create: {
                 code: 'WO-DEMO-PR008', quantity: 50, employeeId: manager.employeeId,
                 productId: laptop.productId, productionLineId: line.productionLineId,
-                status: 'COMPLETED',
+                status: 'IN_PROGRESS', // FIXED: Downgraded to IN_PROGRESS
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId
             }
         });
         await prisma.workOrderFulfillment.upsert({
@@ -1420,6 +1560,98 @@ async function seedCodeSequences(): Promise<void> {
         });
     }
     console.log('   ✓ Code Sequences initialized');
+}
+
+// ============================================================================
+// 22. HELPER: INJECT COMPONENT STOCK WITH LOT TRACEABILITY
+// ============================================================================
+async function injectComponentStock(componentId: number, warehouseId: number, quantity: number, lotCodePrefix: string) {
+    if (quantity <= 0) return;
+
+    const admin = await prisma.employee.findFirst({ where: { username: 'admin' } });
+    const supplier = await prisma.supplier.findFirst();
+
+    // 1. Ensure "Opening Stock" PO exists to satisfy schema constraint (ComponentLot -> PODetail)
+    const openingPo = await prisma.purchaseOrder.upsert({
+        where: { code: 'PO-OPENING-STOCK' },
+        update: {},
+        create: {
+            code: 'PO-OPENING-STOCK',
+            supplierId: supplier?.supplierId || 1,
+            employeeId: admin?.employeeId || 1,
+            status: PurchaseOrderStatus.COMPLETED,
+            warehouseId: warehouseId,
+            totalAmount: 0,
+            orderDate: new Date('2026-01-01'),
+        }
+    });
+
+    // 2. Ensure PO Detail exists
+    const poDetail = await prisma.purchaseOrderDetail.upsert({
+        where: {
+            purchaseOrderId_componentId: {
+                purchaseOrderId: openingPo.purchaseOrderId,
+                componentId: componentId
+            }
+        },
+        update: {
+            quantityReceived: { increment: quantity }
+        },
+        create: {
+            purchaseOrderId: openingPo.purchaseOrderId,
+            componentId: componentId,
+            quantityOrdered: quantity,
+            quantityReceived: quantity,
+            unitPrice: 0
+        }
+    });
+
+    // 3. Update Aggregate Stock (Hard Reset for Seed Idempotency)
+    await prisma.componentStock.upsert({
+        where: { warehouseId_componentId: { warehouseId, componentId } },
+        update: { quantity },
+        create: { warehouseId, componentId, quantity }
+    });
+
+    // 4. Create Traceable Lot
+    const lotCode = `${lotCodePrefix}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    
+    // Check if a lot with this prefix already exists to avoid duplicates on re-seed
+    const existingLot = await prisma.componentLot.findFirst({
+        where: { lotCode: { startsWith: lotCodePrefix }, componentId, warehouseId }
+    });
+
+    if (!existingLot) {
+        await prisma.componentLot.create({
+            data: {
+                lotCode,
+                componentId,
+                poDetailId: poDetail.poDetailId,
+                warehouseId,
+                initialQuantity: quantity,
+                currentQuantity: quantity
+            }
+        });
+
+        // 5. Audit Transaction
+        await prisma.inventoryTransaction.create({
+            data: {
+                quantity,
+                note: `Seeded opening stock: ${lotCodePrefix}`,
+                employeeId: admin?.employeeId || 1,
+                warehouseId,
+                componentId,
+                transactionType: InventoryTransactionType.IMPORT_PO,
+                purchaseOrderId: openingPo.purchaseOrderId
+            }
+        });
+    } else {
+        // Just sync the quantity if lot exists
+        await prisma.componentLot.update({
+            where: { componentLotId: existingLot.componentLotId },
+            data: { currentQuantity: quantity }
+        });
+    }
 }
 
 // Execution

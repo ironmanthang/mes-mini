@@ -7,8 +7,20 @@ export const createWOSchema = Joi.object({
     productionLineId: Joi.number().integer().optional() // NEW: Optional production line
 });
 
+export const updateWOSchema = Joi.object({
+    productionLineId: Joi.number().integer().optional(),
+    targetSalesWarehouseId: Joi.number().integer().optional(),
+    targetErrorWarehouseId: Joi.number().integer().optional(),
+    note: Joi.string().allow('', null).optional()
+});
+
 export const completeWOSchema = Joi.object({
     quantityProduced: Joi.number().integer().min(1).required(),
     batchCode: Joi.string().optional(),
-    expiryDate: Joi.date().iso().min('now').optional()
+    expiryDate: Joi.date().iso().min('now').optional(),
+    warehouseId: Joi.number().integer().min(1).optional()
+});
+
+export const cancelWOSchema = Joi.object({
+    reason: Joi.string().trim().max(500).optional()
 });

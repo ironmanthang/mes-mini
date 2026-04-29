@@ -121,7 +121,7 @@ router.post('/:id/ship',
  *                 properties:
  *                   salesOrderId: { type: integer }
  *                   code: { type: string }
- *                   status: { type: string, enum: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "RETURNED"], example: "PENDING_APPROVAL" }
+ *                   status: { type: string, enum: ["DRAFT", "PENDING", "APPROVED", "IN_PROGRESS", "PARTIALLY_SHIPPED", "SHIPPED", "CANCELLED", "RETURNED"], example: "PENDING" }
  *                   totalAmount: { type: number }
  *                   agent: { type: object, properties: { agentName: { type: string } } }
  *                   employee: { type: object, properties: { fullName: { type: string } } }
@@ -207,7 +207,7 @@ router.post('/:id/ship',
  *                 example: "Please ship with extra care."
  *               status:
  *                 type: string
- *                 enum: ["DRAFT", "PENDING_APPROVAL"]
+ *                 enum: ["DRAFT", "PENDING"]
  *                 default: "DRAFT"
  *                 example: "DRAFT"
  *               priority:
@@ -351,7 +351,7 @@ router.post('/:id/ship',
  * /api/sales-orders/{id}:
  *   put:
  *     summary: "Update a Sales Order (Edit Draft)"
- *     description: "Update details or change status (e.g., DRAFT -> PENDING). Can only edit if status is DRAFT or PENDING_APPROVAL."
+ *     description: "Update details or change status (e.g., DRAFT -> PENDING). Can only edit if status is DRAFT or PENDING."
  *     tags: [Sales Orders]
  *     security: [{ bearerAuth: [] }]
  *     parameters:

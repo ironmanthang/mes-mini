@@ -27,10 +27,10 @@ export const swaggerOptions: swaggerJsDoc.Options = {
             // { name: 'Production Lines', description: 'Manufacturing line management' },
             { name: 'Production Requests', description: 'Managing requests to produce items' },
             // { name: 'Quality', description: 'Quality Control (QC) operations' },
-            // { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
+            { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
             { name: 'Inventory', description: 'Stock Management and Reporting' },
-            // { name: 'Material Requests', description: 'Requesting materials for production' },
-            // { name: 'Stocktaking', description: 'Inventory counting and reconciliation' },
+            { name: 'Material Requests', description: 'Warehouse Material Issue for Production' },
+
             // { name: 'Notifications', description: 'System alerts and messages' },
         ],
         components: {
@@ -100,16 +100,15 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/production/productionRoutes.js',
         // './src/production/quality/qualityRoutes.ts',
         // './dist/production/quality/qualityRoutes.js',
-        // './src/production/workOrders/workOrderRoutes.ts',
-        // './dist/production/workOrders/workOrderRoutes.js',
+        './src/production/workOrders/workOrderRoutes.ts',
+        './dist/production/workOrders/workOrderRoutes.js',
 
         // --- WAREHOUSE OPS ---
         './src/warehouse-ops/inventory/inventoryRoutes.ts',
         './dist/warehouse-ops/inventory/inventoryRoutes.js',
-        // './src/warehouse-ops/material-request/materialRequestRoutes.ts',
-        // './dist/warehouse-ops/material-request/materialRequestRoutes.js',
-        // './src/warehouse-ops/stocktaking/stocktakeRoutes.ts',
-        // './dist/warehouse-ops/stocktaking/stocktakeRoutes.js',
+        './src/warehouse-ops/material-request/materialRequestRoutes.ts',
+        './dist/warehouse-ops/material-request/materialRequestRoutes.js',
+
         './src/warehouse-ops/warehouseRoutes.ts',
         './dist/warehouse-ops/warehouseRoutes.js',
     ],

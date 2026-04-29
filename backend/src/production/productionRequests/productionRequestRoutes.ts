@@ -326,10 +326,10 @@ router.get('/:id',
  *           schema:
  *             type: object
  *             properties:
- *               reason: { type: string }
+ *               reason: { type: string, description: "Cancellation reason (optional)" }
  *     responses:
  *       200:
- *         description: Cancelled
+ *         description: Cancelled — only PENDING/WAITING_MATERIAL/APPROVED PRs can be cancelled; linked PO must be DRAFT/PENDING/APPROVED
  */
 
 /**

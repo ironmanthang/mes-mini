@@ -8,7 +8,7 @@ export const createSOSchema = Joi.object({
     expectedShipDate: Joi.date().iso().min('now').optional().allow(null),
     status: Joi.string().valid(
         SalesOrderStatus.DRAFT,
-        SalesOrderStatus.PENDING_APPROVAL
+        SalesOrderStatus.PENDING
     ).default(SalesOrderStatus.DRAFT),
 
     // Financials
@@ -64,7 +64,7 @@ export const updateSOSchema = Joi.object({
     note: Joi.string().optional().allow(null, ''),
     priority: Joi.string().valid(...Object.values(Priority)).optional(),
 
-    // Can change status from DRAFT -> PENDING_APPROVAL // REMOVED: Status must be changed via dedicated endpoints
+    // Can change status from DRAFT -> PENDING // REMOVED: Status must be changed via dedicated endpoints
 
     // Allow updating Line Items (Full Replacement)
     details: Joi.array().items(

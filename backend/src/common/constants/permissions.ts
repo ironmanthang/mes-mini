@@ -71,10 +71,10 @@ export const PERM = {
     MR_CREATE:            'MR_CREATE',           // Create material requests
     MR_APPROVE:           'MR_APPROVE',          // Approve/process material requests
 
-    // ── Stocktake ─────────────────────────────────────────────────────────────
-    ST_READ:              'ST_READ',             // View stocktakes
-    ST_CREATE:            'ST_CREATE',           // Create stocktakes
-    ST_COMPLETE:          'ST_COMPLETE',         // Complete/approve stocktakes
+
+    // ── Transfer Requests ─────────────────────────────────────────────────────
+    TR_READ:              'TR_READ',             // View transfer requests
+    TR_MANAGE:            'TR_MANAGE',           // Create & complete transfer requests
 
     // ── Attachments ───────────────────────────────────────────────────────────
     ATTACH_UPLOAD:        'ATTACH_UPLOAD',       // Upload attachments

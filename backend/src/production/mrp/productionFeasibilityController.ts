@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../common/lib/prisma.js';
+import { ProductInstanceStatus } from '../../generated/prisma/index.js';
 import mrpService from './mrpService.js';
 
 /**
@@ -33,7 +34,7 @@ export const getProductProductionContext = async (req: Request, res: Response): 
         const currentStock = await prisma.productInstance.count({
             where: {
                 productId,
-                status: 'IN_STOCK',
+                status: ProductInstanceStatus.IN_STOCK_SALES,
                 warehouse: {
                     warehouseType: 'SALES'
                 }

@@ -1,8 +1,7 @@
 import prisma from '../../common/lib/prisma.js';
-import { Priority, ProductionRequestStatus, Prisma } from '../../generated/prisma/index.js';
+import { NotificationType, Priority, ProductionRequestStatus, SalesOrderStatus, WorkOrderStatus, Prisma } from '../../generated/prisma/index.js';
 import MrpService from '../mrp/mrpService.js';
 import NotificationService from '../../notifications/notificationService.js';
-import { NotificationType } from '../../generated/prisma/index.js';
 import { AppError } from '../../common/utils/AppError.js';
 
 interface CreateProductionRequestData {
@@ -64,7 +63,7 @@ class ProductionRequestService {
         });
         if (!soDetail) throw new Error(`Sales Order Detail ID ${soDetailId} not found`);
 
-        if (soDetail.salesOrder.status !== 'APPROVED' && soDetail.salesOrder.status !== 'IN_PROGRESS') {
+        if (soDetail.salesOrder.status !== SalesOrderStatus.APPROVED && soDetail.salesOrder.status !== SalesOrderStatus.IN_PROGRESS) {
             throw new Error(`Sales Order ${soDetail.salesOrder.code} is not in APPROVED or IN_PROGRESS status (current: ${soDetail.salesOrder.status})`);
         }
 
@@ -83,7 +82,9 @@ class ProductionRequestService {
 
         const whereClause: any = {
             soDetailId,
-            status: { notIn: ['CANCELLED'] }
+            // Bug 5 fix: exclude FULFILLED PRs — a fulfilled PR means demand was fully satisfied.
+            // A new PR on the same SO line (e.g., re-order) is valid and should be allowed.
+            status: { notIn: [ProductionRequestStatus.CANCELLED, ProductionRequestStatus.FULFILLED] }
         };
         if (excludePrId != null) {
             whereClause.productionRequestId = { not: excludePrId };
@@ -540,18 +541,38 @@ class ProductionRequestService {
             );
         }
 
-        if (req.status === ProductionRequestStatus.FULFILLED || req.status === ProductionRequestStatus.CANCELLED) {
-            throw new Error(`Cannot cancel. Request is already ${req.status}`);
+        // Bug 1 fix: only PENDING/WAITING_MATERIAL/APPROVED are cancellable
+        const CANCELLABLE_STATUSES: ProductionRequestStatus[] = [
+            ProductionRequestStatus.PENDING,
+            ProductionRequestStatus.WAITING_MATERIAL,
+            ProductionRequestStatus.APPROVED
+        ];
+        if (!CANCELLABLE_STATUSES.includes(req.status)) {
+            throw new Error(`Cannot cancel. Request is in ${req.status} status. Only PENDING/WAITING_MATERIAL/APPROVED PRs can be cancelled.`);
         }
 
+        // Bug 2 fix: linked PO in ORDERED/RECEIVING/COMPLETED blocks PR cancellation
+        const blockingPO = req.purchaseOrderDetails.find(d =>
+            ['ORDERED', 'RECEIVING', 'COMPLETED'].includes(d.purchaseOrder.status)
+        );
+        if (blockingPO) {
+            throw new Error(
+                `Cannot cancel. Linked PO ${blockingPO.purchaseOrder.code} is in ${blockingPO.purchaseOrder.status} status. ` +
+                `Resolve or cancel the PO before cancelling this PR.`
+            );
+        }
+
+        // Bug 3 fix: only IN_PROGRESS WOs block cancellation; COMPLETED/CANCELLED WOs are fine
         const fulfillments = await prisma.workOrderFulfillment.findMany({
             where: { productionRequestId: requestId },
             include: { workOrder: true }
         });
-
-        const hasActiveWO = fulfillments.length > 0;
-        if (hasActiveWO) {
-            throw new Error("Cannot cancel Production Request because it has associated Work Orders. Please cancel the Work Orders first.");
+        const activeFulfillment = fulfillments.find(f =>
+            f.workOrder.status !== WorkOrderStatus.COMPLETED &&
+            f.workOrder.status !== WorkOrderStatus.CANCELLED
+        );
+        if (activeFulfillment) {
+            throw new Error("Cannot cancel PR: linked Work Order is still active. Cancel the Work Order first.");
         }
 
         let noteUpdate = reason ? `${req.note ? req.note + '; ' : ''}Cancelled: ${reason}` : req.note;

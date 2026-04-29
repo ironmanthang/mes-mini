@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
     getAllRequests,
     getRequestById,
-    approveRequest,
+    validateRequest,
+    completeRequest,
     getDispatchSlip
 } from './materialRequestController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
@@ -22,10 +23,16 @@ router.get('/:id',
     getRequestById
 );
 
-router.put('/:id/approve',
+router.put('/:id/validate',
     authorize(PERM.MR_APPROVE),
-    approveRequest
+    validateRequest
 );
+
+router.put('/:id/complete',
+    authorize(PERM.MR_APPROVE),
+    completeRequest
+);
+
 
 router.get('/:id/slip',
     authorize(PERM.MR_READ),
@@ -49,7 +56,7 @@ router.get('/:id/slip',
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [PENDING, APPROVED] }
+ *         schema: { type: string, enum: [PENDING, ISSUED, CANCELLED] }
  *     responses:
  *       200:
  *         description: List of requests
@@ -57,10 +64,10 @@ router.get('/:id/slip',
 
 /**
  * @swagger
- * /api/warehouse-ops/material-requests/{id}/approve:
+ * /api/warehouse-ops/material-requests/{id}/validate:
  *   put:
- *     summary: Approve & Issue Materials
- *     description: Deducts Component Stock and Logs Transaction
+ *     summary: Validate Material Availability
+ *     description: Read-only stock sufficiency check for each request line.
  *     tags: [Material Requests]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -68,12 +75,60 @@ router.get('/:id/slip',
  *         name: id
  *         required: true
  *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [warehouseId]
+ *             properties:
+ *               warehouseId: { type: integer }
  *     responses:
  *       200:
- *         description: Stock Deducted, Request Approved
+ *         description: Validation preview
  *       400:
- *         description: Insufficient Stock
+ *         description: Invalid request or status
  */
+
+/**
+ * @swagger
+ * /api/warehouse-ops/material-requests/{id}/complete:
+ *   put:
+ *     summary: Complete Material Issue (Deduct Stock)
+ *     description: Atomically decrements stock and writes inventory transactions, then marks request ISSUED.
+ *     tags: [Material Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [warehouseId, consumedLots]
+ *             properties:
+ *               warehouseId: { type: integer }
+ *               consumedLots:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [componentId, lotCode, quantity]
+ *                   properties:
+ *                     componentId: { type: integer }
+ *                     lotCode: { type: string }
+ *                     quantity: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Stock deducted, request issued
+ *       400:
+ *         description: Insufficient Stock or invalid lots
+ */
+
 
 /**
  * @swagger

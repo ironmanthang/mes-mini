@@ -76,10 +76,10 @@
 
 ## Cancellation Behavior
 - **Cancel actor guard**: Allowed for creator, `PROD_MGR`, or `SYS_ADMIN`.
-- **Cancel status guard**: Cannot cancel if already `FULFILLED` or `CANCELLED`.
-- **Work Order guard**: Any existing work-order fulfillment relation blocks PR cancellation.
+- **Cancel status guard**: PR must be in `PENDING`, `WAITING_MATERIAL`, or `APPROVED` — `DRAFT`, `IN_PROGRESS`, `FULFILLED`, and `CANCELLED` are not cancellable.
+- **PO blocker**: If the PR has linked PO details, and any of those POs are in `ORDERED`, `RECEIVING`, or `COMPLETED` status, cancellation is blocked. The blocking PO code is included in the error message.
+- **WO blocker**: Only work orders with status `IN_PROGRESS` block cancellation. `COMPLETED` or `CANCELLED` work orders do not block.
 - **Note behavior**: Cancellation reason is appended to note when provided.
-- **PO traceability**: If linked PO details exist, warning with linked PO codes is appended to note.
 - **Cancel write**: Final status becomes `CANCELLED`.
 
 ## Visibility And Retrieval Rules

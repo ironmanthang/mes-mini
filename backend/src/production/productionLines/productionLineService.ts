@@ -73,7 +73,7 @@ class ProductionLineService {
     async deleteProductionLine(id: number): Promise<ProductionLine> {
         // Check if has active work orders
         const hasActiveWO = await prisma.workOrder.findFirst({
-            where: { productionLineId: id, status: { in: [WorkOrderStatus.PLANNED, WorkOrderStatus.IN_PROGRESS] } }
+            where: { productionLineId: id, status: { in: [WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROGRESS] } }
         });
         if (hasActiveWO) throw new Error('Cannot delete: Line has active Work Orders.');
 
