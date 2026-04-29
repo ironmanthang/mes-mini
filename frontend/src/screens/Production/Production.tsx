@@ -1,78 +1,73 @@
-import { useState } from "react";
-import { ClipboardList, Settings, Factory } from "lucide-react";
-
-import { CreateProductionRequest } from "./components/CreateProductionRequest";
-import { CreateWorkOrder } from "./components/CreateWorkOrder";
-import { ConfigureProductionLots } from "./components/ConfigureProductionLots";
-
-type ProductionTab = "production-requests" | "work-orders" | "configure-lots";
+import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
+import { NavLink, Outlet } from "react-router-dom";
 
 export const Production = () => {
-  const [activeTab, setActiveTab] = useState<ProductionTab>("production-requests");
-
   const tabs = [
     { 
       id: "production-requests",
       label: "Production Requests", 
       icon: Factory,
+      to: "/production/requests",
       description: "Create new manufacturing requests"
     },
     { 
       id: "work-orders",
       label: "Work Orders", 
       icon: ClipboardList,
+      to: "/production/work-orders",
       description: "Assign requests to production lines"
     },
     { 
+      id: "material-requests",
+      label: "Material Requests",
+      icon: PackageSearch,
+      to: "/production/material-requests",
+      description: "Request components for work orders"
+    },
+    { 
       id: "configure-lots",
-      label: "Configure Production Lots", 
+      label: "Configure Lots", 
       icon: Settings,
+      to: "/production/configure-lots",
       description: "Setup batches & instances"
     },
   ];
 
   return (
     <div className="p-8 pb-24">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">PRODUCTION MANAGEMENT</h1>
         <p className="text-sm text-gray-500">
           Manage supply chain, manufacturing processes, and quality assurance.
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-6 mb-8 max-w-7xl">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as ProductionTab)}
-              className={`flex flex-col items-start p-4 rounded-xl border transition-all duration-200 text-left cursor-pointer hover:shadow-md ${
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-fit">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.id}
+            to={tab.to}
+            title={tab.description}
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 cursor-pointer ${
                 isActive 
-                  ? "bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500" 
-                  : "bg-white border-gray-200 hover:border-blue-300"
-              }`}
-            >
-              <div className={`p-2 rounded-lg mb-3 ${isActive ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"}`}>
-                <tab.icon className="w-5 h-5" />
-              </div>
-              <h3 className={`font-bold text-sm mb-1 ${isActive ? "text-blue-900" : "text-gray-900"}`}>
+                  ? "bg-white text-blue-700 shadow-sm border border-gray-200/50" 
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 border border-transparent"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <tab.icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-gray-400"}`} />
                 {tab.label}
-              </h3>
-              <p className="text-xs text-gray-500 line-clamp-1">
-                {tab.description}
-              </p>
-            </button>
-          );
-        })}
+              </>
+            )}
+          </NavLink>
+        ))}
       </div>
 
-      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">        
-        {activeTab === "production-requests" && <CreateProductionRequest/>}
-
-        {activeTab === "work-orders" && <CreateWorkOrder/>}
-
-        {activeTab === "configure-lots" && <ConfigureProductionLots/>}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <Outlet />
       </div>
     </div>
   );

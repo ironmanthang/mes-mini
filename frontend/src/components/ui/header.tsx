@@ -1,13 +1,10 @@
 import { BellIcon } from "lucide-react";
 import type { JSX } from "react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { authService } from "../../services/authServices";
 
 import { NotificationsPopover, type NotificationItem } from "./notificationPopover";
-
-interface Props {
-  onNavigate: (pageName: string) => void;
-}
 
 interface UserProfile {
   employeeId: number;
@@ -48,7 +45,8 @@ const initialNotifications: NotificationItem[] = [
   },
 ];
 
-export const Header = ({onNavigate}: Props): JSX.Element => {
+export const Header = (): JSX.Element => {
+  const navigate = useNavigate();
   const [isNotiOpen, setIsNotiOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [userData, setUserData] = useState<UserProfile | null>(null);
@@ -124,9 +122,9 @@ export const Header = ({onNavigate}: Props): JSX.Element => {
         )}
       </div>
 
-      <div 
+      <div
         className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded-lg transition-colors"
-        onClick={() => onNavigate && onNavigate("User & System")}
+        onClick={() => navigate("/user-system/settings")}
       >
         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
           <span className="text-blue-600 text-xs font-bold">L</span>

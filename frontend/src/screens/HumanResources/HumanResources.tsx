@@ -1,80 +1,7 @@
-import { PlusIcon, EditIcon, TrashIcon, Search, Loader2 } from "lucide-react";
-import { useState, useEffect, useCallback, type JSX } from "react";
+import { type JSX } from "react";
+import { NavLink, Outlet } from "react-router-dom";
 
-import { AddEmployeeModal } from "./components/AddEmployeeModal";
-import { EditEmployeeModal } from "./components/EditEmployeeModal";
-import { DeleteEmployeeModal } from "./components/DeleteEmployeeModal";
-import { SuccessNotification } from "../Notification/SuccessNotification";
-
-import { employeeService, type Employee } from "../../services/employeeServices";
-import { Roles } from "./components/Roles";
-
-interface HumanResourcesProp {
-  tabType?: "humanResources" | "roles";
-}
-
-export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp): JSX.Element => {
-  const [activeTab, setActiveTab] = useState<"humanResources" | "roles">(tabType);
-
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedTerm, setDebouncedTerm] = useState("");
-  
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-  
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const fetchEmployees = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const employeesData = await employeeService.getAllEmployees({ search: debouncedTerm });
-      setEmployees(employeesData);
-    } catch (error) {
-      console.error("Failed to fetch employees:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [debouncedTerm]);
-
-  useEffect(() => {
-    fetchEmployees();
-    if (tabType) {
-      setActiveTab(tabType)
-    }
-  }, [fetchEmployees, tabType]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedTerm(searchTerm);
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  const handleSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setShowSuccess(true);
-    fetchEmployees();
-    setSelectedRowId(null);
-    setTimeout(() => setShowSuccess(false), 3000);
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
-
-  const getRoleName = (roles: { roleName: string }[]) => {
-    return roles && roles.length > 0 ? roles[0].roleName : "N/A";
-  };
-
+export const HumanResources = (): JSX.Element => {
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -87,184 +14,36 @@ export const HumanResources = ({tabType = "humanResources"}: HumanResourcesProp)
       </div>
 
       <div className="mb-6 flex items-center gap-2 border-b border-gray-200">
-              <button
-                onClick={() => setActiveTab("humanResources")}
-                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
-                  activeTab === "humanResources"
-                    ? "text-blue-600 border-blue-600"
-                    : "text-gray-600 border-transparent hover:text-gray-900"
-                }`}
-              >
-                Human Resources Management
-              </button>
-              
-              <button
-                onClick={() => setActiveTab("roles")}
-                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
-                  activeTab === "roles"
-                    ? "text-blue-600 border-blue-600"
-                    : "text-gray-600 border-transparent hover:text-gray-900"
-                }`}
-              >
-                Roles
-              </button>
-            </div>
-
-      <div className="animate-in fade-in zoom-in duration-300">
-        {activeTab === "humanResources" ? (
-          <>
-            <div className="bg-white rounded-lg border border-gray-200 animate-in fade-in zoom-in duration-300">
-              <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                <button
-                  onClick={() => setIsAddOpen(true)}
-                  className="p-2 bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors cursor-pointer"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (selectedRowId) {
-                      const emp = employees.find((e) => e.employeeId === selectedRowId);
-                      if (emp) {
-                        setSelectedEmployee(emp);
-                        setIsEditOpen(true);
-                      }
-                    } else {
-                      alert("Please select an employee to edit");
-                    }
-                  }}
-                  className={`p-2 rounded transition-colors cursor-pointer ${
-                      selectedRowId ? "text-gray-600 hover:bg-gray-100" : "text-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  <EditIcon className="w-5 h-5" />
-                </button>
-                
-                <button
-                  onClick={() => selectedRowId ? setIsDeleteOpen(true) : alert("Please select an employee to delete")}
-                  className={`p-2 rounded transition-colors cursor-pointer ${
-                      selectedRowId ? "text-gray-600 hover:bg-gray-100" : "text-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
-
-                <div className="ml-auto relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by Name, ID, Phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="overflow-x-auto min-h-[300px]">
-                {isLoading ? (
-                  <div className="flex h-[300px] items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                  </div>
-                ) : (
-                  <table className="w-full whitespace-nowrap">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50">
-                        <th className="px-6 py-3 text-left w-10"></th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Full Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Username</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Role</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Hire Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Phone Number</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Address</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {employees.length > 0 ? (
-                        employees.map((emp) => (
-                          <tr key={emp.employeeId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4">
-                              <input
-                                type="radio"
-                                name="selectedEmployee"
-                                checked={selectedRowId === emp.employeeId}
-                                onChange={() => setSelectedRowId(emp.employeeId)}
-                                className="cursor-pointer w-[16px] h-[16px]"
-                              />
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{emp.employeeId}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{emp.fullName}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{emp.username}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              <span className="bg-blue-50 text-blue-700 py-1 px-2 rounded text-xs font-medium border border-blue-100">
-                                  {getRoleName(emp.roles)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{formatDate(emp.hireDate)}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{emp.phoneNumber}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600 truncate max-w-[200px]" title={emp.address}>
-                              {emp.address}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                  emp.status === 'ACTIVE' 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : emp.status === 'INACTIVE'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-red-100 text-red-700'
-                              }`}>
-                                  {emp.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={9} className="text-center py-10 text-gray-500">
-                            No employees found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            <AddEmployeeModal 
-              isOpen={isAddOpen} 
-              onConfirm={() => handleSuccess("Employee created successfully. An email with login credentials has been sent.")} 
-              onClose={() => setIsAddOpen(false)} 
-            />
-            
-            <EditEmployeeModal 
-              isOpen={isEditOpen} 
-              userData={selectedEmployee} 
-              onConfirm={() => handleSuccess("Employee details updated successfully.")} 
-              onClose={() => setIsEditOpen(false)} 
-            />
-            
-            <DeleteEmployeeModal 
-              isOpen={isDeleteOpen} 
-              employeeId={selectedRowId}
-              onConfirm={() => handleSuccess("Employee removed successfully.")}
-              onClose={() => setIsDeleteOpen(false)} 
-            />
-            
-            <SuccessNotification 
-                isVisible={showSuccess} 
-                message={successMessage}
-            />
-          </>
-        ) : (
-          <Roles/>
-        )}
+        <NavLink
+          to="/human-resources/employees"
+          className={({ isActive }) =>
+            `px-4 py-3 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
+              isActive
+                ? "text-blue-600 border-blue-600"
+                : "text-gray-600 border-transparent hover:text-gray-900"
+            }`
+          }
+        >
+          Human Resources Management
+        </NavLink>
+        
+        <NavLink
+          to="/human-resources/roles"
+          className={({ isActive }) =>
+            `px-4 py-3 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
+              isActive
+                ? "text-blue-600 border-blue-600"
+                : "text-gray-600 border-transparent hover:text-gray-900"
+            }`
+          }
+        >
+          Roles
+        </NavLink>
       </div>
 
-      
+      <div className="animate-in fade-in zoom-in duration-300">
+        <Outlet />
+      </div>
     </div>
   );
 };
