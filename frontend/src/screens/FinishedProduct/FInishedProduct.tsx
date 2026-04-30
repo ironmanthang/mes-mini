@@ -1,96 +1,88 @@
-import { useState, type JSX } from "react";
+import { type JSX } from "react";
 import { 
   Info, 
   ScanBarcode, 
   ClipboardCheck, 
   ShoppingCart,
+  Activity
 } from "lucide-react";
-import { Information } from "./components/Infomation";
-import { Barcodes } from "./components/Barcodes";
-import { QualityChecks } from "./components/QualityChecks";
-import { Orders } from "./components/Orders";
-
-
-
-type FinishedProductTab = "information" | "barcodes" | "quality" | "orders";
+import { NavLink, Outlet } from "react-router-dom";
 
 export const FinishedProduct = (): JSX.Element => {
-  const [activeTab, setActiveTab] = useState<FinishedProductTab>("information");
-
   const tabs = [
     { 
       id: "information", 
       label: "Information", 
       icon: Info, 
+      to: "/finished-products/info",
       description: "Batch details & serial numbers" 
+    },
+    { 
+      id: "execution", 
+      label: "Production Execution", 
+      icon: Activity, 
+      to: "/finished-products/execution",
+      description: "Track and control production" 
     },
     { 
       id: "barcodes", 
       label: "Barcodes", 
       icon: ScanBarcode, 
+      to: "/finished-products/barcodes",
       description: "Print & manage item labels" 
     },
     { 
       id: "quality", 
       label: "Quality Checks", 
       icon: ClipboardCheck, 
+      to: "/finished-products/quality",
       description: "QA/QC inspections & logs" 
     },
     { 
       id: "orders", 
       label: "Orders", 
       icon: ShoppingCart, 
+      to: "/finished-products/orders",
       description: "Manage sales & shipping" 
     },
   ];
 
   return (
-    <div className="p-8 pb-24">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            FINISHED PRODUCTS
-        </h1>
+    <div className="p-8 pb-24 bg-white min-h-screen">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">FINISHED PRODUCTS MANAGEMENT</h1>
         <p className="text-sm text-gray-500">
           Manage production output, track serial numbers, and ensure product quality.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 max-w-7xl">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          const Icon = tab.icon;
-          
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as FinishedProductTab)}
-              className={`flex flex-col items-start p-4 rounded-xl border transition-all 
-                duration-200 text-left cursor-pointer hover:shadow-md ${
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-fit">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.id}
+            to={tab.to}
+            title={tab.description}
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 cursor-pointer ${
                 isActive 
-                  ? "bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500" 
-                  : "bg-white border-gray-200 hover:border-blue-300"
-              }`}
-            >
-              <div className={`p-2 rounded-lg mb-3 ${isActive ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"}`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <h3 className={`font-bold text-sm mb-1 ${isActive ? "text-blue-900" : "text-gray-900"}`}>
+                  ? "bg-white text-blue-700 shadow-sm border border-gray-200/50" 
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 border border-transparent"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <tab.icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-gray-400"}`} />
                 {tab.label}
-              </h3>
-              <p className="text-xs text-gray-500 line-clamp-1">
-                {tab.description}
-              </p>
-            </button>
-          );
-        })}
+              </>
+            )}
+          </NavLink>
+        ))}
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {activeTab === "information" && <Information />}
-        {activeTab === "barcodes" && <Barcodes />}
-        {activeTab === "quality" && <QualityChecks />}
-        {activeTab === "orders" && <Orders />}
+        <Outlet />
       </div>
     </div>
   );
-};
+};

@@ -33,6 +33,12 @@ import { Roles } from "./screens/HumanResources/components/Roles";
 import { UserManagement } from "./screens/UserAndSystem/components/UserManagement";
 import { AccountSettings } from "./screens/UserAndSystem/components/AccountSettings";
 
+import { Information as FinishedProductInformation } from "./screens/FinishedProduct/components/Infomation";
+import { Barcodes as FinishedProductBarcodes } from "./screens/FinishedProduct/components/Barcodes";
+import { QualityChecks as FinishedProductQuality } from "./screens/FinishedProduct/components/QualityChecks";
+import { Orders as FinishedProductOrders } from "./screens/FinishedProduct/components/Orders";
+import { ProductionExecution as FinishedProductExecution } from "./screens/FinishedProduct/components/ProductionExecution";
+
 export default function App() {
   return (
     <div className="bg-white w-full min-h-screen flex [font-family:'Zen_Kaku_Gothic_Antique',Helvetica]">
@@ -92,7 +98,14 @@ export default function App() {
             </Route>
 
             {/* Finished Products */}
-            <Route path="/finished-products" element={<FinishedProduct />} />
+            <Route path="/finished-products" element={<FinishedProduct />}>
+              <Route index element={<Navigate to="info" replace />} />
+              <Route path="info" element={<FinishedProductInformation />} />
+              <Route path="barcodes" element={<FinishedProductBarcodes />} />
+              <Route path="quality" element={<FinishedProductQuality />} />
+              <Route path="orders" element={<FinishedProductOrders />} />
+              <Route path="execution" element={<FinishedProductExecution />} />
+            </Route>
 
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
