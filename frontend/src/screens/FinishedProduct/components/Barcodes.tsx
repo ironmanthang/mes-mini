@@ -112,9 +112,6 @@ export const Barcodes = (): JSX.Element => {
     }
   };
 
-  // ==========================================
-  // RENDER: MÀN HÌNH 1 - DANH SÁCH CHỜ IN
-  // ==========================================
   if (viewMode === 'LIST') {
     return (
       <div className="flex flex-col gap-6 pb-24 animate-in fade-in duration-300 relative">
@@ -280,7 +277,7 @@ export const Barcodes = (): JSX.Element => {
                         </div>
                         <div className="p-4 bg-gray-900 rounded-lg col-span-2 flex justify-between items-center text-white">
                             <span className="text-sm font-bold uppercase">Selected Count:</span>
-                            <span className="text-2xl font-black text-blue-400">{selectedIds.length} units</span>
+                            <span className="text-xl font-black text-blue-400">{selectedIds.length} units</span>
                         </div>
                     </div>
                 </div>
@@ -292,22 +289,25 @@ export const Barcodes = (): JSX.Element => {
                     </h3>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-sm font-bold text-gray-700 block mb-1.5">Sample Barcode String (Auto-generated)</label>
-                            <input 
+                            <label className="text-sm font-bold text-gray-700 block mb-1.5">Sample Barcode String (Auto-generated)
+                              <input 
                                 type="text" readOnly value={sampleFinalString}
-                                className="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-600"
-                            />
+                                className="w-full mt-1 p-3 bg-gray-100 border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-600"
+                              />
+                            </label>
                             <p className="text-[10px] text-gray-500 mt-1">Formula: FG_[id]_SN_[sn]_WO_[wo_id]</p>
                         </div>
                         <div>
-                            <label className="text-sm font-bold text-gray-700 block mb-1.5">Symbology Standard</label>
-                            <select 
+                            <label className="text-sm font-bold text-gray-700 block mb-1.5">Symbology Standard
+                              <select 
                                 value={symbology} onChange={(e) => setSymbology(e.target.value as any)}
-                                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                            >
-                                <option value="QR">QR Code (Recommended for Full Traceability)</option>
-                                <option value="CODE128">Code 128 (Standard Industrial)</option>
-                            </select>
+                                className="w-full mt-1 p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              >
+                                  <option value="QR">QR Code (Recommended for Full Traceability)</option>
+                                  <option value="CODE128">Code 128 (Standard Industrial)</option>
+                              </select>
+                            </label>
+                            
                         </div>
                     </div>
                 </div>
@@ -324,21 +324,22 @@ export const Barcodes = (): JSX.Element => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <label className="text-xs font-bold text-gray-700 uppercase block mb-1.5">Label Mode</label>
+                            <div className="text-xs font-bold text-gray-700 uppercase block mb-1.5">Label Mode</div>
                             <div className="flex bg-gray-100 p-1 rounded-lg">
                                 <button onClick={() => setLabelMode('INDIVIDUAL')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${labelMode === 'INDIVIDUAL' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Individual (Per Unit)</button>
                                 <button onClick={() => setLabelMode('PACKING')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${labelMode === 'PACKING' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>Packing Unit (Box)</button>
                             </div>
                         </div>
                         <div className="col-span-2">
-                            <label className="text-xs font-bold text-gray-700 uppercase block mb-1.5">Template Size</label>
-                            <select 
+                            <label className="text-xs font-bold text-gray-700 uppercase block mb-1.5">Template Size
+                              <select 
                                 value={template} onChange={(e) => setTemplate(e.target.value as any)}
-                                className="w-full p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                            >
-                                <option value="50x30">50x30 mm (Standard Large)</option>
-                                <option value="35x22">35x22 mm (Compact Tag)</option>
-                            </select>
+                                className="w-full mt-1 p-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              >
+                                  <option value="50x30">50x30 mm (Standard Large)</option>
+                                  <option value="35x22">35x22 mm (Compact Tag)</option>
+                              </select>
+                            </label>
                         </div>
                     </div>
 

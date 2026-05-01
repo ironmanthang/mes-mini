@@ -167,16 +167,21 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                 <div className="p-8 overflow-y-auto space-y-8 flex-1">
                     {/* VÙNG 1: CHỌN LỆNH SẢN XUẤT */}
                     <div className="space-y-4">
-                        <label className="text-sm font-bold text-gray-700">Select Work Order <span className="text-red-500">*</span></label>
-                        <select 
-                            value={selectedWoId} onChange={(e) => setSelectedWoId(Number(e.target.value) || "")}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        >
-                            <option value="">{isLoadingWOs ? "Loading Work Orders..." : "-- Choose Released or In-Progress Order --"}</option>
-                            {workOrders.map(wo => (
-                                <option key={wo.workOrderId} value={wo.workOrderId}>{wo.code} - {wo.product?.productName} ({wo.status})</option>
-                            ))}
-                        </select>
+                        <label className="text-sm font-bold text-gray-700" htmlFor="select-work-order">
+                            Select Work Order <span className="text-red-500">*</span>
+                            <select 
+                                value={selectedWoId} onChange={(e) => setSelectedWoId(Number(e.target.value) || "")}
+                                className="w-full p-2.5 border my-2
+                                border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                id="select-work-order"
+                                name="workOrderId"
+                            >
+                                <option value="">{isLoadingWOs ? "Loading Work Orders..." : "-- Choose Released or In-Progress Order --"}</option>
+                                {workOrders.map(wo => (
+                                    <option key={wo.workOrderId} value={wo.workOrderId}>{wo.code} - {wo.product?.productName} ({wo.status})</option>
+                                ))}
+                            </select>
+                        </label>
 
                         {selectedWo && (
                             <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
