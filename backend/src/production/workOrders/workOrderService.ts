@@ -8,7 +8,7 @@ import {
     SalesOrderStatus,
     WarehouseType
 } from '../../generated/prisma/index.js';
-import MaterialRequestService from '../../warehouse-ops/material-request/materialRequestService.js';
+
 
 interface CreateWorkOrderData {
     productionRequestId: number;
@@ -199,7 +199,7 @@ class WorkOrderService {
         throw new Error("Failed to generate unique Work Order code after multiple retries");
     }
 
-    async getALlWO(query: { page?: number; limit?: number; status?: string } = {}) {
+    async getALlWO(query: { page?: number; limit?: number; status?: string; missingMR?: boolean } = {}) {
         const { getPaginationParams, createPaginatedResponse } = await import('../../common/utils/pagination.js');
         // @ts-ignore
         const { page, limit, skip } = getPaginationParams(query);
@@ -213,6 +213,12 @@ class WorkOrderService {
             where.status = status as WorkOrderStatus;
         }
 
+        // Filter for Work Orders that are IN_PROGRESS but have no Material Request
+        if (query.missingMR) {
+            where.status = WorkOrderStatus.IN_PROGRESS;
+            where.materialRequest = null;
+        }
+
         const [data, total] = await Promise.all([
             prisma.workOrder.findMany({
                 where,
@@ -222,7 +228,8 @@ class WorkOrderService {
                 include: {
                     product: true,
                     employee: { select: { fullName: true } },
-                    productionLine: { select: { lineName: true, location: true } } // NEW
+                    productionLine: { select: { lineName: true, location: true } },
+                    materialRequest: { select: { status: true } }
                 }
             }),
             prisma.workOrder.count({ where })
@@ -354,12 +361,6 @@ class WorkOrderService {
                 throw new Error(`Only RELEASED orders can be started. Current status is ${wo.status}`);
             }
 
-            let materialRequest;
-            try {
-                materialRequest = await MaterialRequestService.createFromWorkOrder(id, userId, tx);
-            } catch (e) {
-                throw new Error(`Cannot start Work Order (Material Request Failed): ${(e as Error).message}`);
-            }
 
             const updatedWorkOrder = await tx.workOrder.update({
                 where: { workOrderId: id },
@@ -401,23 +402,22 @@ class WorkOrderService {
             }
 
             return {
-                workOrder: updatedWorkOrder,
-                materialRequest
+                workOrder: updatedWorkOrder
             };
         });
     }
 
     // The Big One: Complete WO -> Updates Inventory
     // Inputs: quantityProduced, optional batchCode override, optional expiryDate
-    async completeWorkOrder(id: number, quantityProduced: number, userId: number, customBatchCode?: string, expiryDate?: Date, targetWarehouseId?: number) {
-        // Fix: Use dynamic warehouse ID
-        const warehouseId = targetWarehouseId || (await this.getDefaultWarehouseId());
+    async completeWorkOrder(id: number, quantityProduced: number, userId: number, customBatchCode?: string, expiryDate?: Date, targetWarehouseIdOverride?: number) {
+        // Fix: Logic moved inside transaction to access fetched 'wo' configuration
 
         return await prisma.$transaction(async (tx) => {
             const wo = await tx.workOrder.findUnique({
                 where: { workOrderId: id },
                 include: {
                     product: true,
+                    workOrderFulfillments: true,
                     materialRequest: {
                         select: {
                             requestId: true,
@@ -428,6 +428,9 @@ class WorkOrderService {
             });
 
             if (!wo) throw new Error("Work Order not found");
+
+            // Fix: Use targetSalesWarehouseId from WO config, or Override, or Fallback
+            const warehouseId = targetWarehouseIdOverride || wo.targetSalesWarehouseId || (await this.getDefaultWarehouseId());
             if (wo.status !== WorkOrderStatus.IN_PROGRESS) throw new Error(`Cannot complete. Status is ${wo.status}`);
             if (quantityProduced <= 0) throw new Error("Quantity produced must be > 0");
             if (quantityProduced > wo.quantity) {
@@ -463,7 +466,7 @@ class WorkOrderService {
                     productionDate,
                     expiryDate: finalExpiryDate,
                     workOrderId: id,
-                    // productionLineId: 1 // Optional
+                    productionLineId: wo.productionLineId // Fix: Use assigned production line
                 }
             });
 
@@ -502,6 +505,38 @@ class WorkOrderService {
                 where: { workOrderId: id },
                 data: { status: WorkOrderStatus.COMPLETED }
             });
+
+            // E. Rule 177: PR Underfill Fallback
+            // If the PR is still IN_PROGRESS but this was the last active WO, move it back to APPROVED
+            const linkedProductionRequestIds = [
+                ...new Set(wo.workOrderFulfillments.map(f => f.productionRequestId))
+            ];
+
+            if (linkedProductionRequestIds.length > 0) {
+                for (const prId of linkedProductionRequestIds) {
+                    const pr = await tx.productionRequest.findUnique({
+                        where: { productionRequestId: prId },
+                        include: {
+                            workOrderFulfillments: {
+                                include: { workOrder: true }
+                            }
+                        }
+                    });
+
+                    if (pr && pr.status === ProductionRequestStatus.IN_PROGRESS) {
+                        const hasOtherInProgressWO = pr.workOrderFulfillments.some(
+                            f => f.workOrderId !== id && f.workOrder.status === WorkOrderStatus.IN_PROGRESS
+                        );
+
+                        if (!hasOtherInProgressWO) {
+                            await tx.productionRequest.update({
+                                where: { productionRequestId: prId },
+                                data: { status: ProductionRequestStatus.APPROVED }
+                            });
+                        }
+                    }
+                }
+            }
 
             return completedWO;
         });

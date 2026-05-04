@@ -33,26 +33,8 @@ class MaterialRequestService {
      *   FALLBACK: If a PR has no snapshot (created before this feature), we fall back
      *   to the master BOM for that fulfillment to avoid breaking existing data.
      */
-    async createFromWorkOrder(workOrderId: number, _userId: number, tx?: Prisma.TransactionClient) {
-        const db = tx || prisma;
-
-        const existingPendingRequest = await db.materialRequest.findFirst({
-            where: {
-                workOrderId,
-                status: MaterialRequestStatus.PENDING
-            },
-            include: {
-                details: {
-                    include: { component: true }
-                }
-            }
-        });
-
-        if (existingPendingRequest) {
-            return existingPendingRequest;
-        }
-
-        const wo = await db.workOrder.findUnique({
+    async createFromWorkOrder(workOrderId: number, _userId: number) {
+        const wo = await prisma.workOrder.findUnique({
             where: { workOrderId },
             include: {
                 product: true,
@@ -67,6 +49,27 @@ class MaterialRequestService {
         });
 
         if (!wo) throw new Error("Work Order not found");
+
+        const { WorkOrderStatus } = await import('../../generated/prisma/index.js');
+        if (wo.status !== WorkOrderStatus.IN_PROGRESS) {
+            throw new Error(`Cannot create Material Request. Work Order status is ${wo.status}, expected IN_PROGRESS.`);
+        }
+
+        const existingPendingRequest = await prisma.materialRequest.findFirst({
+            where: {
+                workOrderId,
+                status: MaterialRequestStatus.PENDING
+            },
+            include: {
+                details: {
+                    include: { component: true }
+                }
+            }
+        });
+
+        if (existingPendingRequest) {
+            return existingPendingRequest;
+        }
 
         // ── Aggregate component quantities across all PR fulfillments ──────────
         // Map<componentId, totalQuantityNeeded>
@@ -86,7 +89,7 @@ class MaterialRequestService {
                 } else {
                     // Fallback path: PR has no snapshot (legacy data).
                     // Use master BOM × fulfillment quantity.
-                    const bom = await db.billOfMaterial.findMany({
+                    const bom = await prisma.billOfMaterial.findMany({
                         where: { productId: pr.productId }
                     });
                     for (const item of bom) {
@@ -99,7 +102,7 @@ class MaterialRequestService {
         } else {
             // ── No linked PRs: standalone WO (Make-to-Stock, not linked to any PR) ──
             // Fall back to master BOM × WO quantity.
-            const bom = await db.billOfMaterial.findMany({
+            const bom = await prisma.billOfMaterial.findMany({
                 where: { productId: wo.productId },
                 include: { component: true }
             });
@@ -119,7 +122,7 @@ class MaterialRequestService {
 
         const code = `MAT-REQ-${wo.code}`;
 
-        return await db.materialRequest.create({
+        return await prisma.materialRequest.create({
             data: {
                 code,
                 workOrderId,

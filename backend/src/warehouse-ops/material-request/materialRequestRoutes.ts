@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
     getAllRequests,
     getRequestById,
+    createRequest,
     validateRequest,
     completeRequest,
     getDispatchSlip
@@ -16,6 +17,11 @@ router.use(protect);
 router.get('/',
     authorize(PERM.MR_READ),
     getAllRequests
+);
+
+router.post('/',
+    authorize(PERM.MR_CREATE),
+    createRequest
 );
 
 router.get('/:id',
@@ -60,6 +66,45 @@ router.get('/:id/slip',
  *     responses:
  *       200:
  *         description: List of requests
+ *   post:
+ *     summary: Create a Material Request manually
+ *     description: Production staff creates a request for an IN_PROGRESS Work Order.
+ *     tags: [Material Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [workOrderId]
+ *             properties:
+ *               workOrderId: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Material Request created
+ *       400:
+ *         description: Invalid Work Order or status (must be IN_PROGRESS)
+ */
+
+/**
+ * @swagger
+ * /api/warehouse-ops/material-requests/{id}:
+ *   get:
+ *     summary: Get Material Request details
+ *     description: Returns a specific material request with its component details.
+ *     tags: [Material Requests]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Material Request details
+ *       404:
+ *         description: Request not found
  */
 
 /**

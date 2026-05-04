@@ -18,12 +18,15 @@ The Work Order (WO) module represents the actual shop-floor execution to fulfill
        |
      (Release)
        v
-   [RELEASED] -----> [CANCELLED]
+    [RELEASED] -----> [CANCELLED]
        |
     (Start Work)
-       | (Triggers Material Request)
+       |
        v
  [IN_PROGRESS]
+       | (Manually Create Material Request)
+       v
+ [IN_PROGRESS w/ MR]
        | \
        |  \ (Cancel with reason required)
        |   \
@@ -71,8 +74,9 @@ The Work Order (WO) module represents the actual shop-floor execution to fulfill
 
 - **Steps**:
   - `[User]` Triggers the start action on a specific RELEASED Work Order.
-  - `[System]` Auto-generates a Material Request, signaling warehouse operators to pick and transport the necessary raw components to the production line.
+  - `[System]` Moves Work Order to `IN_PROGRESS`.
   - `[System]` Propagates status to linked PR and SO where allowed by state protections.
+  - **Note**: Production staff must now manually create a Material Request after the WO is `IN_PROGRESS`.
 - **Paths**:
   - **Happy Path**: Request is successfully sent to warehouse and work execution begins.
 - **State Changes**:

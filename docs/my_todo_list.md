@@ -9,6 +9,7 @@
 - [x] **Bug Fix**: Fixed broken relative imports in `warrantyController.ts`.
 - [x] **`fulfilledQuantity` bug in QC service**: Verified schema contains `fulfilledQuantity`, ran `prisma generate` to update client.
 - [x] **WO API Simulation Guide**: Verified the full WO lifecycle end-to-end against a freshly seeded DB (DRAFT -> RELEASED -> IN_PROGRESS -> MR validate -> MR complete -> COMPLETED). Confirmed 5x `PENDING_QC` ProductInstances are generated on completion. Created `docs/features/work_order/02_api_simulation.md` as the permanent frontend reference.
+- [x] **Decoupled Material Request Flow**: Decoupled auto-MR creation from WO start. Exposed manual `POST /api/warehouse-ops/material-requests` API and added `IN_PROGRESS` state gate to MR creation. Updated Swagger docs.
 
 ## Pending Objectives (Next Session)
 - [ ] **QC Flow Integration Test**: Now that WO completion generates `PENDING_QC` instances, verify the QC module (pass/fail, warehouse induction, PR attribution to FULFILLED) with a live end-to-end test against the seeded DB.

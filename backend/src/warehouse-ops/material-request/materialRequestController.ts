@@ -20,6 +20,16 @@ export const getAllRequests = async (req: Request, res: Response): Promise<void>
     }
 };
 
+export const createRequest = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const workOrderId = parsePositiveInt(req.body?.workOrderId, 'workOrderId');
+        const result = await MaterialRequestService.createFromWorkOrder(workOrderId, req.user!.employeeId);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+
 export const getRequestById = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parsePositiveInt(req.params.id, 'Material Request ID');

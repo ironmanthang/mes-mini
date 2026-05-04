@@ -655,8 +655,6 @@ model Notification {
   @@map("notifications")
 }
 
-
-
 model CodeSequence {
   scope        String @id
   currentValue Int    @default(0) @map("current_value")

@@ -14,7 +14,7 @@ Material Request (MR) controls component consumption from COMPONENT warehouse to
        v
 [Work Order IN_PROGRESS]
        |
-(Auto-create MR)
+(Manually create MR)
        v
  [MR PENDING] -----> [MR CANCELLED]
        |                  ^
@@ -28,9 +28,10 @@ Material Request (MR) controls component consumption from COMPONENT warehouse to
 
 ## Flow Breakdown
 
-### Auto-Creation from Work Order
-- **Trigger**: Work Order transitions to `IN_PROGRESS`.
-- **Behavior**: System auto-creates one pending MR for the Work Order (or reuses an existing pending MR).
+### Manual Creation from Work Order
+- **Trigger**: Production staff explicitly calls the MR creation API.
+- **Precondition**: The associated Work Order must be in `IN_PROGRESS` status.
+- **Behavior**: System creates one pending MR for the Work Order. It is idempotent (will return existing pending MR if one already exists for that WO).
 - **Quantity Source**: Material lines are aggregated from linked Production Request BOM snapshots; legacy data without snapshots falls back to master BOM.
 - **Result**: MR is created in `PENDING`.
 
@@ -52,7 +53,7 @@ Material Request (MR) controls component consumption from COMPONENT warehouse to
 - **Issued MR**: If MR is already `ISSUED`, issued quantity is treated as irreversible consumption and kept as audit evidence.
 
 ## Statuses
-- **PENDING**: Auto-created from WO start and waiting for warehouse completion.
+- **PENDING**: Manually created from IN_PROGRESS WO and waiting for warehouse completion.
 - **ISSUED**: All lines have been issued and inventory has been decremented.
 - **CANCELLED**: Request is voided because parent WO was cancelled before issue completion.
 

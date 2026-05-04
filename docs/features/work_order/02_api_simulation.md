@@ -119,9 +119,25 @@ Before creating the Work Order, you need actual database IDs. These change per s
 **What happens (automatic side-effects):**
 - WO status -> `IN_PROGRESS`
 - Linked PR (`PR-20260310-0002`) -> `IN_PROGRESS`
-- System **auto-creates a Material Request** with lines derived from BOM x quantity:
+- **Note**: Material Request is NOT auto-created anymore. You must call the MR creation API manually in the next step.
+
+---
+
+### Create Material Request (Manual Step)
+
+**`POST /api/warehouse-ops/material-requests`**
+
+```json
+{
+  "workOrderId": "<your workOrderId>"
+}
+```
+
+**What happens:**
+- System creates a `PENDING` Material Request with lines derived from BOM x quantity:
   - 5x `COM-SCREEN-OLED`
   - 5x `COM-BATTERY-500`
+- **Gate Check**: This call will fail if the Work Order is not yet `IN_PROGRESS`.
 
 ---
 
@@ -129,8 +145,11 @@ Before creating the Work Order, you need actual database IDs. These change per s
 
 **`GET /api/warehouse-ops/material-requests`**
 
-- Look for the MR with status `PENDING` linked to your WO
+- Look for the MR with status `PENDING` linked to your WO (or use the `requestId` from the `POST` response in the previous step)
 - Note down the `requestId`
+
+**Tip: How to find Work Orders that need an MR?**
+- Use **`GET /api/work-orders?missingMR=true`** to find all `IN_PROGRESS` Work Orders that haven't had a Material Request created for them yet.
 
 ---
 
@@ -255,8 +274,9 @@ The 5 instances now sit at `PENDING_QC`. The next steps in the product lifecycle
 | `POST` | `/api/work-orders` | Create WO (DRAFT) |
 | `PUT` | `/api/work-orders/{id}` | Configure line + target warehouses |
 | `PUT` | `/api/work-orders/{id}/release` | DRAFT -> RELEASED |
-| `PUT` | `/api/work-orders/{id}/start` | RELEASED -> IN_PROGRESS (auto-creates MR) |
-| `GET` | `/api/warehouse-ops/material-requests` | Find the auto-created MR |
+| `PUT` | `/api/work-orders/{id}/start` | RELEASED -> IN_PROGRESS |
+| `POST` | `/api/warehouse-ops/material-requests` | Create MR manually for IN_PROGRESS WO |
+| `GET` | `/api/warehouse-ops/material-requests` | List/Find MRs |
 | `PUT` | `/api/warehouse-ops/material-requests/{id}/validate` | Preview stock availability |
 | `PUT` | `/api/warehouse-ops/material-requests/{id}/complete` | Deduct stock, MR -> ISSUED |
 | `PUT` | `/api/work-orders/{id}/complete` | WO -> COMPLETED, creates PENDING_QC instances |

@@ -88,6 +88,10 @@ router.put('/:id/cancel',
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 10 }
+ *       - in: query
+ *         name: missingMR
+ *         description: If true, filters for IN_PROGRESS Work Orders that do not have a Material Request yet.
+ *         schema: { type: boolean }
  *     responses:
  *       200:
  *         description: List of WOs
@@ -162,9 +166,9 @@ router.put('/:id/cancel',
  *           schema:
  *             type: object
  *             properties:
- *               productionLineId: { type: integer }
- *               targetSalesWarehouseId: { type: integer }
- *               targetErrorWarehouseId: { type: integer }
+ *               productionLineId: { type: integer, example: 1 }
+ *               targetSalesWarehouseId: { type: integer, example: 3 }
+ *               targetErrorWarehouseId: { type: integer, example: 4 }
  *               note: { type: string }
  *     responses:
  *       200:
@@ -200,7 +204,7 @@ router.put('/:id/cancel',
  * /api/work-orders/{id}/start:
  *   put:
  *     summary: Start Production (RELEASED -> IN_PROGRESS)
- *     description: Automatically creates a Material Request and updates linked Production Request/Sales Order status.
+ *     description: Moves the Work Order to IN_PROGRESS and updates linked Production Request/Sales Order status. Production staff must manually create a Material Request afterward.
  *     tags: [Work Orders]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -220,7 +224,10 @@ router.put('/:id/cancel',
  * /api/work-orders/{id}/complete:
  *   put:
  *     summary: Complete Production (Move WO to COMPLETED)
- *     description: Requires linked Material Request ISSUED; produced instances are created as PENDING_QC and logged in inventory.
+ *     description: >
+ *       Requires linked Material Request ISSUED. Produced instances are created as PENDING_QC and logged in inventory.
+ *       If the linked Production Request is under-fulfilled and no other Work Orders are IN_PROGRESS, 
+ *       the PR automatically returns to APPROVED.
  *     tags: [Work Orders]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -239,7 +246,7 @@ router.put('/:id/cancel',
  *               quantityProduced: { type: integer, minimum: 1 }
  *               batchCode: { type: string, description: "Optional custom batch code" }
  *               expiryDate: { type: string, format: "date", description: "Optional expiry date" }
- *               warehouseId: { type: integer, description: "Optional warehouse override" }
+ *               warehouseId: { type: integer, description: "Optional warehouse override. Defaults to the Work Order's targetSalesWarehouseId." }
  *     responses:
  *       200:
  *         description: Completed
