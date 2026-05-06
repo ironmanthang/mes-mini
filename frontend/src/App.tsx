@@ -37,7 +37,9 @@ import { Information as FinishedProductInformation } from "./screens/FinishedPro
 import { Barcodes as FinishedProductBarcodes } from "./screens/FinishedProduct/components/Barcodes";
 import { QualityChecks as FinishedProductQuality } from "./screens/FinishedProduct/components/QualityChecks";
 import { Orders as FinishedProductOrders } from "./screens/FinishedProduct/components/Orders";
-import { ProductionExecution as FinishedProductExecution } from "./screens/FinishedProduct/components/ProductionExecution";
+import { ProductionExecution as FinishedProductExecution } from "./screens/Production/components/ProductionExecution";
+import { InboundRequests as FinishedProductInbound } from "./screens/FinishedProduct/components/InboundRequests";
+import { ProductionMonitor as FinishedProductMonitor } from "./screens/FinishedProduct/components/ProductionMonitor";
 
 export default function App() {
   return (
@@ -95,6 +97,7 @@ export default function App() {
               <Route path="work-orders" element={<CreateWorkOrder />} />
               <Route path="material-requests" element={<MaterialRequests />} />
               <Route path="configure-lots" element={<ConfigureProductionLots />} />
+              <Route path="execution" element={<FinishedProductExecution />} />
             </Route>
 
             {/* Finished Products */}
@@ -103,8 +106,9 @@ export default function App() {
               <Route path="info" element={<FinishedProductInformation />} />
               <Route path="barcodes" element={<FinishedProductBarcodes />} />
               <Route path="quality" element={<FinishedProductQuality />} />
+              <Route path="inbound" element={<FinishedProductInbound />} />
+              <Route path="monitor" element={<FinishedProductMonitor />} />
               <Route path="orders" element={<FinishedProductOrders />} />
-              <Route path="execution" element={<FinishedProductExecution />} />
             </Route>
 
             {/* Catch-all */}

@@ -1,276 +1,388 @@
 import { 
-  ClipboardCheck, 
-  CheckCircle2, 
-  XCircle, 
-  Search, 
-  AlertTriangle,
-  PackageCheck,
-  Save,
-  Truck
+  CheckCircle2, XCircle, Search, AlertTriangle, 
+  Save, Camera, Upload, ArrowRightCircle, Check, X, FileText, LayoutList
 } from "lucide-react";
-import { useState, type JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
 
+// --- MOCK DATA ---
+interface ProductInstance {
+  id: number;
+  serialNumber: string;
+  productName: string;
+  status: 'PENDING_QC';
+}
 
-const pendingQCItems = [
-  { id: 1, serial: "SN-2025001-001", name: "Gaming Laptop X1", batch: "BATCH-2025-001", status: "Pending" },
-  { id: 2, serial: "SN-2025001-002", name: "Gaming Laptop X1", batch: "BATCH-2025-001", status: "Pending" },
-  { id: 3, serial: "SN-2025002-055", name: "Mechanical Keyboard", batch: "BATCH-2025-002", status: "Pending" },
+const mockInstances: ProductInstance[] = [
+  { id: 1001, serialNumber: "SN-2026-98765", productName: "Smart Watch V1", status: "PENDING_QC" },
+  { id: 1002, serialNumber: "SN-2026-98766", productName: "Smart Watch V1", status: "PENDING_QC" },
+  { id: 1003, serialNumber: "SN-2026-98767", productName: "Bluetooth Earbuds", status: "PENDING_QC" },
 ];
 
-const qualityChecklist = [
-  { id: "C1", criteria: "Visual Inspection (No scratches/dents)", critical: true },
-  { id: "C2", criteria: "Power On Test (Boot successfully)", critical: true },
-  { id: "C3", criteria: "Screen/Display Check (No dead pixels)", critical: true },
-  { id: "C4", criteria: "Keyboard/Touchpad Responsiveness", critical: false },
-  { id: "C5", criteria: "Connectivity (Wifi/Bluetooth/Ports)", critical: true },
-  { id: "C6", criteria: "Packaging & Accessories Check", critical: false },
+const mockChecklist = [
+  { id: "C1", criteria: "Visual Inspection (No scratches, dents)" },
+  { id: "C2", criteria: "Power Check (Normal startup)" },
+  { id: "C3", criteria: "Display/Screen Check (No dead pixels)" },
+  { id: "C4", criteria: "Connectivity Check (Stable Bluetooth, Wifi)" },
+  { id: "C5", criteria: "Packaging & Accessories Check (Full cable, manual)" }
+];
+
+const DEFECT_TYPES = [
+  "Scratches / Dents",
+  "Cracks / Broken Glass",
+  "No Power / Boot Failure",
+  "Charging Failure / Battery Drain",
+  "Display / Screen Defects",
+  "Keyboard / Touchpad Malfunction",
+  "Port / Connectivity Error",
+  "Audio / Speaker / Mic Failure",
+  "Overheating",
+  "Missing Accessories / Wrong Label"
 ];
 
 export const QualityChecks = (): JSX.Element => {
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  // --- STATE VÙNG 1 (DANH SÁCH) ---
+  const [pendingList, setPendingList] = useState<ProductInstance[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedInstance, setSelectedInstance] = useState<ProductInstance | null>(null);
+
+  // --- STATE VÙNG 2 & 3 (ĐÁNH GIÁ & KẾT QUẢ) ---
+  const [evaluations, setEvaluations] = useState<Record<string, 'PASS' | 'FAIL'>>({});
+  const [defectType, setDefectType] = useState("");
+  const [inspectorNotes, setInspectorNotes] = useState("");
+  const [evidenceImages, setEvidenceImages] = useState<string[]>([]);
   
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
-  const [notes, setNotes] = useState("");
-  const [, setFinalDecision] = useState<"PASS" | "FAIL" | null>(null);
+  // UI State
+  const [showToast, setShowToast] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  
-  const handleSelectItem = (item: any) => {
-    setSelectedItem(item);
-    setCheckedItems({});
-    setNotes("");
-    setFinalDecision(null);
+  // Khởi tạo data
+  useEffect(() => {
+    setPendingList(mockInstances);
+  }, []);
+
+  // LOGIC LOCAL STORAGE (LƯU NHÁP)
+  useEffect(() => {
+    if (selectedInstance) {
+      const draftKey = `qc_draft_${selectedInstance.id}`;
+      const savedDraft = localStorage.getItem(draftKey);
+      
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          setEvaluations(parsed.evaluations || {});
+          setDefectType(parsed.defectType || "");
+          setInspectorNotes(parsed.inspectorNotes || "");
+          setEvidenceImages(parsed.evidenceImages || []);
+          triggerToast("Previous draft restored.");
+        } catch (e) {
+          resetForm();
+        }
+      } else {
+        resetForm();
+      }
+    }
+  }, [selectedInstance]);
+
+  const resetForm = () => {
+    setEvaluations({});
+    setDefectType("");
+    setInspectorNotes("");
+    setEvidenceImages([]);
   };
 
-  const toggleCheck = (id: string) => {
-    setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(""), 3000);
   };
 
-  const checkedCount = Object.values(checkedItems).filter(Boolean).length;
-  const progress = Math.round((checkedCount / qualityChecklist.length) * 100);
-  const allCriticalPassed = qualityChecklist
-    .filter(c => c.critical)
-    .every(c => checkedItems[c.id]);
-
-  const handlePass = () => {
-    if (!allCriticalPassed) {
-      alert("Cannot Pass: Some critical checks are missing!");
-      return;
-    }
-    if (window.confirm(`Confirm PASS for ${selectedItem.serial}?\nItem will be transferred to Sales Warehouse.`)) {
-      alert(`Item ${selectedItem.serial} passed! Transferring to Finished Goods Warehouse...`);
-      setSelectedItem(null);
-    }
+  // --- LOGIC ĐÁNH GIÁ (VÙNG 2) ---
+  const handleEvaluate = (id: string, result: 'PASS' | 'FAIL') => {
+    setEvaluations(prev => {
+      const next = { ...prev, [id]: result };
+      // Nếu đổi từ Fail -> Pass và không còn Fail nào, reset Defect Type
+      if (result === 'PASS' && !Object.values(next).includes('FAIL')) {
+        setDefectType(""); 
+      }
+      return next;
+    });
   };
 
-  const handleFail = () => {
-    if (!notes) {
-      alert("Please provide a reason/note for failure.");
-      return;
-    }
-    if (window.confirm(`Confirm FAIL for ${selectedItem.serial}?\nItem will be moved to Defect Quarantine.`)) {
-      alert(`Item ${selectedItem.serial} marked as DEFECT. Moving to Quarantine Warehouse...`);
-      setSelectedItem(null);
-    }
-  };
+  const progressPercent = Math.round((Object.keys(evaluations).length / mockChecklist.length) * 100);
+  const hasFail = Object.values(evaluations).includes('FAIL');
+  const allPass = Object.keys(evaluations).length === mockChecklist.length && !hasFail;
 
+  // --- ĐIỀU KIỆN MỞ KHÓA NÚT BẤM (SAFETY LOCKS) ---
+  const isDirty = Object.keys(evaluations).length > 0 || defectType !== "" || inspectorNotes !== "";
+  const canSaveDraft = isDirty;
+  const canFail = hasFail && defectType !== "" && inspectorNotes.trim() !== "";
+  const canPass = allPass;
+
+  // --- ACTIONS ---
   const handleSaveDraft = () => {
-    alert("Inspection progress saved as Draft.");
+    if (!selectedInstance) return;
+    const draftKey = `qc_draft_${selectedInstance.id}`;
+    const draftData = { evaluations, defectType, inspectorNotes, evidenceImages };
+    
+    // Chỉ lưu LocalStorage, không gọi BE
+    localStorage.setItem(draftKey, JSON.stringify(draftData));
+    triggerToast("Inspection progress saved as draft.");
   };
 
-  const filteredQueue = pendingQCItems.filter(item => 
-    item.serial.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleMockImageUpload = () => {
+    setEvidenceImages([...evidenceImages, `mock_image_${Date.now()}.png`]);
+  };
+
+  const handleSubmit = async (finalResult: 'PASS' | 'FAIL') => {
+    if (!selectedInstance) return;
+    setIsSubmitting(true);
+
+    try {
+      // Chuẩn bị Payload theo thiết kế
+      const finalNote = finalResult === 'FAIL' ? `[${defectType}] - ${inspectorNotes}` : inspectorNotes;
+      const payload = {
+        productInstanceId: selectedInstance.id,
+        result: finalResult,
+        notes: finalNote,
+        evaluations: evaluations // Chi tiết từng tiêu chí
+      };
+
+      console.log("Submitting QC Result to Backend:", payload);
+      // Giả lập API Delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Thành công: Xóa Local Storage, Xóa khỏi danh sách chờ, Đóng form
+      localStorage.removeItem(`qc_draft_${selectedInstance.id}`);
+      setPendingList(prev => prev.filter(item => item.id !== selectedInstance.id));
+      setSelectedInstance(null);
+      triggerToast(`QC result [${finalResult}] recorded.`);
+      
+    } catch (error) {
+      alert("Error recording QC result.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- RENDER CHÍNH ---
+  const filteredList = pendingList.filter(item => item.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-250px)] min-h-[600px]">
+    <div className="flex gap-6 h-[calc(100vh-120px)] animate-in fade-in duration-300 relative">
       
-      <div className="w-full lg:w-1/4 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <ClipboardListIcon className="w-4 h-4 text-blue-600" />
-            Pending Inspection
-          </h3>
+      {/* ========================================== */}
+      {/* VÙNG A (TRÁI): DANH SÁCH CHỜ KIỂM ĐỊNH */}
+      {/* ========================================== */}
+      <div className="w-1/4 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <LayoutList className="w-5 h-5 text-blue-600" /> Pending Inspection
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">List of products pending QC</p>
+        </div>
+        
+        <div className="p-4 border-b border-gray-100">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             <input 
-              type="text" 
-              placeholder="Scan Serial or Search..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
+              type="text" placeholder="Search Serial Number..." 
+              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
             />
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {filteredQueue.map((item) => (
+          {filteredList.map(item => (
             <div 
               key={item.id}
-              onClick={() => handleSelectItem(item)}
-              className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm group ${
-                selectedItem?.id === item.id 
-                ? "bg-blue-50 border-blue-500 ring-1 ring-blue-500" 
-                : "bg-white border-gray-200 hover:border-blue-300"
-              }`}
+              onClick={() => setSelectedInstance(item)}
+              className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedInstance?.id === item.id ? 'bg-blue-50 border-blue-200 shadow-sm ring-1 ring-blue-500' : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
             >
               <div className="flex justify-between items-start mb-1">
-                <span className="font-bold text-xs text-gray-900 group-hover:text-blue-700">{item.serial}</span>
-                <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">QC Ready</span>
+                <span className="font-mono font-bold text-sm text-blue-700">{item.serialNumber}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 uppercase">Pending</span>
               </div>
-              <p className="text-xs text-gray-600 truncate">{item.name}</p>
-              <p className="text-[10px] text-gray-400 mt-1">Batch: {item.batch}</p>
+              <p className="text-xs text-gray-600 font-medium">{item.productName}</p>
             </div>
           ))}
-          {filteredQueue.length === 0 && (
-             <div className="text-center p-4 text-gray-400 text-sm">No items found.</div>
-          )}
+          {filteredList.length === 0 && <p className="text-center text-sm text-gray-400 py-10">No products pending inspection.</p>}
         </div>
       </div>
 
-      <div className="flex-1 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-        {selectedItem ? (
-          <div className="flex flex-col h-full">
-            
-            <div className="p-6 border-b border-gray-200 bg-gray-50 rounded-t-lg flex justify-between items-start">
+      {/* ========================================== */}
+      {/* VÙNG B & C: KHU VỰC ĐÁNH GIÁ CHI TIẾT */}
+      {/* ========================================== */}
+      {selectedInstance ? (
+        <div className="flex-1 flex gap-6 overflow-hidden">
+          
+          {/* VÙNG B (GIỮA): INSPECTION CHECKLIST */}
+          <div className="w-1/2 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                     <PackageCheck className="w-6 h-6 text-blue-600" />
-                     {selectedItem.name}
-                  </h2>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-                     <span className="font-mono bg-white px-2 py-0.5 border rounded">{selectedItem.serial}</span>
-                     <span>|</span>
-                     <span>Batch: {selectedItem.batch}</span>
-                  </div>
+                  <h3 className="text-base font-bold text-gray-900">Inspection Checklist</h3>
+                  <p className="text-xs font-mono text-gray-500 mt-0.5">SN: {selectedInstance.serialNumber}</p>
                </div>
                <div className="text-right">
-                  <div className="text-sm font-medium text-gray-500 mb-1">Progress</div>
-                  <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2.5">
-                          <div className={`h-2.5 rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-blue-600'}`} style={{width: `${progress}%`}}></div>
-                      </div>
-                      <span className="text-xs font-bold">{progress}%</span>
-                  </div>
+                  <span className="text-2xl font-black text-blue-600">{progressPercent}%</span>
                </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-                
-                <div className="flex-1 p-6 overflow-y-auto border-r border-gray-100">
-                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <ClipboardCheck className="w-4 h-4 text-gray-500" /> Inspection Checklist
-                    </h3>
-                    <div className="space-y-3">
-                        {qualityChecklist.map((check) => (
-                            <label 
-                                key={check.id} 
-                                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                                    checkedItems[check.id] 
-                                    ? "bg-green-50 border-green-200" 
-                                    : "bg-white border-gray-200 hover:bg-gray-50"
-                                }`}
-                            >
-                                <input 
-                                    type="checkbox" 
-                                    checked={!!checkedItems[check.id]}
-                                    onChange={() => toggleCheck(check.id)}
-                                    className="mt-1 w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
-                                />
-                                <div>
-                                    <div className="text-sm font-medium text-gray-900">
-                                        {check.criteria}
-                                        {check.critical && <span className="ml-2 text-[10px] text-red-500 font-bold uppercase border border-red-200 px-1 rounded">Critical</span>}
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-0.5">
-                                        {checkedItems[check.id] ? "Pass" : "Not checked"}
-                                    </div>
-                                </div>
-                            </label>
-                        ))}
-                    </div>
-                </div>
+            {/* Progress Bar */}
+            <div className="w-full h-1.5 bg-gray-200">
+               <div className={`h-full transition-all duration-500 ${hasFail ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${progressPercent}%` }}></div>
+            </div>
 
-                <div className="w-full lg:w-[350px] p-6 bg-gray-50/50 flex flex-col gap-6">
-                    
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">Inspector Notes / Failure Reason</label>
-                        <textarea 
-                            rows={4}
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Enter details here (required for Fail)..."
-                            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-white"
-                        />
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
-                        <h4 className="text-xs font-bold text-gray-500 uppercase">Routing Preview</h4>
-                        <div className="flex items-center gap-2 text-sm">
-                            <Truck className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">If Pass:</span>
-                            <span className="font-bold text-green-700 ml-auto">→ Sales Warehouse</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                            <AlertTriangle className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">If Fail:</span>
-                            <span className="font-bold text-red-700 ml-auto">→ Defect Quarantine</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-auto space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                             <button 
-                                onClick={handleFail}
-                                className="flex flex-col items-center justify-center p-4 
-                                bg-white border border-red-200 text-red-600 rounded-xl 
-                                hover:bg-red-50 hover:border-red-300 transition-all 
-                                shadow-sm group cursor-pointer"
-                             >
-                                <XCircle className="w-6 h-6 mb-1 group-hover:scale-110 transition-transform" />
-                                <span className="font-bold text-sm">FAIL</span>
-                                <span className="text-[10px] opacity-70">Move to Defect</span>
-                             </button>
-
-                             <button 
-                                onClick={handlePass}
-                                className="flex flex-col items-center justify-center 
-                                p-4 bg-green-600 border border-green-600 text-white 
-                                rounded-xl hover:bg-green-500 hover:border-green-500 
-                                transition-all shadow-md group cursor-pointer"
-                             >
-                                <CheckCircle2 className="w-6 h-6 mb-1 group-hover:scale-110 transition-transform" />
-                                <span className="font-bold text-sm">PASS</span>
-                                <span className="text-[10px] opacity-90">Move to Sales</span>
-                             </button>
-                        </div>
-
-                        <button 
-                            onClick={handleSaveDraft}
-                            className="w-full flex items-center justify-center 
-                            gap-2 py-2 text-gray-500 hover:text-gray-700 text-sm 
-                            font-medium transition-colors cursor-pointer"
-                        >
-                            <Save className="w-4 h-4" /> Save Progress (Draft)
-                        </button>
-                    </div>
-
-                </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+               {mockChecklist.map((item, index) => {
+                 const evalState = evaluations[item.id];
+                 return (
+                   <div key={item.id} className={`p-4 rounded-xl border transition-all ${evalState === 'PASS' ? 'bg-green-50/50 border-green-200' : evalState === 'FAIL' ? 'bg-red-50/50 border-red-200' : 'bg-white border-gray-200'}`}>
+                      <p className="text-sm font-bold text-gray-800 mb-3">{index + 1}. {item.criteria}</p>
+                      <div className="flex items-center gap-3">
+                         <button 
+                            onClick={() => handleEvaluate(item.id, 'PASS')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-xs transition-colors cursor-pointer border ${evalState === 'PASS' ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-green-50'}`}
+                         >
+                            <Check className="w-4 h-4" /> PASS
+                         </button>
+                         <button 
+                            onClick={() => handleEvaluate(item.id, 'FAIL')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-xs transition-colors cursor-pointer border ${evalState === 'FAIL' ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-red-50'}`}
+                         >
+                            <X className="w-4 h-4" /> FAIL
+                         </button>
+                      </div>
+                   </div>
+                 )
+               })}
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
-             <ClipboardCheck className="w-16 h-16 mb-4" />
-             <p className="text-lg font-medium">Select an item to inspect</p>
-             <p className="text-sm">Scan barcode or choose from pending list</p>
+
+          {/* VÙNG C (PHẢI): RESULT & EVIDENCE */}
+          <div className="w-1/2 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+            <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+               <h3 className="text-base font-bold text-gray-900">Result & Evidence</h3>
+               <p className="text-xs text-gray-500 mt-0.5">Confirm defects and warehouse routing</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+               
+               {/* 1. Defect Type (Bắt buộc nếu có Lỗi) */}
+               <div className={`space-y-2 transition-opacity ${hasFail ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                  <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                     <AlertTriangle className={`w-4 h-4 ${hasFail ? 'text-red-500' : 'text-gray-400'}`} /> 
+                     Defect Type (Phân loại lỗi) {hasFail && <span className="text-red-500">*</span>}
+                  </label>
+                  <select 
+                     value={defectType} onChange={e => setDefectType(e.target.value)}
+                     className={`w-full p-2.5 border rounded-lg text-sm outline-none transition-all ${hasFail && !defectType ? 'border-red-400 ring-2 ring-red-50' : 'border-gray-300 focus:ring-2 focus:ring-blue-500'}`}
+                  >
+                     <option value="">-- Select defect code --</option>
+                     {DEFECT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                  </select>
+               </div>
+
+               {/* 2. Inspector Notes */}
+               <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                     <FileText className="w-4 h-4 text-blue-500" /> 
+                     Inspector Notes {hasFail && <span className="text-red-500">*</span>}
+                  </label>
+                  <textarea 
+                     value={inspectorNotes} onChange={e => setInspectorNotes(e.target.value)}
+                     placeholder="Detailed status description..." rows={3}
+                     className={`w-full p-3 border rounded-lg text-sm outline-none resize-none transition-all ${hasFail && !inspectorNotes.trim() ? 'border-red-400 ring-2 ring-red-50' : 'border-gray-300 focus:ring-2 focus:ring-blue-500'}`}
+                  />
+               </div>
+
+               {/* 3. Evidence Camera/Upload */}
+               <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                     <Camera className="w-4 h-4 text-blue-500" /> Evidence Upload
+                  </label>
+                  <div className="flex gap-3">
+                     <button onClick={handleMockImageUpload} className="flex-1 flex flex-col items-center justify-center gap-1 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer text-gray-500">
+                        <Camera className="w-5 h-5" />
+                        <span className="text-xs font-bold">Capture</span>
+                     </button>
+                     <button onClick={handleMockImageUpload} className="flex-1 flex flex-col items-center justify-center gap-1 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer text-gray-500">
+                        <Upload className="w-5 h-5" />
+                        <span className="text-xs font-bold">Upload</span>
+                     </button>
+                  </div>
+                  {evidenceImages.length > 0 && (
+                     <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        {evidenceImages.map((img, i) => (
+                           <div key={i} className="w-16 h-16 bg-gray-200 rounded border border-gray-300 flex items-center justify-center flex-shrink-0 relative group">
+                              <span className="text-[8px] text-gray-500 text-center">Image<br/>{i+1}</span>
+                              <button className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hidden group-hover:block" onClick={() => setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))}>
+                                <X className="w-3 h-3" />
+                              </button>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </div>
+
+               {/* 4. Routing Preview */}
+               <div className="p-4 rounded-xl border flex items-center gap-3 bg-gray-50 border-gray-200">
+                  <ArrowRightCircle className={`w-6 h-6 ${allPass ? 'text-green-500' : hasFail ? 'text-red-500' : 'text-gray-400'}`} />
+                  <div>
+                     <p className="text-[10px] font-bold text-gray-500 uppercase">Routing Destination</p>
+                     <p className={`text-sm font-bold ${allPass ? 'text-green-700' : hasFail ? 'text-red-700' : 'text-gray-700'}`}>
+                        {allPass ? "WH-FG (Sales Warehouse)" : hasFail ? "WH-DEFECT (Error Warehouse)" : "Pending evaluation..."}
+                     </p>
+                  </div>
+               </div>
+
+            </div>
+
+            {/* 5. Vùng Footer Actions */}
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex flex-col gap-3">
+               <button 
+                  onClick={handleSaveDraft}
+                  disabled={!canSaveDraft || isSubmitting}
+                  className="w-full py-2.5 flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold text-sm rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+               >
+                  <Save className="w-4 h-4" /> Save Progress (Draft)
+               </button>
+               
+               <div className="flex gap-3">
+                  <button 
+                     onClick={() => handleSubmit('FAIL')}
+                     disabled={!canFail || isSubmitting}
+                     className="flex-1 py-3 flex items-center justify-center gap-2 bg-red-600 text-white font-bold text-sm rounded-lg hover:bg-red-700 transition-all active:scale-95 disabled:opacity-40 disabled:grayscale cursor-pointer shadow-md"
+                     title={hasFail && !canFail ? "Please select defect type and enter notes" : ""}
+                  >
+                     <XCircle className="w-4 h-4" /> FAIL - Move to Defect
+                  </button>
+                  <button 
+                     onClick={() => handleSubmit('PASS')}
+                     disabled={!canPass || isSubmitting}
+                     className="flex-1 py-3 flex items-center justify-center gap-2 bg-green-600 text-white font-bold text-sm rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-40 disabled:grayscale cursor-pointer shadow-md"
+                  >
+                     <CheckCircle2 className="w-4 h-4" /> PASS - Move to Sales
+                  </button>
+               </div>
+            </div>
           </div>
-        )}
-      </div>
+
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
+           <CheckCircle2 className="w-16 h-16 text-gray-300 mb-4" />
+           <p className="text-gray-500 font-medium text-lg">Select a product from the list on the left to start inspection.</p>
+        </div>
+      )}
+
+      {/* TOAST THÔNG BÁO LƯU NHÁP */}
+      {showToast && (
+         <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5">
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <span className="text-sm font-medium">{showToast}</span>
+         </div>
+      )}
+
     </div>
   );
 };
-
-const ClipboardListIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h6"/></svg>
-);

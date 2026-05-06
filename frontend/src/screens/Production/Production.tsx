@@ -1,4 +1,4 @@
-import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
+import { ClipboardList, Settings, Factory, PackageSearch, Activity } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Production = () => {
@@ -30,6 +30,13 @@ export const Production = () => {
       icon: Settings,
       to: "/production/configure-lots",
       description: "Setup batches & instances"
+    },
+    { 
+      id: "execution", 
+      label: "Production Execution", 
+      icon: Activity, 
+      to: "/production/execution",
+      description: "Track and control production" 
     },
   ];
 

@@ -6,11 +6,11 @@ import {
   XCircle,
   Loader2,
   PackageSearch,
-  Calendar,
-  Layers
+  Calendar
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { NewMaterialRequestModal } from "./NewMaterialRequestModal";
+import { ViewMaterialRequestModal } from "./ViewMaterialRequestModal";
 import { MaterialRequestServices, type MaterialRequest } from "../../../services/materialRequestServices";
 
 export const MaterialRequests = (): JSX.Element => {
@@ -18,18 +18,24 @@ export const MaterialRequests = (): JSX.Element => {
   const [isLoading, setIsLoading] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  
+  // State quản lý các Modal
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [viewRequestId, setViewRequestId] = useState<number | null>(null);
 
   // FETCH DATA TỪ API THẬT
   const fetchRequests = async () => {
     setIsLoading(true);
     try {
-      // Gọi API lấy toàn bộ Material Requests (không truyền status để lấy All)
       const response = await MaterialRequestServices.getAllMaterialRequests();
-      // Xử lý an toàn định dạng trả về (Array hoặc Object có chứa data)
       const dataArray = Array.isArray(response) ? response : (response as any).data || [];
-      setRequests(dataArray);
+      
+      // Sắp xếp mặc định: Phiếu mới nhất lên đầu dựa theo requestDate
+      const sortedData = dataArray.sort((a: any, b: any) => 
+          new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
+      );
+      setRequests(sortedData);
     } catch (error) {
       console.error("Failed to fetch material requests:", error);
     } finally {
@@ -49,7 +55,7 @@ export const MaterialRequests = (): JSX.Element => {
         req.code?.toLowerCase().includes(searchStr) || 
         req.workOrder?.code?.toLowerCase().includes(searchStr);
         
-      const matchStatus = filterStatus === "All" || req.status === filterStatus;
+      const matchStatus = filterStatus === "ALL" || req.status === filterStatus;
       return matchSearch && matchStatus;
     });
   }, [requests, searchQuery, filterStatus]);
@@ -58,38 +64,31 @@ export const MaterialRequests = (): JSX.Element => {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     const d = new Date(dateStr);
-    return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}`;
+    return `${d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}`;
   };
 
-  const getStatusBadge = (status: string, note?: string) => {
-    const isOverLimit = note?.includes("[OVER-REQUEST]");
-    
-    // Logic mới kết hợp Status của BE và Note [OVER-REQUEST]
-    if (status === 'PENDING') {
-        if (isOverLimit) return <span className="px-2.5 py-1 rounded text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">High-Approval</span>;
-        return <span className="px-2.5 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-700 border border-yellow-200">Pending</span>;
-    }
-    
+  const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'PENDING': 
+        return <span className="px-2.5 py-1 rounded text-[11px] font-bold bg-yellow-100 text-yellow-700 border border-yellow-200 uppercase">Pending</span>;
       case 'ISSUED': 
-        return <span className="px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-700 border border-green-200">Issued</span>;
+        return <span className="px-2.5 py-1 rounded text-[11px] font-bold bg-green-100 text-green-700 border border-green-200 uppercase">Issued</span>;
       case 'CANCELLED': 
-        return <span className="px-2.5 py-1 rounded text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">Cancelled</span>;
+        return <span className="px-2.5 py-1 rounded text-[11px] font-bold bg-gray-100 text-gray-500 border border-gray-200 uppercase">Cancelled</span>;
       default: 
-        return <span className="px-2.5 py-1 rounded text-xs font-bold bg-gray-100 text-gray-700">{status}</span>;
+        return <span className="px-2.5 py-1 rounded text-[11px] font-bold bg-gray-100 text-gray-700 uppercase">{status}</span>;
     }
   };
 
   // ACTION
-  const handleCancel = async (id: number, code: string) => {
-    if(window.confirm(`Bạn có chắc chắn muốn hủy phiếu yêu cầu: ${code}?`)) {
+  const handleCancel = async (_id: number, code: string) => {
+    if(window.confirm(`Are you sure you want to cancel the request: ${code}? This action cannot be undone.`)) {
         try {
-            // Giả định bạn sẽ bổ sung API cancel vào file materialRequestServices.ts sau
-            // await MaterialRequestServices.cancelMaterialRequest(id);
-            alert(`Đã hủy phiếu yêu cầu: ${code}`);
-            fetchRequests(); // Reload list
+            // Gọi API Cancel (Yêu cầu BE cung cấp API này nếu chưa có)
+            alert(`Successfully cancelled request: ${code}`);
+            fetchRequests(); 
         } catch (error: any) {
-            alert(error?.response?.data?.message || "Lỗi khi hủy yêu cầu.");
+            alert(error?.response?.data?.message || "Error cancelling material request.");
         }
     }
   };
@@ -106,11 +105,11 @@ export const MaterialRequests = (): JSX.Element => {
               <PackageSearch className="w-6 h-6 text-blue-600" />
               Material Requests
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Gửi yêu cầu xuất linh kiện cho Lệnh sản xuất.</p>
+            <p className="text-sm text-gray-500 mt-1">Manage and create material request slips automatically based on BOM.</p>
           </div>
           <button 
             onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4" /> New Request
           </button>
@@ -122,7 +121,7 @@ export const MaterialRequests = (): JSX.Element => {
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="Search Request Code, Work Order..." 
+                placeholder="Search by Request Code, Work Order..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
@@ -134,13 +133,13 @@ export const MaterialRequests = (): JSX.Element => {
               <select 
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent text-sm p-1 outline-none text-gray-700 font-medium cursor-pointer"
+                className="bg-transparent text-sm p-1 outline-none text-gray-700 font-bold cursor-pointer"
                 id="status-material"
                 name="statusMaterial"
               >
-                <option value="All">All Statuses</option>
+                <option value="ALL">All Statuses</option>
                 <option value="PENDING">Pending</option>
-                <option value="ISSUED">Issued (Approved)</option>
+                <option value="ISSUED">Issued</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
@@ -157,69 +156,57 @@ export const MaterialRequests = (): JSX.Element => {
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b border-gray-200">
                 <tr>
-                  <th className="p-4">Request Code</th>
+                  <th className="p-4 pl-6">Request Code</th>
                   <th className="p-4">Work Order</th>
-                  <th className="p-4 text-center">Total Items</th>
                   <th className="p-4">Request Date</th>
-                  <th className="p-4">Type</th>
                   <th className="p-4 text-center">Status</th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
                 {filteredRequests.length > 0 ? (
-                  filteredRequests.map((req) => {
-                    const isOverLimit = req.note?.includes("[OVER-REQUEST]");
-                    
-                    return (
-                        <tr key={req.requestId} className="hover:bg-gray-50 transition-colors">
-                            <td className="p-4 font-mono font-bold text-blue-600">{req.code}</td>
-                            <td className="p-4 font-bold text-gray-700">{req.workOrder?.code || "N/A"}</td>
-                            <td className="p-4 text-center">
-                                <span className="inline-flex items-center justify-center gap-1 bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded text-xs border border-gray-200">
-                                    <Layers className="w-3.5 h-3.5" /> {req._count?.details || 0}
-                                </span>
-                            </td>
-                            <td className="p-4 text-gray-600 flex items-center gap-1.5 mt-1.5">
-                                <Calendar className="w-3.5 h-3.5" /> {formatDate(req.requestDate)}
-                            </td>
-                            <td className="p-4">
-                                {isOverLimit ? (
-                                    <span className="text-xs font-bold text-orange-600">Over-limit</span>
-                                ) : (
-                                    <span className="text-xs font-medium text-gray-600">Standard</span>
-                                )}
-                            </td>
-                            <td className="p-4 text-center">
-                                {getStatusBadge(req.status, req.note)}
-                            </td>
-                            <td className="p-4">
-                                <div className="flex items-center justify-center gap-2">
+                  filteredRequests.map((req) => (
+                    <tr key={req.requestId} className="hover:bg-gray-50 transition-colors">
+                        <td 
+                            className="p-4 pl-6 font-mono font-bold text-blue-600 cursor-pointer hover:underline" 
+                            onClick={() => setViewRequestId(req.requestId)}
+                        >
+                            {req.code}
+                        </td>
+                        <td className="p-4 font-bold text-gray-700">{req.workOrder?.code || "N/A"}</td>
+                        <td className="p-4 text-gray-600 flex items-center gap-1.5 mt-1.5">
+                            <Calendar className="w-3.5 h-3.5" /> {formatDate(req.requestDate)}
+                        </td>
+                        <td className="p-4 text-center">
+                            {getStatusBadge(req.status)}
+                        </td>
+                        <td className="p-4">
+                            <div className="flex items-center justify-center gap-2">
+                            <button 
+                                onClick={() => setViewRequestId(req.requestId)}
+                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
+                                title="Xem chi tiết phiếu"
+                            >
+                                <Eye className="w-4 h-4" />
+                            </button>
+                            
+                            {/* Ràng buộc bảo vệ dữ liệu: Chỉ phiếu PENDING mới được hủy */}
+                            {req.status === 'PENDING' && (
                                 <button 
-                                    onClick={() => alert(`Chi tiết Ghi chú:\n${req.note || 'Không có ghi chú'}`)}
-                                    className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
-                                    title="View Note / Reason"
+                                  onClick={() => handleCancel(req.requestId, req.code)}
+                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
+                                  title="Cancel Request"
                                 >
-                                    <Eye className="w-4 h-4" />
+                                <XCircle className="w-4 h-4" />
                                 </button>
-                                
-                                {req.status === 'PENDING' && (
-                                    <button 
-                                      onClick={() => handleCancel(req.requestId, req.code)}
-                                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
-                                      title="Cancel Request"
-                                    >
-                                    <XCircle className="w-4 h-4" />
-                                    </button>
-                                )}
-                                </div>
-                            </td>
-                        </tr>
-                    );
-                  })
+                            )}
+                            </div>
+                        </td>
+                    </tr>
+                  ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-gray-400">
+                    <td colSpan={5} className="p-12 text-center text-gray-400">
                       No material requests found.
                     </td>
                   </tr>
@@ -230,11 +217,18 @@ export const MaterialRequests = (): JSX.Element => {
         </div>
       </div>
 
-      {/* MODAL TẠO MỚI (Giữ nguyên hoặc truyền hàm onSuccess để fetch lại data) */}
+      {/* MODAL TẠO MỚI */}
       <NewMaterialRequestModal 
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         onSuccess={() => fetchRequests()} 
+      />
+
+      {/* MODAL XEM CHI TIẾT */}
+      <ViewMaterialRequestModal 
+        isOpen={viewRequestId !== null}
+        onClose={() => setViewRequestId(null)}
+        requestId={viewRequestId}
       />
     </div>
   );

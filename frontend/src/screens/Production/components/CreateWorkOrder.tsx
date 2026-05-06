@@ -7,17 +7,19 @@ import { ProductionRequestServices, type ProductionRequestById } from "../../../
 import { ProductionLineServices, type ProductionLine } from "../../../services/productionLineServices";
 import { ProductServices } from "../../../services/productServices";
 import { InventoryServices } from "../../../services/inventoryServices";
-import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 import { WorkOrderServices } from "../../../services/workOrderServices";
+import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 
 export const CreateWorkOrder = (): JSX.Element => {
+  // --- STATE DỮ LIỆU ---
   const [validRequests, setValidRequests] = useState<any[]>([]);
   const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedPrDetail, setSelectedPrDetail] = useState<ProductionRequestById | null>(null);
   
+  // --- STATE FORM ---
   const [selectedRequestId, setSelectedRequestId] = useState<number | "">("");
   const [selectedLineId, setSelectedLineId] = useState<number | "">("");
   const [quantityToProduce, setQuantityToProduce] = useState<number | "">("");
@@ -25,6 +27,7 @@ export const CreateWorkOrder = (): JSX.Element => {
   const [endDate, setEndDate] = useState("");
   const [note, setNote] = useState("");
   
+  // Cấu hình QC Routing bắt buộc của Backend
   const [targetSalesWarehouseId, setTargetSalesWarehouseId] = useState<number | "">("");
   const [targetErrorWarehouseId, setTargetErrorWarehouseId] = useState<number | "">("");
 
@@ -44,12 +47,11 @@ export const CreateWorkOrder = (): JSX.Element => {
           ProductionLineServices.getAllProductionLines(),
           WarehouseServices.getAllWarehouse()
         ]);
-        
-        const prList = (prRes.data || []).filter((r: any) => r.status === 'APPROVED' || r.status === 'IN_PROGRESS');
+        const prList = (prRes.data || []).filter((r: any) => 
+          r.status === 'APPROVED'
+        );
         setValidRequests(prList);
         setProductionLines(Array.isArray(lineRes) ? lineRes : (lineRes as any).data || []);
-        
-        // Lấy danh sách kho để phân luồng QC
         setWarehouses(Array.isArray(whRes) ? whRes : (whRes as any).data || []);
       } catch (error) {
         console.error("Init failed", error);
@@ -120,36 +122,35 @@ export const CreateWorkOrder = (): JSX.Element => {
   const remainingQtyToSchedule = selectedPrDetail ? selectedPrDetail.quantity - scheduledQty : 0;
   
   const isDateDelayed = endDate && selectedPrDetail?.dueDate && new Date(endDate) > new Date(selectedPrDetail.dueDate);
-  const isQtyInvalid = Number(quantityToProduce) > remainingQtyToSchedule;
+  const isQtyExceeded = Number(quantityToProduce) > remainingQtyToSchedule;
   const isDateInvalid = startDate && endDate && new Date(endDate) < new Date(startDate);
   
-  // Validation chặn theo API Simulation
   const isMissingRouting = !targetSalesWarehouseId || !targetErrorWarehouseId;
 
   const handleRelease = async (actionStatus: 'PLANNED' | 'RELEASED') => {
-    if (!selectedRequestId || !selectedLineId || !quantityToProduce || isQtyInvalid || isDateInvalid || (actionStatus === 'RELEASED' && isMissingRouting)) {
+    if (!selectedRequestId || !selectedLineId || !quantityToProduce || Number(quantityToProduce) <= 0 || isDateInvalid || (actionStatus === 'RELEASED' && isMissingRouting)) {
         setShowWarning(true);
         return;
     }
     
     setIsSubmitting(true);
     try {
-        // BƯỚC 1: CREATE WORK ORDER (DRAFT)
+        // Bước 1: Tạo Lệnh DRAFT
         const newWO = await WorkOrderServices.createWorkOrder({
             productionRequestId: Number(selectedRequestId),
             productId: selectedPrDetail!.productId,
-            quantity: Number(quantityToProduce)
+            quantity: Number(quantityToProduce),
+            productionLineId: Number(selectedLineId)
         });
 
-        // BƯỚC 2: CONFIGURE WORK ORDER (Line + Warehouses)
+        // Bước 2: Cập nhật Kho QC
         await WorkOrderServices.updateWorkOrder(newWO.workOrderId, {
-            productionLineId: Number(selectedLineId),
             targetSalesWarehouseId: targetSalesWarehouseId ? Number(targetSalesWarehouseId) : undefined,
             targetErrorWarehouseId: targetErrorWarehouseId ? Number(targetErrorWarehouseId) : undefined,
             note: note
         });
 
-        // BƯỚC 3: RELEASE WORK ORDER (Nếu user chọn Release)
+        // Bước 3: Phát hành lệnh
         if (actionStatus === 'RELEASED') {
             await WorkOrderServices.releaseWorkOrder(newWO.workOrderId);
         }
@@ -157,7 +158,7 @@ export const CreateWorkOrder = (): JSX.Element => {
         setShowSuccess(true);
         setTimeout(() => {
             setShowSuccess(false);
-            window.location.reload(); // Refresh để reset form
+            window.location.reload(); 
         }, 2000);
     } catch (e: any) {
         alert(e.response?.data?.message || "Lỗi khi xử lý lệnh sản xuất.");
@@ -177,8 +178,6 @@ export const CreateWorkOrder = (): JSX.Element => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <div className="lg:col-span-7 space-y-6">
-          
-          {/* VÙNG 1: REQUEST REFERENCE */}
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3">
               <ListChecks className="w-5 h-5 text-blue-600" /> Zone 1: Request Reference
@@ -190,7 +189,7 @@ export const CreateWorkOrder = (): JSX.Element => {
                     value={selectedRequestId} onChange={(e) => setSelectedRequestId(Number(e.target.value))}
                     className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                    <option value="">-- Choose Approved or In-Progress Request --</option>
+                    <option value="">-- Choose Approved Request --</option>
                     {validRequests.map(r => <option key={r.productionRequestId} value={r.productionRequestId}>{r.code} - {r.product?.productName}</option>)}
                 </select>
             </div>
@@ -219,7 +218,6 @@ export const CreateWorkOrder = (): JSX.Element => {
             )}
           </div>
 
-          {/* VÙNG 2: WORK ORDER DETAILS */}
           <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 transition-opacity ${!selectedRequestId ? 'opacity-50 pointer-events-none' : ''}`}>
              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3">
                <Factory className="w-5 h-5 text-blue-600" /> Zone 2: Work Order Details
@@ -242,12 +240,12 @@ export const CreateWorkOrder = (): JSX.Element => {
                     <input 
                         type="number" value={quantityToProduce}
                         onChange={(e) => setQuantityToProduce(e.target.value === "" ? "" : Number(e.target.value))}
-                        className={`w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 ${isQtyInvalid ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
+                        className={`w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 ${isQtyExceeded ? 'border-orange-500 focus:ring-orange-500 bg-orange-50' : 'border-gray-300 focus:ring-blue-500'}`}
                     />
-                    {isQtyInvalid && <p className="text-[10px] text-red-600 font-bold">Quantity cannot exceed the remaining quantity. ({remainingQtyToSchedule})</p>}
+                    {isQtyExceeded && <p className="text-[10px] text-orange-600 font-bold">Cảnh báo: Vượt quá số lượng còn lại ({remainingQtyToSchedule})</p>}
                 </div>
 
-                {/* --- NEW: QC ROUTING WAREHOUSES --- */}
+                {/* YÊU CẦU CHỌN KHO (GATE CHECK) */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700">Target Sales WH (QC Pass) <span className="text-red-500">*</span></label>
                     <select 
@@ -287,18 +285,15 @@ export const CreateWorkOrder = (): JSX.Element => {
                     />
                     {isDateDelayed && (
                         <p className="text-[10px] text-orange-700 font-bold flex items-center gap-1 mt-1">
-                            <AlertTriangle className="w-3 h-3" /> Warning: The end date is later than the request due date.
+                            <AlertTriangle className="w-3 h-3" /> Cảnh báo: Ngày kết thúc trễ hơn Hạn chót Yêu cầu tổng.
                         </p>
                     )}
-                    {isDateInvalid && <p className="text-[10px] text-red-600 font-bold mt-1">End date cannot be earlier than the start date.</p>}
                 </div>
              </div>
           </div>
         </div>
 
         <div className="lg:col-span-5 space-y-6">
-            
-            {/* VÙNG 3: MATERIAL ALLOCATION */}
             <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 min-h-[400px] flex flex-col ${!selectedRequestId || !quantityToProduce ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex items-center justify-between border-b pb-3">
                     <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
@@ -351,7 +346,6 @@ export const CreateWorkOrder = (): JSX.Element => {
                 )}
             </div>
 
-            {/* VÙNG 4: FOOTER ACTIONS */}
             <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 ${!selectedRequestId ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div>
                     <label className="text-sm font-bold text-gray-700 block mb-2">Shift Note / Instructions</label>
@@ -374,7 +368,7 @@ export const CreateWorkOrder = (): JSX.Element => {
                     </button>
                     <button 
                         onClick={() => handleRelease('RELEASED')}
-                        disabled={isSubmitting || !selectedRequestId || isQtyInvalid || isMissingRouting}
+                        disabled={isSubmitting || !selectedRequestId || !quantityToProduce || Number(quantityToProduce) <= 0 || isMissingRouting}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 
                         bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 
                         shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
@@ -389,7 +383,7 @@ export const CreateWorkOrder = (): JSX.Element => {
       </div>
 
       <SuccessNotification isVisible={showSuccess} message="Work Order processed successfully!"/>
-      <WarningNotification isVisible={showWarning} message="Please review the information, quantity/time constraints, and ensure QC routing warehouses are selected." onClose={() => setShowWarning(false)}/>
+      <WarningNotification isVisible={showWarning} message="Please review the information, quantity constraints, and ensure QC Warehouses are selected." onClose={() => setShowWarning(false)}/>
     </div>
   );
 };

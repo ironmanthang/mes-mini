@@ -1,53 +1,38 @@
 import { 
-  Search, Filter, ArrowLeft, PackageCheck,
-  Barcode, CheckCircle2, Printer, Send,
-  Loader2, Calendar, Layers
+  Search, ArrowLeft, PackageCheck,
+  CheckCircle2, Send, Loader2, Layers,
+  AlertCircle, XCircle, ClipboardCheck
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { MaterialRequestServices, type MaterialRequest, type ValidationLine } from "../../../services/materialRequestServices";
 
-// --- UI EXTENDED INTERFACES ---
-interface FifoLotItem {
-  id: string; // Combined CompID + LotCode
-  priority: number;
-  componentCode: string;
-  componentId: number;
-  lotCode: string;
-  available: number;
-  suggested: number;
-  isVerified: boolean;
-}
-
 export const MaterialIssuing = (): JSX.Element => {
-  // --- STATE LIST VIEW ---
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"All" | "PENDING" | "ISSUED">("All");
 
-  // --- STATE PROCESSING VIEW (DETAIL) ---
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
-  const [fifoLots, setFifoLots] = useState<FifoLotItem[]>([]);
+  const [validationLines, setValidationLines] = useState<ValidationLine[]>([]);
   const [isValidating, setIsValidating] = useState(false);
-  const [scannedCode, setScannedCode] = useState("");
-  const [scanError, setScanError] = useState("");
+  const [hasValidated, setHasValidated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Default Warehouse (Per simulation is WH-MAIN id: 1)
-  const CURRENT_WAREHOUSE_ID = 1; 
+  const CURRENT_WAREHOUSE_ID = 1;
 
-  // ==========================================
-  // 1. FETCH MATERIAL REQUEST LIST
-  // ==========================================
   const fetchRequests = async () => {
     setIsLoading(true);
     try {
       const response = await MaterialRequestServices.getAllMaterialRequests({ 
-        status: filterStatus === "All" ? undefined : filterStatus 
+        status: "PENDING"
       });
-      setRequests(response.data || []);
+      
+      const sortedData = (response.data || []).sort((a, b) => 
+        new Date(a.requestDate).getTime() - new Date(b.requestDate).getTime()
+      );
+      
+      setRequests(sortedData);
     } catch (error) {
-      console.error("Failed to fetch material requests:", error);
+      console.error("Failed to fetch requests:", error);
     } finally {
       setIsLoading(false);
     }
@@ -55,97 +40,62 @@ export const MaterialIssuing = (): JSX.Element => {
 
   useEffect(() => {
     fetchRequests();
-  }, [filterStatus]);
+  }, []);
 
-  // ==========================================
-  // 2. VALIDATE & FIFO CALCULATION
-  // ==========================================
-  useEffect(() => {
-    if (selectedRequest) {
-      setScannedCode("");
-      setScanError("");
-      setIsValidating(true);
-      
-      // Call Validate API to get Available Lots per FIFO
-      MaterialRequestServices.validateMaterial(selectedRequest.requestId, CURRENT_WAREHOUSE_ID)
-        .then((res) => {
-            const lines: ValidationLine[] = res.lines || [];
-            let priorityCount = 1;
-            const parsedLots: FifoLotItem[] = [];
-            
-            // Iterate through each component in the request
-            lines.forEach((line) => {
-                // Iterate through available lots for that component
-                line.availableLots.forEach((lot) => {
-                    parsedLots.push({
-                        id: `${line.componentId}-${lot.lotCode}`,
-                        priority: priorityCount++,
-                        componentCode: line.componentCode,
-                        componentId: line.componentId,
-                        lotCode: lot.lotCode,
-                        available: lot.currentQuantity,
-                        suggested: Math.min(line.requiredQuantity, lot.currentQuantity), // Simplified logic
-                        isVerified: false
-                    });
-                });
-            });
-            setFifoLots(parsedLots);
-        })
-        .catch(err => {
-            console.error("Validation failed", err);
-            alert("Error during FIFO inventory reconciliation.");
-        })
-        .finally(() => setIsValidating(false));
-    }
-  }, [selectedRequest]);
-
-  // ==========================================
-  // 3. SIMULATED BARCODE VERIFICATION LOGIC
-  // ==========================================
-  const currentUnverifiedIndex = fifoLots.findIndex(lot => !lot.isVerified);
-  const allVerified = fifoLots.length > 0 && currentUnverifiedIndex === -1;
-
-  const handleVerify = () => {
-    setScanError("");
-    if (currentUnverifiedIndex === -1) return;
-
-    const targetLot = fifoLots[currentUnverifiedIndex];
-    if (scannedCode.trim().toLowerCase() === targetLot.lotCode.toLowerCase()) {
-      const newLots = [...fifoLots];
-      newLots[currentUnverifiedIndex].isVerified = true;
-      setFifoLots(newLots);
-      setScannedCode(""); 
-    } else {
-      setScanError("Mismatch! Lot code does not match FIFO suggestion. Please check again.");
-    }
-  };
-
-  const handleSimulateScan = () => {
-    if (currentUnverifiedIndex !== -1) {
-      setScannedCode(fifoLots[currentUnverifiedIndex].lotCode);
-      setScanError("");
-    }
-  };
-
-  // ==========================================
-  // 4. COMPLETE MATERIAL ISSUE
-  // ==========================================
-  const handleConfirmIssue = async () => {
-    if (!allVerified) return alert("Please verify all lots before issuing!");
+  const handleValidate = async () => {
     if (!selectedRequest) return;
+    
+    setIsValidating(true);
+    try {
+      const res = await MaterialRequestServices.validateMaterial(
+        selectedRequest.requestId, 
+        CURRENT_WAREHOUSE_ID
+      );
+      setValidationLines(res.lines || []);
+      setHasValidated(true);
+    } catch (err) {
+      console.error("Validation failed", err);
+      alert("Error checking inventory.");
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const isAllAvailable = useMemo(() => {
+    return hasValidated && validationLines.length > 0 && validationLines.every(line => line.isSufficient);
+  }, [hasValidated, validationLines]);
+
+  const handleConfirmIssue = async () => {
+    if (!isAllAvailable || !selectedRequest) return;
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        warehouseId: CURRENT_WAREHOUSE_ID,
-        consumedLots: fifoLots.map(l => ({
-            componentId: l.componentId,
-            lotCode: l.lotCode,
-            quantity: l.suggested
-        }))
-      };
+      const consumedLotsPayload = [];
 
-      await MaterialRequestServices.completeMaterialIssue(selectedRequest.requestId, payload);
+      for (const line of validationLines) {
+        let remainingToFulfill = line.requiredQuantity;
+
+        if (line.availableLots && line.availableLots.length > 0) {
+          for (const lot of line.availableLots) {
+            if (remainingToFulfill <= 0) break;
+
+            const quantityToTake = Math.min(remainingToFulfill, lot.currentQuantity);
+            
+            consumedLotsPayload.push({
+              componentId: line.componentId,
+              lotCode: lot.lotCode,
+              quantity: quantityToTake,
+            });
+
+            remainingToFulfill -= quantityToTake;
+          }
+        }
+      }
+
+      await MaterialRequestServices.completeMaterialIssue(selectedRequest.requestId, {
+        warehouseId: CURRENT_WAREHOUSE_ID,
+        consumedLots: consumedLotsPayload 
+      });
       
       alert("Material components issued successfully!");
       fetchRequests(); 
@@ -157,9 +107,19 @@ export const MaterialIssuing = (): JSX.Element => {
     }
   };
 
-  // ==========================================
-  // VIEW RENDERERS
-  // ==========================================
+  const handleReject = async () => {
+    if (!selectedRequest) return;
+    if (!window.confirm("Are you sure you want to reject (cancel) this request?")) return;
+
+    try {
+        alert("Request rejected.");
+        fetchRequests();
+        setSelectedRequest(null);
+    } catch (error) {
+        alert("Failed to reject request.");
+    }
+  };
+
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
       const searchStr = searchQuery.toLowerCase();
@@ -168,7 +128,6 @@ export const MaterialIssuing = (): JSX.Element => {
     });
   }, [requests, searchQuery]);
 
-  // --- MÀN HÌNH 1: DANH SÁCH YÊU CẦU ---
   if (!selectedRequest) {
     return (
       <div className="flex flex-col gap-6 pb-12 animate-in fade-in duration-300">
@@ -178,33 +137,18 @@ export const MaterialIssuing = (): JSX.Element => {
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <PackageCheck className="w-6 h-6 text-blue-600" /> Material Issuing
               </h2>
-              <p className="text-sm text-gray-500 mt-1">Verify barcodes and issue components to the production shop.</p>
+              <p className="text-sm text-gray-500 mt-1">Manage and process component issue requests from the production shop.</p>
             </div>
           </div>
 
-          <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                <input 
-                  type="text" placeholder="Search by Request Code, WO Code..." 
-                  value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
-                />
-              </div>
-              <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
-                <Filter className="w-4 h-4 text-gray-500 ml-2" />
-                <select 
-                  value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="bg-transparent text-sm p-1 outline-none text-gray-700 font-medium cursor-pointer"
-                  id="status-material"
-                  name="statusMaterial"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="PENDING">Pending Issue</option>
-                  <option value="ISSUED">Issued</option>
-                </select>
-              </div>
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" placeholder="Search by request code, work order..." 
+                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
+              />
             </div>
           </div>
 
@@ -217,7 +161,6 @@ export const MaterialIssuing = (): JSX.Element => {
                   <tr>
                     <th className="p-4">Request Code</th>
                     <th className="p-4">Work Order</th>
-                    <th className="p-4 text-center">Component Types</th>
                     <th className="p-4">Request Date</th>
                     <th className="p-4 text-center">Status</th>
                     <th className="p-4 text-center">Actions</th>
@@ -226,38 +169,29 @@ export const MaterialIssuing = (): JSX.Element => {
                 <tbody className="text-sm divide-y divide-gray-100">
                   {filteredRequests.map((req) => (
                     <tr key={req.requestId} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-mono font-bold text-blue-600">{req.code}</td>
-                      <td className="p-4 font-bold text-gray-700">{req.workOrder?.code || "N/A"}</td>
-                      <td className="p-4 text-center">
-                          <span className="inline-flex items-center justify-center gap-1 bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded text-xs border border-gray-200">
-                              <Layers className="w-3.5 h-3.5" /> {req._count?.details || 0}
-                          </span>
-                      </td>
-                      <td className="p-4 text-gray-600 flex items-center gap-1.5 mt-1.5">
-                          <Calendar className="w-3.5 h-3.5" /> 
-                          {new Date(req.requestDate).toLocaleDateString('en-US')}
+                      <td className="p-4 font-bold text-gray-900">{req.code}</td>
+                      <td className="p-4 font-medium text-gray-700">{req.workOrder?.code}</td>
+                      <td className="p-4 text-gray-600">
+                          {new Date(req.requestDate).toLocaleString('en-US')}
                       </td>
                       <td className="p-4 text-center">
-                          {req.status === 'PENDING' ? (
-                             <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 uppercase border border-yellow-200">Pending</span>
-                          ) : (
-                             <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-green-100 text-green-700 uppercase border border-green-200">Issued</span>
-                          )}
+                          <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 uppercase border border-yellow-200">PENDING</span>
                       </td>
                       <td className="p-4 text-center">
-                        {req.status === 'PENDING' ? (
-                          <button 
-                            onClick={() => setSelectedRequest(req)}
-                            className="px-4 py-1.5 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 transition-colors text-xs cursor-pointer active:scale-95 shadow-sm"
-                          >
-                            Process
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400 font-medium italic">Completed</span>
-                        )}
+                        <button 
+                          onClick={() => setSelectedRequest(req)}
+                          className="px-6 py-1.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors text-xs cursor-pointer shadow-sm"
+                        >
+                          Process
+                        </button>
                       </td>
                     </tr>
                   ))}
+                  {filteredRequests.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-10 text-center text-gray-400 italic">No pending requests found.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}
@@ -267,72 +201,81 @@ export const MaterialIssuing = (): JSX.Element => {
     );
   }
 
-  // --- SCREEN 2: DETAIL PROCESSING (DETAIL VIEW) ---
   return (
     <div className="flex flex-col gap-6 pb-20 animate-in slide-in-from-right-4 duration-300">
       
       <div className="flex items-center gap-4">
-        <button onClick={() => setSelectedRequest(null)} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 cursor-pointer shadow-sm">
+        <button onClick={() => { setSelectedRequest(null); setHasValidated(false); }} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 cursor-pointer shadow-sm">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Material Issue Processing</h2>
-          <p className="text-sm text-gray-500 font-mono">Request Code: {selectedRequest.code}</p>
+          <p className="text-sm text-gray-500 font-mono">Process inventory check and issue for request: {selectedRequest.code}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-gray-900 uppercase flex items-center gap-2 border-b pb-3">
-              <PackageCheck className="w-5 h-5 text-blue-600" /> Source Request Info
-            </h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block">Work Order</span>
-                  <span className="text-sm font-bold text-gray-900">{selectedRequest.workOrder?.code || 'N/A'}</span>
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Request Code</span>
+                  <p className="text-sm font-bold text-gray-900">{selectedRequest.code}</p>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 col-span-2 flex justify-between items-center">
-                  <div>
-                      <span className="text-[10px] font-bold text-blue-600 uppercase block">Total Component Types</span>
-                      <span className="text-sm font-bold text-gray-900">{selectedRequest._count?.details || 0} Components</span>
-                  </div>
-                  <Layers className="w-8 h-8 text-blue-200" />
+              <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Work Order</span>
+                  <p className="text-sm font-bold text-gray-900">{selectedRequest.workOrder?.code}</p>
               </div>
-            </div>
+              <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Request Date</span>
+                  <p className="text-sm font-bold text-gray-900">{new Date(selectedRequest.requestDate).toLocaleDateString('en-US')}</p>
+              </div>
+              <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Status</span>
+                  <p className="text-sm font-bold text-yellow-600">PENDING</p>
+              </div>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                <h3 className="text-sm font-bold text-gray-900 uppercase flex items-center gap-2">
-                 <Filter className="w-5 h-5 text-blue-600" /> FIFO Picking Suggestions
+                 <Layers className="w-5 h-5 text-blue-600" /> Validation Table
                </h3>
-               {isValidating && <Loader2 className="w-5 h-5 animate-spin text-blue-500" />}
+               {isValidating && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
             </div>
             <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
                     <tr>
-                        <th className="p-3 pl-6">Priority</th>
-                        <th className="p-3">Component</th>
-                        <th className="p-3">Target Lot Code</th>
-                        <th className="p-3 text-right">Available</th>
-                        <th className="p-3 text-right text-blue-600 pr-6">Required</th>
+                        <th className="p-4">Component Name</th>
+                        <th className="p-4 text-right">Required Qty</th>
+                        <th className="p-4 text-center">Availability</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                    {fifoLots.map((lot, idx) => {
-                      const isCurrentTarget = idx === currentUnverifiedIndex;
+                    {(hasValidated ? validationLines : (selectedRequest.details || [])).map((line: any, idx) => {
+                      const isSufficient = hasValidated ? (line as ValidationLine).isSufficient : null;
+                      
                       return (
-                        <tr key={lot.id} className={`transition-colors ${lot.isVerified ? 'bg-green-50/30' : isCurrentTarget ? 'bg-blue-50/50 border-l-4 border-l-blue-500' : 'bg-white opacity-60'}`}>
-                            <td className="p-3 pl-6 font-bold text-gray-500">#{lot.priority}</td>
-                            <td className="p-3 font-bold text-gray-900">{lot.componentCode}</td>
-                            <td className="p-3 font-mono font-bold text-gray-700 flex items-center gap-2">
-                                {lot.lotCode} 
-                                {lot.isVerified && <CheckCircle2 className="w-4 h-4 text-green-500"/>}
+                        <tr key={idx} className="hover:bg-gray-50">
+                            <td className="p-4 font-medium text-gray-900">
+                                {hasValidated ? (line as ValidationLine).componentName : line.component?.componentName}
                             </td>
-                            <td className="p-3 text-right text-gray-600">{lot.available}</td>
-                            <td className="p-3 text-right font-black text-blue-700 pr-6">{lot.suggested}</td>
+                            <td className="p-4 text-right font-bold text-gray-700">
+                                {hasValidated ? (line as ValidationLine).requiredQuantity : line.quantity}
+                            </td>
+                            <td className="p-4 text-center">
+                                {!hasValidated ? (
+                                    <span className="text-gray-300 italic text-xs">Awaiting check...</span>
+                                ) : isSufficient ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                                        <CheckCircle2 className="w-3 h-3" /> AVAILABLE
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                        <AlertCircle className="w-3 h-3" /> SHORTAGE
+                                    </span>
+                                )}
+                            </td>
                         </tr>
                       )
                     })}
@@ -341,75 +284,57 @@ export const MaterialIssuing = (): JSX.Element => {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-5">
-            <h3 className="text-sm font-bold text-gray-900 uppercase flex items-center gap-2 border-b pb-3">
-              <Barcode className="w-5 h-5 text-blue-600" /> Lot Verification
-            </h3>
-
-            {allVerified ? (
-              <div className="py-8 flex flex-col items-center justify-center text-green-600 bg-green-50 rounded-lg border border-green-200 animate-in zoom-in">
-                <CheckCircle2 className="w-12 h-12 mb-2" />
-                <h4 className="font-bold text-lg">Verification Complete!</h4>
-                <p className="text-xs font-medium text-green-700 mt-1">Ready for actual inventory deduction.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                    <div className="text-xs font-bold text-gray-700 uppercase flex justify-between">
-                      Scan Target <span className="text-blue-600">Lot #{fifoLots[currentUnverifiedIndex]?.priority}</span>
-                    </div>
-                    <div className="p-3 bg-gray-100 rounded-lg font-mono text-sm text-center font-bold text-gray-600 border border-gray-200 border-dashed truncate">
-                       {fifoLots[currentUnverifiedIndex]?.lotCode || "Loading..."}
-                    </div>
-                </div>
-
-                <div className="space-y-2 relative">
-                    <label className="text-xs font-bold text-gray-700 uppercase">Input / Simulate Scan
-                      <input 
-                        type="text" autoFocus
-                        value={scannedCode} onChange={(e) => setScannedCode(e.target.value)}
-                        placeholder="Enter lot code or click button..."
-                        className={`w-full p-3 pr-10 border mt-1 
-                        rounded-lg text-sm font-mono outline-none focus:ring-2 ${scanError ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
-                        id="simulate-scan"
-                        name="simulateScan"
-                      />
-                    </label>
-                    
-                    <button 
-                      onClick={handleSimulateScan}
-                      className="absolute right-2 top-[26px] p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                    >
-                      <Barcode className="w-5 h-5" />
-                    </button>
-                    {scanError && <p className="text-[11px] text-red-600 font-bold mt-1">{scanError}</p>}
-                </div>
+        <div className="lg:col-span-4 space-y-4">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
+            <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-3">Actions</h3>
+            
+            <div className="space-y-3">
+                <button 
+                    onClick={handleValidate}
+                    disabled={isValidating || isSubmitting}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-lg hover:bg-blue-100 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                    {isValidating ? <Loader2 className="w-5 h-5 animate-spin"/> : <ClipboardCheck className="w-5 h-5" />} 
+                    Step 1: Validate Stock
+                </button>
 
                 <button 
-                  onClick={handleVerify}
-                  disabled={!scannedCode.trim()}
-                  className="w-full py-3 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-colors disabled:opacity-50 cursor-pointer shadow-md"
+                    onClick={handleConfirmIssue}
+                    disabled={!isAllAvailable || isSubmitting}
+                    className={`w-full flex items-center justify-center gap-2 py-4 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 cursor-pointer
+                        ${isAllAvailable ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 grayscale cursor-not-allowed opacity-60'}
+                    `}
                 >
-                  Verify Lot
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5" />} 
+                    Step 2: Complete & Issue
                 </button>
-              </div>
+
+                <button 
+                    onClick={handleReject}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-red-200 text-red-500 font-bold rounded-lg hover:bg-red-50 transition-all cursor-pointer mt-4"
+                >
+                    <XCircle className="w-5 h-5" /> Reject Request
+                </button>
+            </div>
+
+            {!hasValidated && (
+                <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                    <p className="text-[11px] text-orange-700 leading-relaxed">
+                        <b>Instructions:</b> You must click <b>Validate Stock</b> to check inventory before issuing components.
+                    </p>
+                </div>
+            )}
+            {hasValidated && !isAllAvailable && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
+                    <p className="text-[11px] text-red-700 leading-relaxed font-bold">
+                        Insufficient stock! Cannot proceed with issuing. Please check physical inventory or reject the request.
+                    </p>
+                </div>
             )}
           </div>
-
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-3">
-             <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors shadow-sm cursor-pointer">
-                <Printer className="w-4 h-4" /> Print Issue Slip
-             </button>
-             <button 
-                onClick={handleConfirmIssue}
-                disabled={!allVerified || isSubmitting}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:grayscale cursor-pointer"
-             >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />} Confirm & Issue
-             </button>
-          </div>
         </div>
+
       </div>
     </div>
   );

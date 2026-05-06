@@ -94,10 +94,16 @@ export interface DispatchSlip {
 
 export const MaterialRequestServices = {
     getAllMaterialRequests: async (params?: { page?: number; limit?: number; status?: Status }) => {
-        // Backend trả về PaginatedResponse (gồm data, total, page, limit)
         const response = await api.get<{ data: MaterialRequest[], total: number }>('/warehouse-ops/material-requests', { params });
         return response.data;
     },
+
+    createFromWorkOrder: async (woId: number) => {
+    const response = await api.post<{ workOrderId: number }>(`/warehouse-ops/material-requests`, {
+        workOrderId: woId 
+    });
+    return response.data;
+},
 
     getMaterialRequestById: async (id: number) => {
         const response = await api.get<MaterialRequest>(`/warehouse-ops/material-requests/${id}`);

@@ -4,7 +4,9 @@ import {
   ScanBarcode, 
   ClipboardCheck, 
   ShoppingCart,
-  Activity
+  Activity,
+  PackagePlus,
+  LineChart
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -18,11 +20,11 @@ export const FinishedProduct = (): JSX.Element => {
       description: "Batch details & serial numbers" 
     },
     { 
-      id: "execution", 
-      label: "Production Execution", 
-      icon: Activity, 
-      to: "/finished-products/execution",
-      description: "Track and control production" 
+      id: "monitor", 
+      label: "Production Monitor", 
+      icon: LineChart, 
+      to: "/finished-products/monitor",
+      description: "Real-time tracking & delay alerts" 
     },
     { 
       id: "barcodes", 
@@ -37,6 +39,13 @@ export const FinishedProduct = (): JSX.Element => {
       icon: ClipboardCheck, 
       to: "/finished-products/quality",
       description: "QA/QC inspections & logs" 
+    },
+    { 
+      id: "inbound", 
+      label: "Inbound Requests", 
+      icon: PackagePlus, 
+      to: "/finished-products/inbound",
+      description: "Create warehouse entry requests" 
     },
     { 
       id: "orders", 
@@ -85,4 +94,4 @@ export const FinishedProduct = (): JSX.Element => {
       </div>
     </div>
   );
-};
+};

@@ -1,8 +1,10 @@
 import { 
-    X, Send, Loader2, Search, AlertTriangle, PackageSearch
+    X, Send, Loader2, Search, PackageSearch
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { WorkOrderServices, type WorkOrderListItem } from "../../../services/workOrderServices";
+import { MaterialRequestServices } from "../../../services/materialRequestServices";
+import { ProductServices } from "../../../services/productServices"; 
 
 interface NewMaterialRequestModalProps {
     isOpen: boolean;
@@ -10,12 +12,12 @@ interface NewMaterialRequestModalProps {
     onSuccess: () => void;
 }
 
-interface MaterialAllowanceMock {
+interface AutoBomRow {
     componentId: number;
     componentName: string;
-    standardQty: number; // Định mức chuẩn
-    issuedQty: number;   // Số lượng đã xin trước đây
-    remainingAllowance: number; // Hạn mức còn lại
+    unit: string;
+    bomRatio: number;      
+    requestQty: number;    
 }
 
 export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMaterialRequestModalProps): JSX.Element | null => {
@@ -24,122 +26,85 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
     const [selectedWo, setSelectedWo] = useState<WorkOrderListItem | null>(null);
     const [isLoadingWOs, setIsLoadingWOs] = useState(false);
     
-    const [bomTableData, setBomTableData] = useState<MaterialAllowanceMock[]>([]);
-    const [requestQtys, setRequestQtys] = useState<Record<number, number>>({});
+    const [bomTableData, setBomTableData] = useState<AutoBomRow[]>([]);
     const [isFetchingBom, setIsFetchingBom] = useState(false);
     
-    const [isOverLimit, setIsOverLimit] = useState(false);
-    const [overRequestReason, setOverRequestReason] = useState("");
-
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Fetch Work Orders list when Modal is opened
     useEffect(() => {
         if (isOpen) {
             setIsLoadingWOs(true);
             WorkOrderServices.getAllWorkOrders({ limit: 500 })
                 .then(res => {
                     const data = res.data || [];
-                    const validWOs = data.filter(w => w.status === 'RELEASED' || w.status === 'IN_PROGRESS');
+                    const validWOs = data.filter(w => w.status === 'IN_PROGRESS');
                     setWorkOrders(validWOs);
                 })
                 .catch(err => console.error("Failed to load Work Orders:", err))
                 .finally(() => setIsLoadingWOs(false));
         } else {
-            setSelectedWoId("");
-            setSelectedWo(null);
-            setBomTableData([]);
-            setRequestQtys({});
-            setIsOverLimit(false);
-            setOverRequestReason("");
+            resetModalState();
         }
     }, [isOpen]);
 
+    // GET ACTUAL BOM DATA FROM PRODUCT SERVICES
     useEffect(() => {
         if (selectedWoId) {
             const wo = workOrders.find(w => w.workOrderId === Number(selectedWoId));
             setSelectedWo(wo || null);
 
-            if (wo) {
+            // If Work Order is found and has productId
+            if (wo && wo.productId) {
                 setIsFetchingBom(true);
-                setTimeout(() => {
-                    const mockAllowance: MaterialAllowanceMock[] = [
-                        { 
-                            componentId: 101, 
-                            componentName: "Màn hình OLED 1.5 inch", 
-                            standardQty: wo.quantity * 1, 
-                            issuedQty: Math.floor(wo.quantity * 0.8), // Giả lập đã xuất 80%
-                            remainingAllowance: 0 
-                        },
-                        { 
-                            componentId: 102, 
-                            componentName: "Pin Lithium 500mAh", 
-                            standardQty: wo.quantity * 1, 
-                            issuedQty: 0, 
-                            remainingAllowance: 0 
-                        }
-                    ].map(item => ({
-                        ...item,
-                        remainingAllowance: item.standardQty - item.issuedQty // Công thức tính hạn mức còn lại
-                    }));
-
-                    setBomTableData(mockAllowance);
-                    
-                    const initialQtys: Record<number, number> = {};
-                    mockAllowance.forEach(item => {
-                        initialQtys[item.componentId] = Math.max(0, item.remainingAllowance);
+                
+                // Call API to fetch BOM based on Work Order's productId
+                ProductServices.getBOMById(wo.productId)
+                    .then(bomList => {
+                        // Calculate and map data for display
+                        const tableData: AutoBomRow[] = bomList.map(bomItem => ({
+                            componentId: bomItem.componentId,
+                            componentName: bomItem.component.componentName,
+                            unit: bomItem.component.unit,
+                            bomRatio: bomItem.quantityNeeded,
+                            // Calculate total quantity to issue (Auto-BOM Logic)
+                            requestQty: bomItem.quantityNeeded * wo.quantity 
+                        }));
+                        setBomTableData(tableData);
+                    })
+                    .catch(err => {
+                        console.error("Failed to fetch BOM details:", err);
+                        setBomTableData([]);
+                    })
+                    .finally(() => {
+                        setIsFetchingBom(false);
                     });
-                    setRequestQtys(initialQtys);
-                    setIsFetchingBom(false);
-                }, 600);
             }
         } else {
             setBomTableData([]);
-            setRequestQtys({});
         }
     }, [selectedWoId, workOrders]);
 
-    const handleQtyChange = (compId: number, value: string) => {
-        const numVal = parseInt(value) || 0;
-        
-        setRequestQtys(prev => {
-            const next = { ...prev, [compId]: numVal };
-            
-            let hasOver = false;
-            bomTableData.forEach(item => {
-                const inputVal = item.componentId === compId ? numVal : (prev[item.componentId] || 0);
-                if (inputVal > item.remainingAllowance) hasOver = true;
-            });
-            setIsOverLimit(hasOver);
-            
-            return next;
-        });
+    const resetModalState = () => {
+        setSelectedWoId("");
+        setSelectedWo(null);
+        setBomTableData([]);
     };
 
     const handleSubmit = async () => {
-        if (!selectedWoId) return alert("Vui lòng chọn Lệnh sản xuất.");
-        if (isOverLimit && !overRequestReason.trim()) {
-            return alert("Lý do xin vượt mức là bắt buộc!");
-        }
+        if (!selectedWoId) return alert("Please select a Work Order.");
 
         setIsSubmitting(true);
         try {
-            const payload = {
-                work_order_id: Number(selectedWoId),
-                items: bomTableData.map(item => ({
-                    component_id: item.componentId,
-                    quantity: requestQtys[item.componentId] || 0
-                })),
-                reason: isOverLimit ? overRequestReason : undefined,
-            };
-            
-            console.log("Mock Submit Payload:", payload);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // BE automatically extracts data by workOrderId
+            await MaterialRequestServices.createFromWorkOrder(Number(selectedWoId));
 
-            alert("Gửi yêu cầu vật tư thành công!");
+            alert("Material request submitted successfully!");
             onSuccess();
             onClose();
         } catch (error) {
-            alert("Lỗi khi gửi yêu cầu.");
+            console.error(error);
+            alert("Error submitting request. Please try again!");
         } finally {
             setIsSubmitting(false);
         }
@@ -165,20 +130,22 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                 </div>
 
                 <div className="p-8 overflow-y-auto space-y-8 flex-1">
-                    {/* VÙNG 1: CHỌN LỆNH SẢN XUẤT */}
+                    {/* ZONE 1: SELECT WORK ORDER */}
                     <div className="space-y-4">
                         <label className="text-sm font-bold text-gray-700" htmlFor="select-work-order">
                             Select Work Order <span className="text-red-500">*</span>
                             <select 
-                                value={selectedWoId} onChange={(e) => setSelectedWoId(Number(e.target.value) || "")}
-                                className="w-full p-2.5 border my-2
-                                border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                value={selectedWoId} 
+                                onChange={(e) => setSelectedWoId(Number(e.target.value) || "")}
+                                className="w-full p-2.5 border my-2 border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 id="select-work-order"
                                 name="workOrderId"
                             >
-                                <option value="">{isLoadingWOs ? "Loading Work Orders..." : "-- Choose Released or In-Progress Order --"}</option>
+                                <option value="">{isLoadingWOs ? "Loading Work Orders..." : "-- Choose In-Progress Order --"}</option>
                                 {workOrders.map(wo => (
-                                    <option key={wo.workOrderId} value={wo.workOrderId}>{wo.code} - {wo.product?.productName} ({wo.status})</option>
+                                    <option key={wo.workOrderId} value={wo.workOrderId}>
+                                        {wo.code} - {wo.product?.productName} ({wo.status})
+                                    </option>
                                 ))}
                             </select>
                         </label>
@@ -190,18 +157,18 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                                     <span className="text-sm font-bold text-gray-900">{selectedWo.product?.productName}</span>
                                 </div>
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Product Quantity</span>
-                                    <span className="text-sm font-bold text-gray-900">{selectedWo.quantity} units</span>
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Planned Quantity</span>
+                                    <span className="text-sm font-bold text-gray-900">{selectedWo.quantity} {selectedWo.product?.unit || 'units'}</span>
                                 </div>
                             </div>
                         )}
                     </div>
-
-                    {/* VÙNG 2: BẢNG CHI TIẾT YÊU CẦU */}
+ 
+                    {/* ZONE 2: AUTO-BOM REQUEST DETAILS TABLE */}
                     <div className={`space-y-3 ${!selectedWoId ? 'opacity-50 pointer-events-none' : ''}`}>
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-bold text-gray-900 uppercase flex items-center gap-2">
-                                <Search className="w-4 h-4 text-blue-600" /> BOM Request Table
+                                <Search className="w-4 h-4 text-blue-600" /> Auto-BOM Preview
                             </h3>
                             {isFetchingBom && <Loader2 className="w-4 h-4 animate-spin text-blue-600"/>}
                         </div>
@@ -210,65 +177,41 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
                                     <tr>
-                                        <th className="p-3">Component</th>
-                                        <th className="p-3 text-right">Standard Qty</th>
-                                        <th className="p-3 text-right">Issued/Pending</th>
-                                        <th className="p-3 text-right text-blue-600">Remaining Allowance</th>
-                                        <th className="p-3 text-center bg-blue-50 w-32">Request Qty</th>
+                                        <th className="p-3">Component Name</th>
+                                        <th className="p-3">Unit</th>
+                                        <th className="p-3 text-right">BOM Ratio</th>
+                                        <th className="p-3 text-center bg-blue-50 text-blue-700 w-32">Request Qty</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm divide-y divide-gray-100">
-                                    {bomTableData.map((item) => {
-                                        const inputQty = requestQtys[item.componentId] ?? 0;
-                                        const overLimit = inputQty > item.remainingAllowance;
-
-                                        return (
-                                            <tr key={item.componentId} className={overLimit ? 'bg-orange-50/30' : 'hover:bg-gray-50'}>
-                                                <td className="p-3 font-medium text-gray-900">{item.componentName}</td>
-                                                <td className="p-3 text-right text-gray-500">{item.standardQty}</td>
-                                                <td className="p-3 text-right text-gray-500">{item.issuedQty}</td>
-                                                <td className="p-3 text-right font-bold text-blue-700">{item.remainingAllowance}</td>
-                                                <td className="p-3 bg-blue-50/30">
-                                                    <input 
-                                                        type="number" min="0"
-                                                        value={inputQty}
-                                                        onChange={(e) => handleQtyChange(item.componentId, e.target.value)}
-                                                        className={`w-full p-2 border rounded text-center font-bold outline-none focus:ring-2 bg-white ${
-                                                            overLimit ? 'border-orange-400 text-orange-700 focus:ring-orange-500' : 'border-blue-200 text-blue-700 focus:ring-blue-500'
-                                                        }`}
-                                                    />
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {bomTableData.length === 0 && !isFetchingBom && (
-                                        <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic">Please select a Work Order to load BOM details.</td></tr>
+                                    {bomTableData.map((item) => (
+                                        <tr key={item.componentId} className="hover:bg-gray-50 transition-colors">
+                                            <td className="p-3 font-medium text-gray-900">{item.componentName}</td>
+                                            <td className="p-3 text-gray-500">{item.unit}</td>
+                                            <td className="p-3 text-right text-gray-500">{item.bomRatio}</td>
+                                            <td className="p-3 text-center font-bold text-blue-700 bg-blue-50/30">
+                                                {item.requestQty}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {bomTableData.length === 0 && !isFetchingBom && selectedWoId && (
+                                        <tr>
+                                            <td colSpan={4} className="p-8 text-center text-orange-500 italic">
+                                                BOM has not been configured for this product!
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {!selectedWoId && (
+                                        <tr>
+                                            <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                                                Please select a Work Order to load material list.
+                                            </td>
+                                        </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
-
-                    {/* VÙNG 3: XỬ LÝ VƯỢT HẠN MỨC */}
-                    {isOverLimit && (
-                        <div className="bg-orange-50 p-5 rounded-xl border border-orange-200 animate-in slide-in-from-top-2">
-                            <div className="flex items-start gap-3">
-                                <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                                <div className="w-full">
-                                    <h4 className="text-sm font-bold text-orange-800">Cảnh báo: Yêu cầu vượt hạn mức!</h4>
-                                    <p className="text-xs text-orange-700 mt-1 mb-3">
-                                        Bạn đang yêu cầu cấp phát linh kiện nhiều hơn hạn mức cho phép. Vui lòng nhập lý do giải trình để cấp trên phê duyệt.
-                                    </p>
-                                    <textarea 
-                                        value={overRequestReason} onChange={e => setOverRequestReason(e.target.value)}
-                                        rows={2}
-                                        placeholder="Nhập lý do xin vượt định mức (VD: Máy dập lỗi làm hỏng linh kiện)..."
-                                        className="w-full p-2.5 border border-orange-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Footer Buttons */}
@@ -278,7 +221,7 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                     </button>
                     <button 
                         onClick={handleSubmit} 
-                        disabled={isSubmitting || !selectedWoId || (isOverLimit && !overRequestReason.trim()) || isFetchingBom} 
+                        disabled={isSubmitting || !selectedWoId || isFetchingBom || bomTableData.length === 0} 
                         className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95"
                     >
                         {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5" />} 
