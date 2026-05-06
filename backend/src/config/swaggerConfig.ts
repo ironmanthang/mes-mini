@@ -27,7 +27,9 @@ export const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Warehouses', description: 'Master data for Warehouses' },
             // { name: 'Production Lines', description: 'Manufacturing line management' },
             { name: 'Production Requests', description: 'Managing requests to produce items' },
-            // { name: 'Quality', description: 'Quality Control (QC) operations' },
+            { name: 'Quality', description: 'Quality Control (QC) operations' },
+            { name: 'Quality Master Data', description: 'Manage QC Checklists and Inspection Points' },
+            { name: 'Warehouse Ops', description: 'Warehouse operations including product induction' },
             { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
             { name: 'Inventory', description: 'Stock Management and Reporting' },
             { name: 'Material Requests', description: 'Warehouse Material Issue for Production' },
@@ -73,6 +75,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/master-data/suppliers/supplierRoutes.js',
         './src/master-data/warehouses/warehouseRoutes.ts',
         './dist/master-data/warehouses/warehouseRoutes.js',
+        './src/master-data/qualityChecklists/qualityChecklistRoutes.ts',
+        './dist/master-data/qualityChecklists/qualityChecklistRoutes.js',
 
         // --- DASHBOARDS ---
         './src/warehouse-ops/dashboard/warehouseDashboardRoutes.ts',
@@ -101,8 +105,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/production/productionRequests/productionRequestRoutes.js',
         './src/production/productionRoutes.ts',
         './dist/production/productionRoutes.js',
-        // './src/production/quality/qualityRoutes.ts',
-        // './dist/production/quality/qualityRoutes.js',
+        './src/production/qualityChecks/qualityCheckRoutes.ts',
+        './dist/production/qualityChecks/qualityCheckRoutes.js',
         './src/production/workOrders/workOrderRoutes.ts',
         './dist/production/workOrders/workOrderRoutes.js',
 
@@ -111,6 +115,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/warehouse-ops/inventory/inventoryRoutes.js',
         './src/warehouse-ops/material-request/materialRequestRoutes.ts',
         './dist/warehouse-ops/material-request/materialRequestRoutes.js',
+        './src/warehouse-ops/productInduction/productInductionRoutes.ts',
+        './dist/warehouse-ops/productInduction/productInductionRoutes.js',
 
         './src/warehouse-ops/warehouseRoutes.ts',
         './dist/warehouse-ops/warehouseRoutes.js',

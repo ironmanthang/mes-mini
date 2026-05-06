@@ -10,14 +10,22 @@ export const createProductSchema = Joi.object({
     unit: Joi.string().required().messages({
         'string.empty': 'Unit is required'
     }),
-    categoryId: Joi.number().integer().optional().allow(null)
+    categoryId: Joi.number().integer().optional().allow(null),
+    checklistId: Joi.number().integer().optional().allow(null),
+    minStockLevel: Joi.number().integer().min(0).optional().default(0),
+    warrantyPeriodDays: Joi.number().integer().min(0).optional().allow(null),
+    shelfLifeDays: Joi.number().integer().min(0).optional().allow(null)
 });
 
 export const updateProductSchema = Joi.object({
     code: Joi.string().uppercase().trim().optional(),
     productName: Joi.string().trim().optional(),
     unit: Joi.string().optional(),
-    categoryId: Joi.number().integer().optional().allow(null)
+    categoryId: Joi.number().integer().optional().allow(null),
+    checklistId: Joi.number().integer().optional().allow(null),
+    minStockLevel: Joi.number().integer().min(0).optional(),
+    warrantyPeriodDays: Joi.number().integer().min(0).optional().allow(null),
+    shelfLifeDays: Joi.number().integer().min(0).optional().allow(null)
 });
 
 export const addBomComponentSchema = Joi.object({

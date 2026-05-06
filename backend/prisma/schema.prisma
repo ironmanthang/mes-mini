@@ -8,6 +8,113 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SalesOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  IN_PROGRESS
+  PARTIALLY_SHIPPED
+  SHIPPED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  ORDERED
+  RECEIVING
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionRequestStatus {
+  DRAFT
+  PENDING
+  WAITING_MATERIAL
+  APPROVED
+  IN_PROGRESS
+  FULFILLED
+  CANCELLED
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  RELEASED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum QualityCheckResult {
+  PASSED
+  FAILED
+}
+
+enum InspectionType {
+  BINARY
+  MEASUREMENT
+  SELECTION
+}
+
+enum ProductInstanceStatus {
+  PENDING_QC
+  PASSED_QC
+  FAILED_QC
+  IN_STOCK_SALES
+  IN_STOCK_ERROR
+  SHIPPED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum InventoryTransactionType {
+  IMPORT_PO
+  EXPORT_PRODUCTION
+  IMPORT_PRODUCTION
+  EXPORT_SALES
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum MaterialRequestStatus {
+  PENDING
+  ISSUED
+  CANCELLED
+}
+
+enum TransferRequestStatus {
+  PENDING
+  COMPLETED
+}
+
+enum TransferEntityType {
+  COMPONENT
+  PRODUCT
+}
+
+enum WarehouseType {
+  COMPONENT
+  SALES
+  ERROR
+}
+
+enum NotificationType {
+  PO_APPROVED
+  PO_RECEIVED
+  SO_APPROVED
+  SO_SHIPPED
+  PR_APPROVED
+  PR_UNBLOCKED
+  WO_COMPLETED
+  LOW_STOCK
+  MATERIAL_ISSUED
+  GENERAL
+}
+
 model Employee {
   employeeId                Int                    @id @default(autoincrement()) @map("employee_id")
   fullName                  String                 @map("full_name")
@@ -145,6 +252,7 @@ model Product {
   productId          Int                 @id @default(autoincrement()) @map("product_id")
   productName        String              @map("product_name")
   categoryId         Int?                @map("category_id")
+  checklistId        Int?                @map("checklist_id")
   minStockLevel      Int                 @default(0) @map("min_stock_level")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
@@ -156,6 +264,7 @@ model Product {
   warrantyPeriodDays Int?                @map("warranty_period_days")
   shelfLifeDays      Int?                @map("shelf_life_days")
   category           ProductCategory?    @relation(fields: [categoryId], references: [categoryId])
+  checklist          QualityChecklist?   @relation(fields: [checklistId], references: [checklistId])
   salesOrderDetails  SalesOrderDetail[]
   workOrders         WorkOrder[]
 
@@ -362,30 +471,34 @@ model ProductionLine {
 }
 
 model WorkOrder {
-  workOrderId           Int                    @id @default(autoincrement()) @map("work_order_id")
-  createDate            DateTime               @default(now()) @map("create_date")
-  employeeId            Int                    @map("employee_id")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  productId             Int                    @map("product_id")
-  code                  String                 @unique
-  quantity              Int
-  productionLineId      Int?                   @map("production_line_id")
-  status                WorkOrderStatus        @default(DRAFT)
-  endDate               DateTime?              @map("end_date")
-  note                  String?
-  startDate             DateTime?              @map("start_date")
-  targetDate            DateTime?              @map("target_date")
-  targetSalesWarehouseId Int?                   @map("target_sales_warehouse_id")
-  targetErrorWarehouseId Int?                   @map("target_error_warehouse_id")
-  materialRequest       MaterialRequest?
-  productionBatches     ProductionBatch[]
-  workOrderFulfillments WorkOrderFulfillment[]
-  employee              Employee               @relation(fields: [employeeId], references: [employeeId])
-  product               Product                @relation(fields: [productId], references: [productId])
-  productionLine        ProductionLine?        @relation(fields: [productionLineId], references: [productionLineId])
-  targetSalesWarehouse  Warehouse?             @relation("WOTargetSales", fields: [targetSalesWarehouseId], references: [warehouseId])
-  targetErrorWarehouse  Warehouse?             @relation("WOTargetError", fields: [targetErrorWarehouseId], references: [warehouseId])
+  workOrderId             Int                    @id @default(autoincrement()) @map("work_order_id")
+  createDate              DateTime               @default(now()) @map("create_date")
+  employeeId              Int                    @map("employee_id")
+  createdAt               DateTime               @default(now()) @map("created_at")
+  updatedAt               DateTime               @updatedAt @map("updated_at")
+  productId               Int                    @map("product_id")
+  code                    String                 @unique
+  quantity                Int
+  productionLineId        Int?                   @map("production_line_id")
+  status                  WorkOrderStatus        @default(DRAFT)
+  endDate                 DateTime?              @map("end_date")
+  note                    String?
+  startDate               DateTime?              @map("start_date")
+  targetDate              DateTime?              @map("target_date")
+  targetSalesWarehouseId  Int?                   @map("target_sales_warehouse_id")
+  targetErrorWarehouseId  Int?                   @map("target_error_warehouse_id")
+  laborCost               Decimal?               @map("labor_cost") @db.Decimal(12, 2)
+  overheadCost            Decimal?               @map("overhead_cost") @db.Decimal(12, 2)
+  totalMaterialCost       Decimal?               @map("total_material_cost") @db.Decimal(12, 2)
+  totalProductionCost     Decimal?               @map("total_production_cost") @db.Decimal(12, 2)
+  materialRequest         MaterialRequest?
+  productionBatches       ProductionBatch[]
+  workOrderFulfillments   WorkOrderFulfillment[]
+  employee                Employee               @relation(fields: [employeeId], references: [employeeId])
+  product                 Product                @relation(fields: [productId], references: [productId])
+  productionLine          ProductionLine?        @relation(fields: [productionLineId], references: [productionLineId])
+  targetSalesWarehouse    Warehouse?             @relation("WOTargetSales", fields: [targetSalesWarehouseId], references: [warehouseId])
+  targetErrorWarehouse    Warehouse?             @relation("WOTargetError", fields: [targetErrorWarehouseId], references: [warehouseId])
 
   @@map("work_orders")
 }
@@ -457,12 +570,14 @@ model Warranty {
 }
 
 model QualityChecklist {
-  checklistId   Int            @id @default(autoincrement()) @map("checklist_id")
-  checklistName String         @map("checklist_name")
-  description   String?
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  qualityChecks QualityCheck[]
+  checklistId      Int               @id @default(autoincrement()) @map("checklist_id")
+  checklistName    String            @map("checklist_name")
+  description      String?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  qualityChecks    QualityCheck[]
+  inspectionPoints InspectionPoint[]
+  products         Product[]
 
   @@map("quality_checklists")
 }
@@ -480,8 +595,42 @@ model QualityCheck {
   checklist         QualityChecklist   @relation(fields: [checklistId], references: [checklistId])
   employee          Employee           @relation(fields: [employeeId], references: [employeeId])
   productInstance   ProductInstance    @relation(fields: [productInstanceId], references: [productInstanceId])
+  inspectionResults InspectionResult[]
 
+  @@unique([productInstanceId])
   @@map("quality_checks")
+}
+
+model InspectionPoint {
+  inspectionPointId Int               @id @default(autoincrement()) @map("inspection_point_id")
+  checklistId       Int               @map("checklist_id")
+  pointName         String            @map("point_name")
+  description       String?
+  pointType         InspectionType    @default(BINARY) @map("point_type")
+  minValue          Decimal?          @map("min_value") @db.Decimal(10, 4)
+  maxValue          Decimal?          @map("max_value") @db.Decimal(10, 4)
+  unit              String?
+  sortOrder         Int               @default(0) @map("sort_order")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  checklist         QualityChecklist  @relation(fields: [checklistId], references: [checklistId], onDelete: Cascade)
+  results           InspectionResult[]
+
+  @@map("inspection_points")
+}
+
+model InspectionResult {
+  inspectionResultId Int             @id @default(autoincrement()) @map("inspection_result_id")
+  qualityCheckId     Int             @map("quality_check_id")
+  inspectionPointId  Int             @map("inspection_point_id")
+  passed             Boolean
+  measuredValue      Decimal?        @map("measured_value") @db.Decimal(10, 4)
+  notes              String?
+  qualityCheck       QualityCheck    @relation(fields: [qualityCheckId], references: [qualityCheckId], onDelete: Cascade)
+  inspectionPoint    InspectionPoint @relation(fields: [inspectionPointId], references: [inspectionPointId])
+
+  @@unique([qualityCheckId, inspectionPointId])
+  @@map("inspection_results")
 }
 
 model Warehouse {
@@ -694,103 +843,4 @@ model Attachment {
   @@map("attachments")
 }
 
-enum SalesOrderStatus {
-  DRAFT
-  PENDING
-  APPROVED
-  IN_PROGRESS
-  PARTIALLY_SHIPPED
-  SHIPPED
-  CANCELLED
-}
 
-enum PurchaseOrderStatus {
-  DRAFT
-  PENDING
-  APPROVED
-  ORDERED
-  RECEIVING
-  COMPLETED
-  CANCELLED
-}
-
-enum ProductionRequestStatus {
-  DRAFT
-  PENDING
-  WAITING_MATERIAL
-  APPROVED
-  IN_PROGRESS
-  FULFILLED
-  CANCELLED
-}
-
-enum WorkOrderStatus {
-  DRAFT
-  RELEASED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum QualityCheckResult {
-  PASSED
-  FAILED
-}
-
-enum ProductInstanceStatus {
-  PENDING_QC
-  PASSED_QC
-  FAILED_QC
-  IN_STOCK_SALES
-  IN_STOCK_ERROR
-  SHIPPED
-}
-
-enum EmployeeStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum InventoryTransactionType {
-  IMPORT_PO
-  EXPORT_PRODUCTION
-  IMPORT_PRODUCTION
-  EXPORT_SALES
-  TRANSFER
-  ADJUSTMENT
-}
-
-enum MaterialRequestStatus {
-  PENDING
-  ISSUED
-  CANCELLED
-}
-
-enum TransferRequestStatus {
-  PENDING
-  COMPLETED
-}
-
-enum TransferEntityType {
-  COMPONENT
-  PRODUCT
-}
-
-enum WarehouseType {
-  COMPONENT
-  SALES
-  ERROR
-}
-
-enum NotificationType {
-  PO_APPROVED
-  PO_RECEIVED
-  SO_APPROVED
-  SO_SHIPPED
-  PR_APPROVED
-  PR_UNBLOCKED
-  WO_COMPLETED
-  LOW_STOCK
-  MATERIAL_ISSUED
-  GENERAL
-}

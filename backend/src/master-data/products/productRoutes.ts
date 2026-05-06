@@ -156,6 +156,11 @@ router.delete('/:id/bom/:componentId', bomAuth, removeBomComponent);
  *               code: { type: string, example: "PRD-001" }
  *               productName: { type: string, example: "Smart Thermostat" }
  *               unit: { type: string, example: "pcs" }
+ *               categoryId: { type: integer, example: 1 }
+ *               checklistId: { type: integer, example: 1 }
+ *               minStockLevel: { type: integer, example: 10 }
+ *               warrantyPeriodDays: { type: integer, example: 365 }
+ *               shelfLifeDays: { type: integer, example: 730 }
  *     responses:
  *       201:
  *         description: Created
@@ -185,6 +190,10 @@ router.delete('/:id/bom/:componentId', bomAuth, removeBomComponent);
  *               productName: { type: string }
  *               unit: { type: string }
  *               categoryId: { type: integer }
+ *               checklistId: { type: integer }
+ *               minStockLevel: { type: integer }
+ *               warrantyPeriodDays: { type: integer }
+ *               shelfLifeDays: { type: integer }
  *     responses:
  *       200:
  *         description: Updated

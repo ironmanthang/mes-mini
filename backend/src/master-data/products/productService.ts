@@ -8,6 +8,10 @@ interface ProductCreateData {
     productName: string;
     unit: string;
     categoryId?: number;
+    checklistId?: number;
+    minStockLevel?: number;
+    warrantyPeriodDays?: number;
+    shelfLifeDays?: number;
 }
 
 interface ProductBarcodeData {
@@ -49,7 +53,7 @@ class ProductService {
         const productId = typeof id === 'string' ? parseInt(id) : id;
         const product = await prisma.product.findUnique({
             where: { productId },
-            include: { category: true }
+            include: { category: true, checklist: true }
         });
         if (!product) throw new Error('Product not found');
         return product;
@@ -59,9 +63,11 @@ class ProductService {
         const existing = await prisma.product.findUnique({ where: { code: data.code } });
         if (existing) throw new Error(`Product code "${data.code}" already exists.`);
 
+        await this.validateRelations(data.categoryId, data.checklistId);
+
         return prisma.product.create({
-            data: data as any,
-            include: { category: true }
+            data: data,
+            include: { category: true, checklist: true }
         });
     }
 
@@ -75,11 +81,24 @@ class ProductService {
             if (exists) throw new Error(`Product code "${data.code}" already exists.`);
         }
 
+        await this.validateRelations(data.categoryId, data.checklistId);
+
         return prisma.product.update({
             where: { productId },
-            data: data as any,
-            include: { category: true }
+            data: data,
+            include: { category: true, checklist: true }
         });
+    }
+
+    private async validateRelations(categoryId?: number | null, checklistId?: number | null) {
+        if (categoryId) {
+            const category = await prisma.productCategory.findUnique({ where: { categoryId } });
+            if (!category) throw new Error(`Product Category with ID ${categoryId} not found.`);
+        }
+        if (checklistId) {
+            const checklist = await prisma.qualityChecklist.findUnique({ where: { checklistId } });
+            if (!checklist) throw new Error(`Quality Checklist with ID ${checklistId} not found.`);
+        }
     }
 
     async deleteProduct(id: string | number): Promise<Product> {

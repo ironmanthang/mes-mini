@@ -65,6 +65,7 @@ export const PERM = {
     WH_STOCK_READ:        'WH_STOCK_READ',       // View inventory/stock levels
     WH_STOCK_ADJUST:      'WH_STOCK_ADJUST',     // Adjust inventory balances
     WH_MANAGE:            'WH_MANAGE',           // Full CRUD on warehouse entities
+    WH_INDUCT:            'WH_INDUCT',           // Induct finished products from production into warehouse
 
     // ── Material Requests ─────────────────────────────────────────────────────
     MR_READ:              'MR_READ',             // View material export requests

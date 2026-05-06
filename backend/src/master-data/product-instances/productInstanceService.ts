@@ -82,6 +82,7 @@ interface ProductInstanceListItem {
     status: ProductInstanceStatus;
     createdAt: Date;
     product: {
+        productId: number;
         productName: string;
         code: string;
     };
@@ -133,6 +134,7 @@ class ProductInstanceService {
                     createdAt: true,
                     product: {
                         select: {
+                            productId: true,
                             productName: true,
                             code: true
                         }

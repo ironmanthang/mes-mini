@@ -87,6 +87,7 @@ router.get('/:id',
  *                       product:
  *                         type: object
  *                         properties:
+ *                           productId: { type: integer }
  *                           productName: { type: string }
  *                           code: { type: string }
  *                       warehouse:

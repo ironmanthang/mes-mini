@@ -2,7 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from '../../src/common/lib/prisma.js';
 import { PERM } from '../../src/common/constants/permissions.js';
-import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType, ProductInstanceStatus, MaterialRequestStatus } from '../../src/generated/prisma/index.js';
+import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType, ProductInstanceStatus, MaterialRequestStatus, InspectionType } from '../../src/generated/prisma/index.js';
 
 // ============================================================================
 // 🎛️ CENTRAL CONTROL PANEL
@@ -26,6 +26,7 @@ const SEED_CONFIG = {
     SALES_ORDERS: true,
     PRODUCTION_REQUESTS: true,
     MATERIAL_REQUESTS: true, // NEW: Control for material request seeding
+    QC_TESTING: true,        // NEW: Control for QC Testing Scenario
 };
 
 const DEFAULT_PASSWORD = '123456';
@@ -45,7 +46,10 @@ async function main(): Promise<void> {
     if (SEED_CONFIG.SUPPLIERS) await seedSuppliers();
     if (SEED_CONFIG.COMPONENTS) await seedComponents();
     if (SEED_CONFIG.WAREHOUSES) await seedWarehouses();
-    if (SEED_CONFIG.PRODUCTS) await seedProducts();
+    if (SEED_CONFIG.PRODUCTS) {
+        await seedQualityChecklists();
+        await seedProducts();
+    }
     if (SEED_CONFIG.LINES) await seedProductionLines();
     if (SEED_CONFIG.RELATIONS) await seedSupplierComponents();
     if (SEED_CONFIG.INSTANCES) await seedProductInstances();
@@ -66,6 +70,8 @@ async function main(): Promise<void> {
     
     // NEW: Seed Material Requests for all WOs
     if (SEED_CONFIG.MATERIAL_REQUESTS) await seedMaterialRequests();
+
+    if (SEED_CONFIG.QC_TESTING) await seedQcTestingScenario();
 
     await seedCodeSequences();
 
@@ -178,7 +184,9 @@ async function seedProductInstances(): Promise<void> {
             status: 'COMPLETED',
             productionLineId: line?.productionLineId,
             targetSalesWarehouseId: fgWarehouse?.warehouseId,
-            targetErrorWarehouseId: defectWarehouse?.warehouseId
+            targetErrorWarehouseId: defectWarehouse?.warehouseId,
+            laborCost: 50000,
+            overheadCost: 20000
         }
     });
 
@@ -363,7 +371,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.QC_READ, PERM.WH_STOCK_READ,
             PERM.MR_READ, PERM.MR_APPROVE,
             PERM.ST_READ, PERM.DASH_READ,
-            PERM.TR_READ,
+            PERM.TR_READ, PERM.WH_INDUCT,
             PERM.PRODUCT_READ, PERM.PRODUCT_CREATE, PERM.PRODUCT_UPDATE,
             PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
             PERM.SUPPLIER_READ,
@@ -374,6 +382,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.ST_READ, PERM.ST_CREATE, PERM.ST_COMPLETE,
             PERM.TR_READ, PERM.TR_MANAGE,
             PERM.PO_RECEIVE, PERM.SO_SHIP,
+            PERM.WH_INDUCT,
             PERM.ATTACH_UPLOAD,
             PERM.PRODUCT_READ,
             PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
@@ -595,10 +604,59 @@ async function seedWarehouses(): Promise<void> {
 }
 
 // ============================================================================
+// 5.5 SEED QUALITY CHECKLISTS
+// ============================================================================
+async function seedQualityChecklists(): Promise<void> {
+    console.log('...Seeding Quality Checklists');
+
+    // 1. Electronics Standard Checklist
+    const elecChecklist = await prisma.qualityChecklist.upsert({
+        where: { checklistId: 1 },
+        update: {},
+        create: {
+            checklistName: 'Standard Electronics QC',
+            description: 'Standard checklist for electronics products',
+        }
+    });
+
+    await prisma.inspectionPoint.deleteMany({ where: { checklistId: elecChecklist.checklistId } });
+    await prisma.inspectionPoint.createMany({
+        data: [
+            {
+                checklistId: elecChecklist.checklistId,
+                pointName: 'Power On Test',
+                description: 'Verify device powers on correctly',
+                pointType: InspectionType.BINARY,
+                sortOrder: 1
+            },
+            {
+                checklistId: elecChecklist.checklistId,
+                pointName: 'Screen Quality',
+                description: 'Check for dead pixels or scratches',
+                pointType: InspectionType.BINARY,
+                sortOrder: 2
+            },
+            {
+                checklistId: elecChecklist.checklistId,
+                pointName: 'Battery Voltage',
+                description: 'Measure battery voltage',
+                pointType: InspectionType.MEASUREMENT,
+                minValue: 3.7,
+                maxValue: 4.2,
+                unit: 'V',
+                sortOrder: 3
+            }
+        ]
+    });
+}
+
+// ============================================================================
 // 6. SEED PRODUCTS & BILL OF MATERIALS (BOM)
 // ============================================================================
 async function seedProducts(): Promise<void> {
     console.log('...Seeding Products & BOM');
+
+    const elecChecklist = await prisma.qualityChecklist.findFirst({ where: { checklistName: 'Standard Electronics QC' } });
 
     // 1. Create Product
     const product = await prisma.product.upsert({
@@ -608,7 +666,8 @@ async function seedProducts(): Promise<void> {
             code: 'PROD-LAPTOP-X1',
             productName: 'Laptop X1 Pro',
             unit: 'pcs',
-            minStockLevel: 20
+            minStockLevel: 20,
+            checklistId: elecChecklist?.checklistId
         }
     });
 
@@ -977,10 +1036,11 @@ async function seedDemoProducts(): Promise<void> {
     console.log('...Seeding Demo Products + BOM');
 
     // --- Tablet A1 ---
+    const elecChecklist = await prisma.qualityChecklist.findFirst({ where: { checklistName: 'Standard Electronics QC' } });
     const tablet = await prisma.product.upsert({
         where: { code: 'PROD-TABLET-A1' },
         update: {},
-        create: { code: 'PROD-TABLET-A1', productName: 'Tablet A1', unit: 'pcs', minStockLevel: 15 }
+        create: { code: 'PROD-TABLET-A1', productName: 'Tablet A1', unit: 'pcs', minStockLevel: 15, checklistId: elecChecklist?.checklistId }
     });
     const screenOled = await prisma.component.findUnique({ where: { code: 'COM-SCREEN-OLED' } });
     const battery500 = await prisma.component.findUnique({ where: { code: 'COM-BATTERY-500' } });
@@ -993,7 +1053,7 @@ async function seedDemoProducts(): Promise<void> {
     const desktop = await prisma.product.upsert({
         where: { code: 'PROD-DESKTOP-Z5' },
         update: {},
-        create: { code: 'PROD-DESKTOP-Z5', productName: 'Desktop Z5 Workstation', unit: 'pcs', minStockLevel: 10 }
+        create: { code: 'PROD-DESKTOP-Z5', productName: 'Desktop Z5 Workstation', unit: 'pcs', minStockLevel: 10, checklistId: elecChecklist?.checklistId }
     });
     const cpuUltra = await prisma.component.findUnique({ where: { code: 'COM-CPU-ULTRA' } });
     const ram32 = await prisma.component.findUnique({ where: { code: 'COM-RAM-32GB' } });
@@ -1008,7 +1068,7 @@ async function seedDemoProducts(): Promise<void> {
     const monitor = await prisma.product.upsert({
         where: { code: 'PROD-MONITOR-M1' },
         update: {},
-        create: { code: 'PROD-MONITOR-M1', productName: 'Monitor M1 Pro', unit: 'pcs', minStockLevel: 25 }
+        create: { code: 'PROD-MONITOR-M1', productName: 'Monitor M1 Pro', unit: 'pcs', minStockLevel: 25, checklistId: elecChecklist?.checklistId }
     });
     const display15 = await prisma.component.findUnique({ where: { code: 'COM-DISPLAY-15' } });
     const caseAlloy = await prisma.component.findUnique({ where: { code: 'COM-CASE-ALLOY' } });
@@ -1122,10 +1182,11 @@ async function seedDemoProductInstances(): Promise<void> {
                 quantity: count, 
                 employeeId: admin!.employeeId, 
                 productId: product.productId, 
-                status: 'COMPLETED',
                 productionLineId: line?.productionLineId,
                 targetSalesWarehouseId: warehouseId,
-                targetErrorWarehouseId: defectWarehouse?.warehouseId
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: count * 1000,
+                overheadCost: count * 500
             }
         });
 
@@ -1510,7 +1571,9 @@ async function seedDemoProductionRequests(): Promise<void> {
                 productId: monitor.productId, productionLineId: line.productionLineId,
                 status: 'IN_PROGRESS',
                 targetSalesWarehouseId: fgWarehouse?.warehouseId,
-                targetErrorWarehouseId: defectWarehouse?.warehouseId
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 10000,
+                overheadCost: 5000
             }
         });
         await prisma.workOrderFulfillment.upsert({
@@ -1529,7 +1592,9 @@ async function seedDemoProductionRequests(): Promise<void> {
                 productId: laptop.productId, productionLineId: line.productionLineId,
                 status: 'IN_PROGRESS', // FIXED: Downgraded to IN_PROGRESS
                 targetSalesWarehouseId: fgWarehouse?.warehouseId,
-                targetErrorWarehouseId: defectWarehouse?.warehouseId
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 50000,
+                overheadCost: 25000
             }
         });
         await prisma.workOrderFulfillment.upsert({
@@ -1652,6 +1717,93 @@ async function injectComponentStock(componentId: number, warehouseId: number, qu
             data: { currentQuantity: quantity }
         });
     }
+}
+
+// ============================================================================
+// 23. QC TESTING SCENARIO (PENDING_QC Instances)
+// ============================================================================
+async function seedQcTestingScenario(): Promise<void> {
+    console.log('...Seeding QC Testing Scenario (PENDING_QC)');
+
+    const admin = await prisma.employee.findFirst({ where: { username: 'admin' } });
+    const product = await prisma.product.findUnique({ where: { code: 'PROD-LAPTOP-X1' } });
+    const line = await prisma.productionLine.findFirst();
+    const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
+    const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
+
+    if (!admin || !product || !fgWarehouse || !defectWarehouse) {
+        console.warn('   ⚠️ Missing prerequisites for QC testing scenario');
+        return;
+    }
+
+    // 1. Create a dummy PR for traceability
+    const pr = await prisma.productionRequest.upsert({
+        where: { code: 'PR-QC-TEST' },
+        update: {},
+        create: {
+            code: 'PR-QC-TEST',
+            productId: product.productId,
+            quantity: 5,
+            status: ProductionRequestStatus.APPROVED,
+            priority: Priority.HIGH,
+            employeeId: admin.employeeId,
+            note: 'PR for testing QC and Induction'
+        }
+    });
+
+    // 2. Create a COMPLETED Work Order
+    const woCode = 'WO-QC-TEST';
+    const wo = await prisma.workOrder.upsert({
+        where: { code: woCode },
+        update: {},
+        create: {
+            code: woCode,
+            quantity: 5,
+            employeeId: admin.employeeId,
+            productId: product.productId,
+            productionLineId: line?.productionLineId,
+            status: 'COMPLETED',
+            targetSalesWarehouseId: fgWarehouse.warehouseId,
+            targetErrorWarehouseId: defectWarehouse.warehouseId,
+            laborCost: 5000,
+            overheadCost: 2000
+        }
+    });
+
+    // 3. Link WO to PR
+    await prisma.workOrderFulfillment.upsert({
+        where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: pr.productionRequestId } },
+        update: {},
+        create: { workOrderId: wo.workOrderId, productionRequestId: pr.productionRequestId, quantity: 5 }
+    });
+
+    // 4. Create Production Batch
+    const batchCode = 'BATCH-QC-TEST';
+    let batch = await prisma.productionBatch.findFirst({ where: { batchCode } });
+    if (!batch) {
+        batch = await prisma.productionBatch.create({
+            data: { batchCode, productionDate: new Date(), workOrderId: wo.workOrderId }
+        });
+    }
+
+    // 5. Create PENDING_QC Instances (NO warehouse assigned yet)
+    const instancesData = [];
+    for (let i = 1; i <= 5; i++) {
+        instancesData.push({
+            productId: product.productId,
+            serialNumber: `SN-QC-TEST-${i.toString().padStart(4, '0')}`,
+            status: ProductInstanceStatus.PENDING_QC,
+            productionBatchId: batch.productionBatchId,
+            warehouseId: null // Crucial: PENDING_QC items are not yet in a warehouse
+        });
+    }
+
+    await prisma.productInstance.createMany({
+        data: instancesData,
+        skipDuplicates: true
+    });
+
+    console.log('   ✓ QC Testing instances created (SN-QC-TEST-0001 to 0005)');
 }
 
 // Execution
