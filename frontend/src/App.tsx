@@ -20,12 +20,14 @@ import { CreateProductionRequest } from "./screens/Production/components/CreateP
 import { CreateWorkOrder } from "./screens/Production/components/CreateWorkOrder";
 import { MaterialRequests } from "./screens/Production/components/MaterialRequests";
 import { ConfigureProductionLots } from "./screens/Production/components/ConfigureProductionLots";
+import { ProductCosts } from "./screens/Production/components/ProductCosts";
 
 import { WarehouseInformation } from "./screens/Warehouses/components/WarehouseInformation";
 import { MaterialIssuing } from "./screens/Warehouses/components/MaterialIssuing";
 import { Stocktaking } from "./screens/Warehouses/components/Stocktaking";
 import { ImportExport } from "./screens/Warehouses/components/ImportExport";
 import { TransferStock } from "./screens/Warehouses/components/TransferStock";
+import { ProductInduction } from "./screens/Warehouses/components/ProductInduction";
 
 import { Employees } from "./screens/HumanResources/components/Employees";
 import { Roles } from "./screens/HumanResources/components/Roles";
@@ -39,11 +41,22 @@ import { QualityChecks as FinishedProductQuality } from "./screens/FinishedProdu
 import { Orders as FinishedProductOrders } from "./screens/FinishedProduct/components/Orders";
 import { ProductionExecution as FinishedProductExecution } from "./screens/Production/components/ProductionExecution";
 import { InboundRequests as FinishedProductInbound } from "./screens/FinishedProduct/components/InboundRequests";
-import { ProductionMonitor as FinishedProductMonitor } from "./screens/FinishedProduct/components/ProductionMonitor";
+import { ProductionMonitor as FinishedProductMonitor } from "./screens/Production/components/ProductionMonitor";
+import { InventoryReport } from "./screens/Warehouses/components/InventoryReport";
+import { Reports } from "./screens/Reports";
+import { Performance } from "./screens/Reports/components/Performance";
+import { ProductLookup } from "./screens/PublicPortal/ProductLookup";
 
 export default function App() {
   return (
-    <div className="bg-white w-full min-h-screen flex [font-family:'Zen_Kaku_Gothic_Antique',Helvetica]">
+    <Routes>
+      {/* ── Public Portal (no sidebar) ── */}
+      <Route path="/product-lookup" element={<ProductLookup />} />
+      <Route path="/product-lookup/:serialNumber" element={<ProductLookup />} />
+
+      {/* ── Authenticated shell ── */}
+      <Route path="/*" element={
+      <div className="bg-white w-full min-h-screen flex [font-family:'Zen_Kaku_Gothic_Antique',Helvetica]">
       <Sidebar />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -84,16 +97,20 @@ export default function App() {
             <Route path="/warehouse" element={<Warehouse />}>
               <Route index element={<Navigate to="info" replace />} />
               <Route path="info" element={<WarehouseInformation />} />
+              <Route path="induction" element={<ProductInduction />} />
               <Route path="material-issuing" element={<MaterialIssuing />} />
               <Route path="stocktaking" element={<Stocktaking />} />
               <Route path="import-export" element={<ImportExport />} />
               <Route path="transfer-stock" element={<TransferStock />} />
+              <Route path="inventory-report" element={<InventoryReport />} />
             </Route>
 
             {/* Production */}
             <Route path="/production" element={<Production />}>
               <Route index element={<Navigate to="requests" replace />} />
               <Route path="requests" element={<CreateProductionRequest />} />
+              <Route path="monitor" element={<FinishedProductMonitor />} />
+              <Route path="product-costs" element={<ProductCosts />} />
               <Route path="work-orders" element={<CreateWorkOrder />} />
               <Route path="material-requests" element={<MaterialRequests />} />
               <Route path="configure-lots" element={<ConfigureProductionLots />} />
@@ -107,8 +124,13 @@ export default function App() {
               <Route path="barcodes" element={<FinishedProductBarcodes />} />
               <Route path="quality" element={<FinishedProductQuality />} />
               <Route path="inbound" element={<FinishedProductInbound />} />
-              <Route path="monitor" element={<FinishedProductMonitor />} />
               <Route path="orders" element={<FinishedProductOrders />} />
+            </Route>
+
+            {/* Reports */}
+            <Route path="/reports" element={<Reports />}>
+              <Route index element={<Navigate to="performance" replace />} />
+              <Route path="performance" element={<Performance />} />
             </Route>
 
             {/* Catch-all */}
@@ -117,5 +139,7 @@ export default function App() {
         </div>
       </main>
     </div>
+    } />
+    </Routes>
   );
 }

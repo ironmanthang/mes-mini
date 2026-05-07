@@ -4,9 +4,7 @@ import {
   ScanBarcode, 
   ClipboardCheck, 
   ShoppingCart,
-  Activity,
   PackagePlus,
-  LineChart
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -18,13 +16,6 @@ export const FinishedProduct = (): JSX.Element => {
       icon: Info, 
       to: "/finished-products/info",
       description: "Batch details & serial numbers" 
-    },
-    { 
-      id: "monitor", 
-      label: "Production Monitor", 
-      icon: LineChart, 
-      to: "/finished-products/monitor",
-      description: "Real-time tracking & delay alerts" 
     },
     { 
       id: "barcodes", 

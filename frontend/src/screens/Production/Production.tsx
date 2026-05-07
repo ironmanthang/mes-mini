@@ -1,4 +1,4 @@
-import { ClipboardList, Settings, Factory, PackageSearch, Activity } from "lucide-react";
+import { ClipboardList, Settings, Factory, PackageSearch, Activity, Monitor, DollarSign } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Production = () => {
@@ -9,6 +9,13 @@ export const Production = () => {
       icon: Factory,
       to: "/production/requests",
       description: "Create new manufacturing requests"
+    },
+    { 
+      id: "monitor",
+      label: "Production Monitor",
+      icon: Monitor,
+      to: "/production/monitor",
+      description: "Real-time tracking of work order execution"
     },
     { 
       id: "work-orders",
@@ -38,6 +45,13 @@ export const Production = () => {
       to: "/production/execution",
       description: "Track and control production" 
     },
+    { 
+      id: "product-costs",
+      label: "Product Costs",
+      icon: DollarSign,
+      to: "/production/product-costs",
+      description: "Analyze manufacturing costs and absorption"
+    },
   ];
 
   return (
@@ -49,17 +63,17 @@ export const Production = () => {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-fit">
+      <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto scrollbar-hide no-scrollbar">
         {tabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}
             title={tab.description}
             className={({ isActive }) =>
-              `flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 cursor-pointer ${
+              `flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-200 cursor-pointer flex-shrink-0 ${
                 isActive 
                   ? "bg-white text-blue-700 shadow-sm border border-gray-200/50" 
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 border border-transparent"
+                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 border border-transparent"
               }`
             }
           >
@@ -76,6 +90,16 @@ export const Production = () => {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         <Outlet />
       </div>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { Warehouse as WarehouseIcon, ClipboardCheck, ArrowRightLeft, Truck, PackageCheck } from "lucide-react";
+import { Warehouse as WarehouseIcon, ClipboardCheck, ArrowRightLeft, Truck, PackageCheck, QrCode, BarChart3 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Warehouse = () => {
@@ -9,6 +9,13 @@ export const Warehouse = () => {
       icon: WarehouseIcon,
       to: "/warehouse/info",
       description: "Manage locations, capacity & status"
+    },
+    { 
+      id: "induction",
+      label: "Product Induction",
+      icon: QrCode,
+      to: "/warehouse/induction",
+      description: "Scan & receive finished goods from production"
     },
     { 
       id: "material-issuing",
@@ -37,6 +44,13 @@ export const Warehouse = () => {
       icon: Truck,
       to: "/warehouse/transfer-stock",
       description: "Internal warehouse transfer"
+    },
+    { 
+      id: "inventory-report", 
+      label: "Inventory Report", 
+      icon: BarChart3,
+      to: "/warehouse/inventory-report",
+      description: "Real-time stock vs commitments analysis"
     },
   ];
 
