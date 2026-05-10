@@ -2,6 +2,7 @@ import { X, Loader2 } from "lucide-react";
 import type { JSX } from "react";
 import { useState, useEffect } from "react";
 import { employeeService, type Employee, type UpdateEmployeeRequest } from "../../../services/employeeServices";
+import { roleService, type Role } from "../../../services/roleServices";
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -11,267 +12,216 @@ interface EditEmployeeModalProps {
 }
 
 export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: EditEmployeeModalProps): JSX.Element | null => {
+  // CẬP NHẬT: State formData khớp với UpdateEmployeeRequest mới
   const [formData, setFormData] = useState<UpdateEmployeeRequest>({
     fullName: "",
-    username: "",
     phoneNumber: "",
-    address: "",
+    province: "",
+    ward: "",
+    street: "",
+    dateOfBirth: "",
     hireDate: "",
+    status: "ACTIVE",
+    roleIds: []
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [roles, setRoles] = useState<Role[]>([]);
   const [provinces, setProvinces] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
 
-  const [selectedProvince, setSelectedProvince] = useState<{code: number, name: string} | null>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState<{code: number, name: string} | null>(null);
-  const [street, setStreet] = useState("");
+  // Load danh sách roles và tỉnh thành khi mở modal
+  useEffect(() => {
+    if (isOpen) {
+      roleService.getAllRoles().then(data => setRoles(data));
+      fetch("https://provinces.open-api.vn/api/p/")
+        .then(res => res.json())
+        .then(data => setProvinces(data));
+    }
+  }, [isOpen]);
 
+  // CẬP NHẬT: Map dữ liệu từ userData sang formData
   useEffect(() => {
     if (isOpen && userData) {
       setFormData({
         fullName: userData.fullName || "",
-        username: userData.username || "",
         phoneNumber: userData.phoneNumber || "",
-        address: userData.address || "",
-        hireDate: userData.hireDate || new Date(userData.hireDate).toISOString().split('T')[0],
+        dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth).toISOString().split('T')[0] : "",
+        hireDate: userData.hireDate ? new Date(userData.hireDate).toISOString().split('T')[0] : "",
+        status: userData.status,
+        roleIds: userData.roles.map(r => r.roleId),
+        // Địa chỉ ban đầu từ backend là chuỗi gộp, người dùng sẽ chọn lại nếu cần update
+        province: "", 
+        ward: "",
+        street: ""
       });
-      
-      setStreet("");
-      setSelectedProvince(null);
-      setSelectedDistrict(null);
-      setError(null);
     }
   }, [isOpen, userData]);
 
-  useEffect(() => {
-      const fetchData = async () => {  
-        try {
-          const res = await fetch("https://provinces.open-api.vn/api/v2/p/");
-          const provData = await res.json();
-          setProvinces(provData);
-        } catch (error) {
-          console.error("Failed to fetch provinces API", error);
-        }
-      };
-  
-      if (isOpen) {
-          fetchData();
-      }
-    }, [isOpen]);
-
-  useEffect(() => {
-    if (selectedProvince) {
-      const prov = provinces.find(p => p.code === selectedProvince.code);
-
-      const fetchData = async () => {
-        try {
-          const res = await fetch(`https://provinces.open-api.vn/api/v2/w/?province=${prov.code}`);
-          const ward = await res.json();
-          setDistricts(ward);
-          setSelectedDistrict(null);
-        } catch (err) {
-          console.error("Failed to fetch ward", err);
-        }
-      }
-
-      if (prov) {
-        fetchData();
-      }
-      
+  const handleProvinceChange = async (provinceCode: string) => {
+    const province = provinces.find(p => p.code === parseInt(provinceCode));
+    setFormData(prev => ({ ...prev, province: province?.name || "", ward: "" }));
+    
+    if (provinceCode) {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
+      const data = await res.json();
+      setDistricts(data.districts || []);
     } else {
       setDistricts([]);
     }
-  }, [selectedProvince, provinces]);
-
-  useEffect(() => {
-    const parts = [
-      street.trim(),
-      selectedDistrict?.name,
-      selectedProvince?.name
-    ].filter(Boolean);
-
-    setFormData(prev => ({ ...prev, address: parts.join(", ") }));
-  }, [street, selectedDistrict, selectedProvince]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEdit = async () => {
-    if (!userData) {
-      setError("User data not found.");
-      return;
-    }
-
+    if (!userData) return;
     setIsLoading(true);
     setError(null);
-
     try {
-      await employeeService.updateEmployee(
-        userData.employeeId,
-        formData
-      );
+      // Gọi API update với ID và dữ liệu đã thay đổi
+      await employeeService.updateEmployee(userData.employeeId, formData);
       onConfirm();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to update employee.");
+      setError(err.message || "Failed to update employee");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen || !userData) return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-      <div className="bg-white w-[700px] rounded-lg shadow-xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-        
-        <div className="relative p-6 text-center border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">EDIT EMPLOYEE INFORMATION</h2>
-          <button onClick={onClose} className="absolute right-4 top-4 p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+        <div className="flex justify-between items-center p-6 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-800">Edit Employee Profile</h2>
+          <button onClick={onClose} className="p-2 cursor-pointer
+          hover:bg-gray-100 rounded-full transition-colors">
+            <X size={20} className="text-gray-500" />
           </button>
         </div>
 
-        <div className="p-8 overflow-y-auto">
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded">
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">ID<span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  value={userData.employeeId} 
-                  disabled 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm text-gray-500 cursor-not-allowed outline-none" 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Full Name</label>
-                <input 
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  type="text" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Username</label>
-                <input 
-                  readOnly
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  type="text" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm text-gray-500 cursor-not-allowed outline-none" 
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Full Name</label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Role</label>
-                <input 
-                  type="text" 
-                  defaultValue={(userData.roles && userData.roles[0]?.roleName)} 
-                  disabled
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm text-gray-500 cursor-not-allowed outline-none" 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Hire Date</label>
-                <input 
-                  name="hireDate"
-                  value={formData.hireDate}
-                  onChange={handleChange}
-                  type="date" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none text-gray-600" 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800">Phone Number</label>
-                <input 
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleChange}
-                  type="text" 
-                  className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
-                />
-              </div>
+            <div className="space-y-2 text-gray-400">
+              <label className="text-sm font-semibold">Email (Read-only)</label>
+              <input
+                type="text"
+                value={userData?.email || ""}
+                disabled
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Phone Number</label>
+              <input
+                type="text"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+                <option value="TERMINATED">TERMINATED</option>
+              </select>
             </div>
           </div>
 
-          <div className="mt-6 space-y-3">
-            <label className="text-sm font-bold text-gray-800">Address Details</label>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Address Section */}
+          <div className="space-y-4 pt-4 border-t border-gray-50">
+            <h3 className="font-bold text-gray-800 uppercase text-xs tracking-wider">Update Address</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <select 
-                value={selectedProvince?.code || ""}
-                onChange={(e) => {
-                  const code = Number(e.target.value);
-                  const name = e.target.options[e.target.selectedIndex].text;
-                  setSelectedProvince(code ? { code, name } : null);
-                }}
-                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer"
+                onChange={(e) => handleProvinceChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
               >
-                <option value="">-- Province / City --</option>
-                {provinces.map(p => (
-                  <option key={p.code} value={p.code}>{p.name}</option>
-                ))}
+                <option value="">-- Select Province --</option>
+                {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
               </select>
 
               <select 
-                value={selectedDistrict?.code || ""}
-                onChange={(e) => {
-                  const code = Number(e.target.value);
-                  const name = e.target.options[e.target.selectedIndex].text;
-                  setSelectedDistrict(code ? { code, name } : null);
-                }}
-                disabled={!selectedProvince}
-                className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none cursor-pointer disabled:opacity-50"
+                onChange={(e) => setFormData({ ...formData, ward: districts.find(d => d.code === parseInt(e.target.value))?.name || "" })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
               >
-                <option value="">-- District --</option>
-                {districts.map(d => (
-                  <option key={d.code} value={d.code}>{d.name}</option>
-                ))}
+                <option value="">-- Select District/Ward --</option>
+                {districts.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
               </select>
             </div>
-
-            <input 
-              type="text" 
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-              placeholder="Street name, building, house number..." 
-              className="w-full bg-gray-50 border-none rounded p-3 text-sm focus:ring-1 focus:ring-gray-200 outline-none" 
+            <input
+              type="text"
+              placeholder="Update street, building, house number..."
+              value={formData.street}
+              onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
             />
           </div>
 
+          {/* Roles Management */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Assign Roles</label>
+            <div className="flex flex-wrap gap-3">
+              {roles.map((role) => (
+                <label key={role.roleId} className="flex items-center gap-2 p-2 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-blue-600 rounded"
+                    checked={formData.roleIds?.includes(role.roleId)}
+                    onChange={(e) => {
+                      const currentIds = formData.roleIds || [];
+                      const newRoleIds = e.target.checked
+                        ? [...currentIds, role.roleId]
+                        : currentIds.filter(id => id !== role.roleId);
+                      setFormData({ ...formData, roleIds: newRoleIds });
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">{role.roleName}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center justify-center gap-4 pb-8 pt-2">
+        <div className="flex items-center justify-end gap-4 p-6 border-t border-gray-100 bg-gray-50">
           <button 
-            onClick={onClose} 
-            disabled={isLoading}
-            className="px-8 py-2.5 bg-[#111111] text-white text-sm font-semibold rounded hover:bg-gray-900 transition-colors cursor-pointer disabled:opacity-50"
+            onClick={onClose}
+            className="px-6 py-2 cursor-pointer
+            text-gray-600 font-semibold hover:bg-gray-200 rounded-lg transition-colors"
           >
             CANCEL
           </button>
           <button 
-            onClick={handleEdit} 
+            onClick={handleEdit}
             disabled={isLoading}
-            className="px-8 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-500 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-8 py-2 cursor-pointer
+            bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-md"
           >
-            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isLoading ? "SAVING..." : "SAVE CHANGES"}
+            {isLoading ? <Loader2 className="animate-spin" size={18} /> : "SAVE CHANGES"}
           </button>
         </div>
       </div>

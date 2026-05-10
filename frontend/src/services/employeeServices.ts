@@ -1,7 +1,9 @@
 import api from "./api";
 
+// Cập nhật thêm roleCode dựa trên FormattedEmployee của backend
 export interface Role {
   roleId: number;
+  roleCode: string;
   roleName: string;
 }
 
@@ -13,35 +15,48 @@ export interface Employee {
   username: string;
   email: string;
   phoneNumber: string;
-  address: string;
-  dateOfBirth: string;
+  address: string | null;
+  dateOfBirth: string | null;
   hireDate: string; 
   terminationDate?: string | null;
   status: EmployeeStatus;
   roles: Role[];
+  sessionVersion?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
-export interface CreateEmployeeRequest {
-  fullName: string;
-  username: string;
-  password?: string;
-  email: string;
-  phoneNumber: string;
-  address: string;
-  dateOfBirth: string;
-  hireDate: string;
-  roleIds: number[];
-  status: 'ACTIVE' | 'INACTIVE';
+// Định dạng dữ liệu trả về cho danh sách có phân trang từ getPaginationParams backend
+export interface PaginatedEmployeeResponse {
+  data: Employee[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
+// Bỏ username và password (backend tự sinh). 
+// Đổi address thành province, ward, street theo đúng EmployeeCreateData
+export interface CreateEmployeeRequest {
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  province: string;
+  ward: string;
+  street: string;
+  dateOfBirth?: string;
+  hireDate: string;
+  roleIds: number[];
+  status?: EmployeeStatus;
+}
+
+// Bỏ email và username (backend xóa bỏ trong logic update).
+// Đổi address thành cụm province, ward, street.
 export interface UpdateEmployeeRequest {
   fullName?: string;
-  username?: string;
-  email?: string;
   phoneNumber?: string;
-  address?: string;
+  province?: string;
+  ward?: string;
+  street?: string;
   dateOfBirth?: string;
   hireDate?: string;
   terminationDate?: string | null;
@@ -51,8 +66,9 @@ export interface UpdateEmployeeRequest {
 
 
 export const employeeService = {
-  getAllEmployees: async (params? : { search?: string; page?: number; limit?: number }) => {
-    const response = await api.get<Employee[]>("/employees", { params });
+  // Cập nhật kiểu trả về cho dạng phân trang
+  getAllEmployees: async (params?: { search?: string; page?: number; limit?: number }) => {
+    const response = await api.get<PaginatedEmployeeResponse>("/employees", { params });
     return response.data;
   },
 
@@ -76,8 +92,10 @@ export const employeeService = {
     return response.data;
   },
 
-  deleteEmployee: async (id: number) => {
-    const response = await api.delete<{ message: string }>(`/employees/${id}`);
+  // Backend hỗ trợ forceLogout (hủy token), thêm vào nếu UI có gọi
+  forceLogout: async (id: number) => {
+    const response = await api.post<{ message: string }>(`/employees/${id}/force-logout`);
     return response.data;
-  },
+  }
+
 };

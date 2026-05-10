@@ -200,7 +200,7 @@ export const QualityChecks = (): JSX.Element => {
     <div className="flex gap-5 h-[calc(100vh-120px)] animate-in fade-in duration-300 relative w-full">
 
       {/* ZONE A (30%): PENDING INSPECTION LIST */}
-      <div className="w-[30%] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-shrink-0">
+      <div className="flex-[3] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-w-0">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -244,7 +244,7 @@ export const QualityChecks = (): JSX.Element => {
       {selectedInstance ? (
         <>
           {/* ZONE B (40%): INSPECTION CHECKLIST */}
-          <div className="w-[40%] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-shrink-0">
+          <div className="flex-[4] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-w-0">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
                 <h3 className="text-base font-bold text-gray-900">Inspection Checklist</h3>
@@ -314,7 +314,7 @@ export const QualityChecks = (): JSX.Element => {
           </div>
 
           {/* ZONE C (30%): RESULT & EVIDENCE */}
-          <div className="w-[30%] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col flex-shrink-0">
+          <div className="flex-[3] bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col min-w-0">
             <div className="p-5 border-b border-gray-100 bg-gray-50/50">
               <h3 className="text-base font-bold text-gray-900">Result & Evidence</h3>
               <p className="text-xs text-gray-500 mt-0.5">Confirm evidence and finalize results</p>
