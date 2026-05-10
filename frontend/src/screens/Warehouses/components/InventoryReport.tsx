@@ -20,16 +20,16 @@ interface InventoryItem {
 }
 
 const mockComponentWarehouses = [
-   { id: 1, name: "Kho Linh Kiện Chính (WH-COMP-01)" },
-   { id: 2, name: "Kho Phụ Liệu (WH-SUB-02)" }
+   { id: 1, name: "Main Component Warehouse (WH-COMP-01)" },
+   { id: 2, name: "Sub-Material Warehouse (WH-SUB-02)" }
 ];
 
 const mockProductWarehouses = [
-   { id: 3, name: "Kho Thành Phẩm (WH-FG-01)" },
-   { id: 4, name: "Khu Cách Ly Phế Phẩm (WH-DEFECT)" }
+   { id: 3, name: "Finished Goods Warehouse (WH-FG-01)" },
+   { id: 4, name: "Defect Isolation Zone (WH-DEFECT)" }
 ];
 
-// Tạo mock data linh kiện (Có tính cost)
+// Generate component mock data (Cost included)
 const mockComponents: InventoryItem[] = Array.from({ length: 45 }, (_, i) => {
    const onHand = Math.floor(Math.random() * 5000);
    const reserved = Math.floor(Math.random() * (onHand || 1));
@@ -38,17 +38,17 @@ const mockComponents: InventoryItem[] = Array.from({ length: 45 }, (_, i) => {
    return {
       id: 1000 + i,
       code: `COMP-${(i + 1).toString().padStart(3, '0')}`,
-      name: `Linh kiện lắp ráp loại ${String.fromCharCode(65 + (i % 26))}`,
-      unit: i % 3 === 0 ? "Bộ" : "Cái",
+      name: `Assembly component type ${String.fromCharCode(65 + (i % 26))}`,
+      unit: i % 3 === 0 ? "Set" : "Pcs",
       onHand, reserved, available, minStockLevel,
       isLowStock: available <= minStockLevel && available > 0,
       standardCost: (Math.floor(Math.random() * 50) + 10) * 1000
    };
 });
-// Thêm case đặc biệt: Hết hàng
+// Special case: Out of stock
 mockComponents[0] = { ...mockComponents[0], onHand: 100, reserved: 100, available: 0, isLowStock: false };
 
-// Tạo mock data thành phẩm (Không có standardCost lúc tồn)
+// Generate finished goods mock data (No standardCost in stock)
 const mockProducts: InventoryItem[] = Array.from({ length: 25 }, (_, i) => {
    const onHand = Math.floor(Math.random() * 1000);
    const reserved = Math.floor(Math.random() * (onHand || 1));
@@ -58,20 +58,20 @@ const mockProducts: InventoryItem[] = Array.from({ length: 25 }, (_, i) => {
       id: 5000 + i,
       code: `PROD-${(i + 1).toString().padStart(3, '0')}`,
       name: i % 2 === 0 ? `Smart Watch V${(i % 5) + 1}` : `Bluetooth Earbuds Pro ${i}`,
-      unit: "Hộp",
+      unit: "Box",
       onHand, reserved, available, minStockLevel,
       isLowStock: available <= minStockLevel && available > 0
    };
 });
 
 export const InventoryReport = (): JSX.Element => {
-   // --- STATE QUẢN LÝ VIEW & FILTERS ---
+   // --- VIEW & FILTERS STATE MANAGEMENT ---
    const [activeTab, setActiveTab] = useState<TabType>('COMPONENT');
    const [warehouseId, setWarehouseId] = useState<string>("ALL");
    const [searchQuery, setSearchQuery] = useState("");
    const [statusFilter, setStatusFilter] = useState<'ALL' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
 
-   // --- STATE BẢNG DỮ LIỆU ---
+   // --- DATA TABLE STATE ---
    const [sortConfig, setSortConfig] = useState<{ key: keyof InventoryItem, direction: 'asc' | 'desc' } | null>(null);
    const [currentPage, setCurrentPage] = useState(1);
    const itemsPerPage = 30;
@@ -181,7 +181,7 @@ export const InventoryReport = (): JSX.Element => {
                </div>
             </div>
 
-            {/* Công cụ Export */}
+            {/* Export Tools */}
             <div className="flex items-center gap-3">
                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 font-bold rounded-lg text-sm hover:bg-green-100 transition-colors cursor-pointer shadow-sm">
                   <Download className="w-4 h-4" /> Export Excel
@@ -195,7 +195,7 @@ export const InventoryReport = (): JSX.Element => {
 
 
          {/* ========================================== */}
-         {/* MỤC 3: BẢNG DỮ LIỆU TỔNG HỢP (DATA GRID) */}
+         {/* SECTION 3: SUMMARY DATA TABLE (DATA GRID) */}
          {/* ========================================== */}
          <div className="flex-1 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
 

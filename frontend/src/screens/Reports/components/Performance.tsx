@@ -36,7 +36,7 @@ const mockData: PerformanceDashboardData = {
     totalOutput: 4580,
     overallPassRate: 94.2,
     topLine: { name: "Line 01 - Assembly", output: 1250 },
-    topStaff: { name: "Nguyễn Văn A", count: 320 }
+    topStaff: { name: "John Doe", count: 320 }
   },
   linePerformance: [
     { lineName: "Line 01", passed: 1200, failed: 50 },
@@ -45,18 +45,18 @@ const mockData: PerformanceDashboardData = {
     { lineName: "Unassigned", passed: 1080, failed: 0 }
   ],
   staffLeaderboard: [
-    { employeeName: "Nguyễn Văn A", role: "QC Staff", processedCount: 320 },
-    { employeeName: "Trần Thị B", role: "Assembly Worker", processedCount: 295 },
-    { employeeName: "Lê Văn C", role: "QC Staff", processedCount: 280 },
-    { employeeName: "Phạm Minh D", role: "QC Staff", processedCount: 250 },
-    { employeeName: "Hoàng Anh E", role: "Assembly Worker", processedCount: 210 }
+    { employeeName: "John Doe", role: "QC Staff", processedCount: 320 },
+    { employeeName: "Jane Smith", role: "Assembly Worker", processedCount: 295 },
+    { employeeName: "Michael Brown", role: "QC Staff", processedCount: 280 },
+    { employeeName: "Emily Davis", role: "QC Staff", processedCount: 250 },
+    { employeeName: "Alex Wilson", role: "Assembly Worker", processedCount: 210 }
   ],
   defectBreakdown: [
     { name: "Scratches", value: 45 },
     { name: "No Power", value: 30 },
     { name: "Display Error", value: 15 },
     { name: "Missing Parts", value: 7 },
-    { name: "Others", value: 3 } // Gom nhóm Others
+    { name: "Others", value: 3 } // Group Others
   ]
 };
 
