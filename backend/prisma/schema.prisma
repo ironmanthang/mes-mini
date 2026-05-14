@@ -115,6 +115,20 @@ enum NotificationType {
   GENERAL
 }
 
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AttachmentCategory {
+  CONTRACT
+  INVOICE
+  PACKING_SLIP
+  INSPECTION
+  OTHER
+}
+
 model Employee {
   employeeId                Int                    @id @default(autoincrement()) @map("employee_id")
   fullName                  String                 @map("full_name")
@@ -809,20 +823,6 @@ model CodeSequence {
   currentValue Int    @default(0) @map("current_value")
 
   @@map("code_sequences")
-}
-
-enum Priority {
-  HIGH
-  MEDIUM
-  LOW
-}
-
-enum AttachmentCategory {
-  CONTRACT
-  INVOICE
-  PACKING_SLIP
-  INSPECTION
-  OTHER
 }
 
 model Attachment {

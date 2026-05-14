@@ -25,12 +25,16 @@
 - [x] **Finalize Quality/Induction Docs**: Ran `/finalize-feature` on all Phase A and Phase B documentation. Transformed transient simulation guides into permanent **Frontend Integration Guides**.
 - [x] **Permission Fix (WH_INDUCT)**: Identified and fixed missing `WH_INDUCT` permission for `WH_STAFF` in the seed script.
 - [x] **Swagger QC Improvement**: Updated `POST /api/quality` with a concrete electronics checklist example and fixed indentation errors.
+- [x] **FIFO Pick List API**: Created a dedicated `GET /api/sales-orders/:id/pick-list` endpoint to guide warehouse staff before scanning.
+- [x] **Work Order Cost**: Implemented Work Order Operational Cost Input (`laborCost`, `overheadCost`) upon completion, triggering atomic cost absorption.
+- [x] **Backend Integration Testing Framework**: Implemented a comprehensive test suite for 7 core MES modules (`Purchase Orders`, `Receive PO`, `Product Induction`, `Material Requests`, `Work Orders`, `Quality Control`, `Production Requests`). Enforced **TC Isolation** principles and automated sequential execution in Docker. Documented in `docs/features/backend_testing_standard.md`.
+- [x] **Sequential Test Verification**: Verified the stability of the entire test suite (21/21 tests passed) when run tuần tự as independent commands.
 
 ## Pending Objectives (Next Session)
-- [ ] **FIFO Pick List API**: Create a dedicated `GET /api/sales-orders/:id/pick-list` endpoint to guide warehouse staff before scanning.
 - [ ] **Frontend Integration**: Integrate the new FIFO Pick List and Warranty Activation endpoints into the React dashboard.
 - [ ] **Audit Logs**: Review the `InventoryTransaction` note format for better traceability during FIFO violations.
-- [ ] **Work Order Cost**: Implement Work Order Operational Cost Input (`laborCost`, `overheadCost`) upon completion.
 - [ ] **Cost Reporting APIs**: Create `GET /api/costs/materials` and `GET /api/costs/products`.
 - [ ] **Line Performance**: Implement Production Line Performance Reporting API (`GET /api/production/reports/line-performance`).
 - [ ] **Spoilage Gap**: Address the "Spoilage / Supplementary Material Request" gap in Business logic.
+- [ ] **Cancel MR**: Implement "Cancel (and delete?) Material Request" logic (Gate: only if status is PENDING).
+

@@ -55,7 +55,11 @@ class WorkOrderService {
             where: { productionRequestId: { in: productionRequestIds } },
             include: {
                 product: { include: { bom: true } },
-                workOrderFulfillments: true // Fetch existing fulfillments here
+                workOrderFulfillments: {
+                    include: {
+                        workOrder: { select: { status: true } } // Needed to exclude CANCELLED WOs from remaining calc
+                    }
+                }
             }
         });
 
@@ -87,8 +91,11 @@ class WorkOrderService {
             }
 
             // Calculate Remaining Quantity
-            // Cast to any to avoid TS error of potentially missing type def
-            const previousFulfilled = req.workOrderFulfillments.reduce((sum, f) => sum + (f as any).quantity, 0);
+            // Only count fulfillments from non-CANCELLED Work Orders.
+            // A CANCELLED WO must "return" its quantity back to the PR so it can be re-scheduled.
+            const previousFulfilled = req.workOrderFulfillments
+                .filter((f: any) => f.workOrder.status !== WorkOrderStatus.CANCELLED)
+                .reduce((sum: number, f: any) => sum + f.quantity, 0);
             const remainingQuantity = req.quantity - previousFulfilled;
 
             // Determine qty for this specific request
@@ -408,8 +415,18 @@ class WorkOrderService {
     }
 
     // The Big One: Complete WO -> Updates Inventory
-    // Inputs: quantityProduced, optional batchCode override, optional expiryDate
-    async completeWorkOrder(id: number, quantityProduced: number, userId: number, customBatchCode?: string, expiryDate?: Date, targetWarehouseIdOverride?: number) {
+    async completeWorkOrder(
+        id: number,
+        data: {
+            quantityProduced: number;
+            laborCost: number;
+            overheadCost: number;
+            batchCode?: string;
+            expiryDate?: Date;
+            targetWarehouseIdOverride?: number;
+        },
+        userId: number
+    ) {
         // Fix: Logic moved inside transaction to access fetched 'wo' configuration
 
         return await prisma.$transaction(async (tx) => {
@@ -430,11 +447,11 @@ class WorkOrderService {
             if (!wo) throw new Error("Work Order not found");
 
             // Fix: Use targetSalesWarehouseId from WO config, or Override, or Fallback
-            const warehouseId = targetWarehouseIdOverride || wo.targetSalesWarehouseId || (await this.getDefaultWarehouseId());
+            const warehouseId = data.targetWarehouseIdOverride || wo.targetSalesWarehouseId || (await this.getDefaultWarehouseId());
             if (wo.status !== WorkOrderStatus.IN_PROGRESS) throw new Error(`Cannot complete. Status is ${wo.status}`);
-            if (quantityProduced <= 0) throw new Error("Quantity produced must be > 0");
-            if (quantityProduced > wo.quantity) {
-                throw new Error(`Quantity produced (${quantityProduced}) cannot exceed planned quantity (${wo.quantity}).`);
+            if (data.quantityProduced <= 0) throw new Error("Quantity produced must be > 0");
+            if (data.quantityProduced > wo.quantity) {
+                throw new Error(`Quantity produced (${data.quantityProduced}) cannot exceed planned quantity (${wo.quantity}).`);
             }
 
             const hasIssuedMaterial = wo.materialRequest?.status === MaterialRequestStatus.ISSUED;
@@ -451,9 +468,9 @@ class WorkOrderService {
             // Batch Configuration: Use custom code if provided, else generate
             const productionDate = new Date();
             const dateStr = productionDate.toISOString().slice(0, 10).replace(/-/g, '');
-            const batchCode = customBatchCode || `BATCH-${wo.code}-${dateStr}`;
+            const batchCode = data.batchCode || `BATCH-${wo.code}-${dateStr}`;
 
-            let finalExpiryDate = expiryDate || null;
+            let finalExpiryDate = data.expiryDate || null;
             if (!finalExpiryDate && wo.product.shelfLifeDays) {
                 const calculatedDate = new Date(productionDate);
                 calculatedDate.setDate(calculatedDate.getDate() + wo.product.shelfLifeDays);
@@ -473,7 +490,7 @@ class WorkOrderService {
             // B. Generate Serial Numbers & Register Product Instances
             // Requirement: Barcode/Serial Number generation
             // Format: SN-{PRD_CODE}-{BATCH_CODE}-{SEQ}
-            for (let i = 1; i <= quantityProduced; i++) {
+            for (let i = 1; i <= data.quantityProduced; i++) {
                 const seq = i.toString().padStart(3, '0');
                 const serialNumber = `SN-${wo.product.code}-${batchCode}-${seq}`;
 
@@ -500,10 +517,14 @@ class WorkOrderService {
                 });
             }
 
-            // D. Update Work Order Status
+            // D. Update Work Order Status and save Operational Costs
             const completedWO = await tx.workOrder.update({
                 where: { workOrderId: id },
-                data: { status: WorkOrderStatus.COMPLETED }
+                data: {
+                    status: WorkOrderStatus.COMPLETED,
+                    laborCost: data.laborCost,
+                    overheadCost: data.overheadCost
+                }
             });
 
             // E. Rule 177: PR Underfill Fallback

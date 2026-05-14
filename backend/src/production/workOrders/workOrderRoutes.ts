@@ -241,9 +241,11 @@ router.put('/:id/cancel',
  *         application/json:
  *           schema:
  *             type: object
- *             required: [quantityProduced]
+ *             required: [quantityProduced, laborCost, overheadCost]
  *             properties:
  *               quantityProduced: { type: integer, minimum: 1 }
+ *               laborCost: { type: number, minimum: 0, description: "Total labor cost for this Work Order" }
+ *               overheadCost: { type: number, minimum: 0, description: "Total overhead cost for this Work Order" }
  *               batchCode: { type: string, description: "Optional custom batch code" }
  *               expiryDate: { type: string, format: "date", description: "Optional expiry date" }
  *               warehouseId: { type: integer, description: "Optional warehouse override. Defaults to the Work Order's targetSalesWarehouseId." }

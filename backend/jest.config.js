@@ -23,6 +23,19 @@ export default {
     extensionsToTreatAsEsm: ['.ts'],
     silent: false,
     verbose: true,
-    forceExit: true, // Force exit after tests complete (e.g. database connections)
+    forceExit: true,       // Force exit after tests (closes DB connections)
     detectOpenHandles: true,
+
+    // ── Test Isolation Config ──────────────────────────────────────────────────
+    // Run all test files sequentially to prevent race conditions where two
+    // test suites try to create records with the same unique code.
+    // --runInBand is passed via the CLI in package.json scripts.
+
+    // Increase timeout for beforeAll blocks that perform Prisma DB writes.
+    testTimeout: 30000,
+
+    // Wipe and re-seed the database once before all test suites run.
+    // This ensures every `npm run test` starts from a clean, known state.
+    globalSetup: './tests/setup/globalSetup.ts',
 };
+

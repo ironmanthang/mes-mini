@@ -623,6 +623,109 @@ if (so.status !== SalesOrderStatus.PENDING) throw new Error(`Process Violation: 
         return this.getSOById(id);
     }
 
+    private async _getEligibleInstances(
+        productId: number,
+        salesOrderId: number,
+        tx: Prisma.TransactionClient
+    ) {
+        const allAvailable = await tx.productInstance.findMany({
+            where: { productId: productId, status: ProductInstanceStatus.IN_STOCK_SALES, salesOrderId: null },
+            include: {
+                warehouse: true, // Included for the pick list
+                productionBatch: {
+                    include: {
+                        workOrder: {
+                            include: {
+                                workOrderFulfillments: {
+                                    include: {
+                                        productionRequest: {
+                                            include: { salesOrderDetail: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { receivedAt: 'asc' }
+        });
+
+        const mtoEligible: typeof allAvailable = [];
+        const mtsEligible: typeof allAvailable = [];
+
+        for (const inst of allAvailable) {
+            let isMTOForThisSO = false;
+            let isBlocked = false;
+
+            const prs = inst.productionBatch.workOrder.workOrderFulfillments.map(f => f.productionRequest);
+            for (const pr of prs) {
+                const linkedSOId = pr.salesOrderDetail?.salesOrderId;
+                if (linkedSOId === salesOrderId) {
+                    isMTOForThisSO = true;
+                    break;
+                } else if (linkedSOId) {
+                    // Check status of other SO
+                    const otherSO = await tx.salesOrder.findUnique({ where: { salesOrderId: linkedSOId } });
+                    if (otherSO && (otherSO.status === SalesOrderStatus.IN_PROGRESS || otherSO.status === SalesOrderStatus.PARTIALLY_SHIPPED)) {
+                        isBlocked = true;
+                    }
+                }
+            }
+
+            if (isMTOForThisSO) {
+                mtoEligible.push(inst);
+            } else if (!isBlocked) {
+                mtsEligible.push(inst);
+            }
+        }
+
+        return [...mtoEligible, ...mtsEligible];
+    }
+
+    async generatePickList(soId: string | number) {
+        const id = typeof soId === 'string' ? parseInt(soId) : soId;
+        
+        return await prisma.$transaction(async (tx) => {
+            const so = await tx.salesOrder.findUnique({
+                where: { salesOrderId: id },
+                include: { details: { include: { product: true } } }
+            });
+
+            if (!so) throw new Error("Sales Order not found");
+
+            const allowedStatuses: SalesOrderStatus[] = [SalesOrderStatus.APPROVED, SalesOrderStatus.IN_PROGRESS, SalesOrderStatus.PARTIALLY_SHIPPED];
+            if (!allowedStatuses.includes(so.status)) {
+                throw new Error(`Cannot generate pick list for order in ${so.status} status.`);
+            }
+
+            const pickList = [];
+
+            for (const detail of so.details) {
+                const quantityNeeded = detail.quantity - (detail.quantityShipped || 0);
+                if (quantityNeeded <= 0) continue;
+
+                const eligibleInstances = await this._getEligibleInstances(detail.productId, id, tx);
+                const instancesToPick = eligibleInstances.slice(0, quantityNeeded);
+
+                for (const inst of instancesToPick) {
+                    pickList.push({
+                        productId: detail.productId,
+                        productName: detail.product.productName,
+                        productCode: detail.product.code,
+                        serialNumber: inst.serialNumber,
+                        warehouseId: inst.warehouseId,
+                        warehouseName: inst.warehouse?.warehouseName,
+                        location: inst.warehouse?.location,
+                        receivedAt: inst.receivedAt
+                    });
+                }
+            }
+
+            return pickList;
+        });
+    }
+
     async shipOrder(
         soId: string | number,
         shipmentItems: { productId: number; serialNumbers: string[] }[],
@@ -658,61 +761,10 @@ if (so.status !== SalesOrderStatus.PENDING) throw new Error(`Process Violation: 
                 }
 
                 // --- GENERATE PICK LIST FOR VALIDATION ---
-                // 1. Find all IN_STOCK_SALES instances for this product
-                const allAvailable = await tx.productInstance.findMany({
-                    where: { productId: item.productId, status: ProductInstanceStatus.IN_STOCK_SALES, salesOrderId: null },
-                    include: {
-                        productionBatch: {
-                            include: {
-                                workOrder: {
-                                    include: {
-                                        workOrderFulfillments: {
-                                            include: {
-                                                productionRequest: {
-                                                    include: { salesOrderDetail: true }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    orderBy: { receivedAt: 'asc' }
-                });
-
-                // 2. Filter eligible and separate into MTO vs MTS
-                const mtoEligible: typeof allAvailable = [];
-                const mtsEligible: typeof allAvailable = [];
-
-                for (const inst of allAvailable) {
-                    let isMTOForThisSO = false;
-                    let isBlocked = false;
-
-                    const prs = inst.productionBatch.workOrder.workOrderFulfillments.map(f => f.productionRequest);
-                    for (const pr of prs) {
-                        const linkedSOId = pr.salesOrderDetail?.salesOrderId;
-                        if (linkedSOId === id) {
-                            isMTOForThisSO = true;
-                            break;
-                        } else if (linkedSOId) {
-                            // Check status of other SO
-                            const otherSO = await tx.salesOrder.findUnique({ where: { salesOrderId: linkedSOId } });
-                            if (otherSO && (otherSO.status === SalesOrderStatus.IN_PROGRESS || otherSO.status === SalesOrderStatus.PARTIALLY_SHIPPED)) {
-                                isBlocked = true;
-                            }
-                        }
-                    }
-
-                    if (isMTOForThisSO) {
-                        mtoEligible.push(inst);
-                    } else if (!isBlocked) {
-                        mtsEligible.push(inst);
-                    }
-                }
-
+                const eligibleInstances = await this._getEligibleInstances(item.productId, id, tx);
+                
                 // 3. Select top N (quantityToShip)
-                const allowedInstances = [...mtoEligible, ...mtsEligible].slice(0, quantityToShip);
+                const allowedInstances = eligibleInstances.slice(0, quantityToShip);
                 const allowedSerials = allowedInstances.map(inst => inst.serialNumber);
 
                 // --- VALIDATE SCANNED SERIALS ---

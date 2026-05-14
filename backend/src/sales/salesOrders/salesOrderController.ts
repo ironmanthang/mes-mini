@@ -131,3 +131,14 @@ export const checkFeasibility = async (req: Request, res: Response): Promise<voi
         res.status(400).json({ message: (error as Error).message });
     }
 };
+
+export const getPickList = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = req.params.id as string;
+        const result = await SOService.generatePickList(id);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+};
+

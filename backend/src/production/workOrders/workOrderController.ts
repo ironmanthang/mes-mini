@@ -78,7 +78,7 @@ export const releaseWorkOrder = async (req: Request, res: Response): Promise<voi
 export const completeWorkOrder = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = parseInt(String(req.params.id));
-        const { quantityProduced, batchCode, expiryDate, warehouseId } = req.body;
+        const { quantityProduced, batchCode, expiryDate, warehouseId, laborCost, overheadCost } = req.body;
 
         if (!quantityProduced || quantityProduced <= 0) {
             res.status(400).json({ message: "Quantity Produced must be > 0" });
@@ -89,11 +89,15 @@ export const completeWorkOrder = async (req: Request, res: Response): Promise<vo
 
         const result = await WorkOrderService.completeWorkOrder(
             id,
-            quantityProduced,
-            req.user!.employeeId,
-            batchCode,
-            parsedExpiryDate,
-            warehouseId
+            {
+                quantityProduced,
+                laborCost: Number(laborCost),
+                overheadCost: Number(overheadCost),
+                batchCode,
+                expiryDate: parsedExpiryDate,
+                targetWarehouseIdOverride: warehouseId
+            },
+            req.user!.employeeId
         );
         res.status(200).json({ message: "Work Order Completed", result });
     } catch (error) {

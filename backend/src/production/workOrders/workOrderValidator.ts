@@ -18,7 +18,9 @@ export const completeWOSchema = Joi.object({
     quantityProduced: Joi.number().integer().min(1).required(),
     batchCode: Joi.string().optional(),
     expiryDate: Joi.date().iso().min('now').optional(),
-    warehouseId: Joi.number().integer().min(1).optional()
+    warehouseId: Joi.number().integer().min(1).optional(),
+    laborCost: Joi.number().min(0).required(),
+    overheadCost: Joi.number().min(0).required()
 });
 
 export const cancelWOSchema = Joi.object({

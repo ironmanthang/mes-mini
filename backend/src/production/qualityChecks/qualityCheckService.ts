@@ -148,7 +148,6 @@ class QualityCheckService {
                     data: { status: targetStatus }
                 });
 
-                // 7. Cost absorption check stub (Phase 4)
                 await this.checkBatchCostAbsorption(
                     instance.productionBatch.productionBatchId,
                     instance.productionBatch.workOrderId,

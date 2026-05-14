@@ -34,7 +34,57 @@ env:
   REPO_NAME: mes-mini-backend
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run Migrations on Test DB
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+          DIRECT_URL: postgresql://test:test@localhost:5432/testdb
+
+      - name: Run Tests
+        working-directory: backend
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+          DIRECT_URL: postgresql://test:test@localhost:5432/testdb
+          JWT_SECRET: my-super-secret-jwt-key-for-testing-only-1234
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: 'read' # id-token: 'write' removed since we use JSON keys

@@ -242,7 +242,7 @@ class ProductionRequestService {
         }
 
         if (pr.employeeId !== userId) {
-            throw new Error("Only the creator can update this draft Production Request.");
+            throw new AppError("Only the creator can update this draft Production Request.", 403);
         }
 
         if (data.productId != null) {
@@ -313,7 +313,7 @@ class ProductionRequestService {
 
         // Self-approval guard — route already checked PERM.PR_APPROVE
         if (pr.employeeId === approverId) {
-            throw new Error("Violation: You cannot approve a Production Request that you created yourself.");
+            throw new AppError("Violation: You cannot approve a Production Request that you created yourself.", 403);
         }
 
         const updated = await prisma.productionRequest.update({
@@ -334,7 +334,7 @@ class ProductionRequestService {
         });
 
         await NotificationService.createNotification({
-            type: NotificationType.PO_APPROVED,
+            type: NotificationType.PR_APPROVED,
             title: 'Production Request Approved',
             message: `Your Production Request ${pr.code} has been approved.`,
             employeeId: pr.employeeId,

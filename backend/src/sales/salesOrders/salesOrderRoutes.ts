@@ -12,6 +12,7 @@ import {
     deleteSO,
     cancelSO,
     checkFeasibility,
+    getPickList,
 } from './salesOrderController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import validate from '../../common/middleware/validate.js';
@@ -30,6 +31,11 @@ router.get('/',
 router.get('/:id/feasibility',
     authorize(PERM.SO_READ),
     checkFeasibility
+);
+
+router.get('/:id/pick-list',
+    authorize(PERM.SO_SHIP),
+    getPickList
 );
 
 router.get('/:id',
@@ -532,6 +538,45 @@ router.post('/:id/ship',
  *         description: "Feasibility result with per-line-item traffic light status"
  *       400:
  *         description: "Error (Wrong SO status or not found)"
+ */
+
+/**
+ * @swagger
+ * /api/sales-orders/{id}/pick-list:
+ *   get:
+ *     summary: "Get FIFO Pick List"
+ *     description: "Generates a strict First-In-First-Out (FIFO) pick list for warehouse staff to fulfill the Sales Order."
+ *     tags: [Sales Orders]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: "List of serial numbers to pick"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   productId: { type: integer, example: 1 }
+ *                   productName: { type: string, example: "Laptop" }
+ *                   productCode: { type: string, example: "PRD-LAPTOP" }
+ *                   serialNumber: { type: string, example: "SN-LAPTOP-0001" }
+ *                   warehouseId: { type: integer, example: 2 }
+ *                   warehouseName: { type: string, example: "Sales Warehouse A" }
+ *                   location: { type: string, example: "Aisle 3, Shelf B" }
+ *                   receivedAt: { type: string, format: "date-time" }
+ *       400:
+ *         description: "Logic Error (SO not in eligible status for picking)"
+ *       403:
+ *         description: "Forbidden (Must have SO_SHIP permission)"
+ *       404:
+ *         description: "SO not found"
  */
 
 export default router;
