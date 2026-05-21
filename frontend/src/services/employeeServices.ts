@@ -92,6 +92,11 @@ export const employeeService = {
     return response.data;
   },
 
+  deleteEmployee: async (id: number) => {
+    const response = await api.delete<{ message: string }>(`/employees/${id}`);
+    return response.data;
+  },
+
   // Backend hỗ trợ forceLogout (hủy token), thêm vào nếu UI có gọi
   forceLogout: async (id: number) => {
     const response = await api.post<{ message: string }>(`/employees/${id}/force-logout`);
