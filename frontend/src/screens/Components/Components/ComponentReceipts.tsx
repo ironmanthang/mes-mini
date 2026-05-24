@@ -1,6 +1,7 @@
 import { 
   PackageCheck, Search, Building2, Calendar, User, 
-  MapPin, CheckCircle, UploadCloud, X, Loader2, FileText, Paperclip
+  MapPin, CheckCircle, UploadCloud, X, Loader2, FileText, Paperclip,
+  Printer
 } from "lucide-react";
 import { useState, useEffect, useRef, type JSX } from "react";
 import { purchaseOrderService, type PurchaseOrder } from "../../../services/purchaseOrderServices";
@@ -35,6 +36,15 @@ export const ComponentReceipts = (): JSX.Element => {
 
   const [showWarning, setShowWarning] = useState(false);
   const [messageWarning, setMessageWarning] = useState("");
+
+  const [receivedLots, setReceivedLots] = useState<{
+    lotCode: string;
+    componentId: number;
+    initialQuantity: number;
+    componentName?: string;
+    componentCode?: string;
+  }[]>([]);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{"fullName": "Current User"}');
 
@@ -166,12 +176,12 @@ export const ComponentReceipts = (): JSX.Element => {
       const payload = {
         items: itemsToReceive.map(item => ({
           componentId: item.componentId,
-          quantity: item.receivingQty,
+          initialQuantity: item.receivingQty,
           warehouseId: Number(selectedWarehouseId)
         }))
       };
 
-      await purchaseOrderService.receiveGoods(poId, payload);
+      const res = await purchaseOrderService.receiveGoods(poId, payload);
 
       if (attachedFiles.length > 0) {
         for (const file of attachedFiles) {
@@ -196,24 +206,133 @@ export const ComponentReceipts = (): JSX.Element => {
         }
       }
 
+      const lotsWithDetails = res.generatedLots.map(lot => {
+        const detailItem = poDetails?.details?.find(d => d.componentId === lot.componentId);
+        return {
+          lotCode: lot.lotCode,
+          componentId: lot.componentId,
+          initialQuantity: lot.quantity,
+          componentName: detailItem?.component?.componentName || `Component #${lot.componentId}`,
+          componentCode: detailItem?.component?.code || `COMP-${lot.componentId}`
+        };
+      });
+
+      setReceivedLots(lotsWithDetails);
       setShowSuccess(true);
       
       setTimeout(() => {
         setShowSuccess(false);
-        setSelectedPoId("");
-        setPoDetails(null);
-        setAttachedFiles([]);
-        setNote("");
-        purchaseOrderService.getAllPOs({ limit: 1000 }).then(res => {
-           setValidPOs((res.data || []).filter(po => po.status === 'ORDERED' || po.status === 'RECEIVING'));
-        });
-      }, 2000);
+        setShowPrintModal(true); // Open print modal instead of resetting immediately
+      }, 1500);
 
     } catch (error: any) {
       alert(error?.response?.data?.message || "Lỗi khi nhập kho.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleClosePrintModal = () => {
+    setShowPrintModal(false);
+    setReceivedLots([]);
+    setSelectedPoId("");
+    setPoDetails(null);
+    setAttachedFiles([]);
+    setNote("");
+    purchaseOrderService.getAllPOs({ limit: 1000 }).then(res => {
+       setValidPOs((res.data || []).filter(po => po.status === 'ORDERED' || po.status === 'RECEIVING'));
+    });
+  };
+
+  const handlePrintLabels = () => {
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    const labelsHTML = receivedLots.map(lot => `
+      <div class="label-card">
+        <div class="qr-code" data-code="${lot.lotCode}"></div>
+        <div class="lot-code">${lot.lotCode}</div>
+      </div>
+    `).join("");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Lot Labels</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background-color: white;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+            @media print {
+              @page {
+                margin: 10mm;
+              }
+            }
+            .label-card {
+              width: 100%;
+              height: 100vh;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              page-break-after: always;
+            }
+            .label-card:last-child {
+              page-break-after: auto;
+            }
+            .qr-code {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-code canvas, .qr-code img {
+              width: 65vw !important;
+              height: 65vw !important;
+              max-width: 500px;
+              max-height: 500px;
+            }
+            .lot-code {
+              margin-top: 16px;
+              font-size: 20px;
+              font-family: monospace;
+              font-weight: bold;
+              white-space: nowrap;
+              letter-spacing: 1px;
+            }
+          </style>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        </head>
+        <body>
+          ${labelsHTML}
+          <script>
+            window.onload = function() {
+              document.querySelectorAll('.qr-code').forEach(function(el) {
+                new QRCode(el, {
+                  text: el.getAttribute('data-code'),
+                  width: 400,
+                  height: 400,
+                  colorDark : "#000000",
+                  colorLight : "#ffffff",
+                  correctLevel : QRCode.CorrectLevel.H
+                });
+              });
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
 
@@ -461,6 +580,68 @@ export const ComponentReceipts = (): JSX.Element => {
 
       <SuccessNotification isVisible={showSuccess} message="Goods received successfully!"/>
       <WarningNotification isVisible={showWarning} message={messageWarning} onClose={() => setShowWarning(false)}/>
+
+      {/* Print Barcode Lots Modal */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+          <div className="bg-white w-[550px] p-6 rounded-lg shadow-xl animate-in fade-in zoom-in duration-200 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b pb-3 bg-white rounded-t-lg">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Printer className="w-5 h-5 text-blue-600" /> Print Component Lot Labels
+              </h3>
+              <button 
+                onClick={handleClosePrintModal} 
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              <p>Receipt completed! Print the generated **Internal Lot Labels** to label the received boxes for scanning traceability.</p>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b">
+                  <tr>
+                    <th className="p-3">Lot Code</th>
+                    <th className="p-3">Component</th>
+                    <th className="p-3 text-right">Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                  {receivedLots.map((lot, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-3 font-mono text-blue-600 font-bold">{lot.lotCode}</td>
+                      <td className="p-3">
+                        <p className="font-bold text-gray-900">{lot.componentName}</p>
+                        <p className="text-xs text-gray-500">{lot.componentCode}</p>
+                      </td>
+                      <td className="p-3 text-right font-black">{lot.initialQuantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <button 
+                onClick={handleClosePrintModal} 
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Close & Finish
+              </button>
+              <button 
+                onClick={handlePrintLabels} 
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-md transition-colors cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print Barcode Labels
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

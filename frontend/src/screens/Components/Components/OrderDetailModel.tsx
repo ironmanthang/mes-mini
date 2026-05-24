@@ -1,8 +1,8 @@
 import { 
-  X, CheckCircle, Printer, User, Package, Paperclip, Loader2, Download, FileText
+  X, CheckCircle, Printer, User, Package, Paperclip, Loader2, Download, FileText, QrCode
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
-import { purchaseOrderService, type PurchaseOrder, type Attachment } from "../../../services/purchaseOrderServices";
+import { purchaseOrderService, type PurchaseOrder, type Attachment, type ComponentLot } from "../../../services/purchaseOrderServices";
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -20,6 +20,223 @@ export const OrderDetailModal = ({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+  const [lots, setLots] = useState<ComponentLot[]>([]);
+  const [isLoadingLots, setIsLoadingLots] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLots = async () => {
+      if (!order?.purchaseOrderId) return;
+      if (order.status !== 'RECEIVING' && order.status !== 'COMPLETED') {
+        setLots([]);
+        return;
+      }
+      
+      setIsLoadingLots(true);
+      setLots([]); 
+
+      try {
+        const data = await purchaseOrderService.getLotsByPO(order.purchaseOrderId);
+        if (isMounted) {
+          setLots(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch lots:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingLots(false);
+        }
+      }
+    };
+
+    if (isOpen) {
+      fetchLots();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, order?.purchaseOrderId, order?.status]);
+
+  const handlePrintLot = (lot: ComponentLot) => {
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Lot Label</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background-color: white;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+            @media print {
+              @page {
+                margin: 10mm;
+              }
+            }
+            .label-card {
+              width: 100%;
+              height: 100vh;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              page-break-after: always;
+            }
+            .label-card:last-child {
+              page-break-after: auto;
+            }
+            .qr-code {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-code canvas, .qr-code img {
+              width: 65vw !important;
+              height: 65vw !important;
+              max-width: 500px;
+              max-height: 500px;
+            }
+            .lot-code {
+              margin-top: 16px;
+              font-size: 20px;
+              font-family: monospace;
+              font-weight: bold;
+              white-space: nowrap;
+              letter-spacing: 1px;
+            }
+          </style>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        </head>
+        <body>
+          <div class="label-card">
+            <div class="qr-code" data-code="${lot.lotCode}"></div>
+            <div class="lot-code">${lot.lotCode}</div>
+          </div>
+          <script>
+            window.onload = function() {
+              document.querySelectorAll('.qr-code').forEach(function(el) {
+                new QRCode(el, {
+                  text: el.getAttribute('data-code'),
+                  width: 400,
+                  height: 400,
+                  colorDark : "#000000",
+                  colorLight : "#ffffff",
+                  correctLevel : QRCode.CorrectLevel.H
+                });
+              });
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handlePrintAllLots = () => {
+    if (lots.length === 0) return;
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) {
+      alert("Vui lòng cho phép popup để sử dụng tính năng in.");
+      return;
+    }
+
+    const labelsHTML = lots.map(lot => `
+      <div class="label-card">
+        <div class="qr-code" data-code="${lot.lotCode}"></div>
+        <div class="lot-code">${lot.lotCode}</div>
+      </div>
+    `).join("");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Lot Labels</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background-color: white;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+            @media print {
+              @page {
+                margin: 10mm;
+              }
+            }
+            .label-card {
+              width: 100%;
+              height: 100vh;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              page-break-after: always;
+            }
+            .label-card:last-child {
+              page-break-after: auto;
+            }
+            .qr-code {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-code canvas, .qr-code img {
+              width: 65vw !important;
+              height: 65vw !important;
+              max-width: 500px;
+              max-height: 500px;
+            }
+            .lot-code {
+              margin-top: 16px;
+              font-size: 20px;
+              font-family: monospace;
+              font-weight: bold;
+              white-space: nowrap;
+              letter-spacing: 1px;
+            }
+          </style>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        </head>
+        <body>
+          ${labelsHTML}
+          <script>
+            window.onload = function() {
+              document.querySelectorAll('.qr-code').forEach(function(el) {
+                new QRCode(el, {
+                  text: el.getAttribute('data-code'),
+                  width: 400,
+                  height: 400,
+                  colorDark : "#000000",
+                  colorLight : "#ffffff",
+                  correctLevel : QRCode.CorrectLevel.H
+                });
+              });
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -306,6 +523,60 @@ export const OrderDetailModal = ({
                         </div>
                     )}
                 </div>
+
+                {(order.status === 'RECEIVING' || order.status === 'COMPLETED') && (
+                  <div className="border-t border-gray-100 pt-6 print:hidden">
+                      <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                              <QrCode className="w-4 h-4 text-blue-500" /> Generated Lot Labels (Barcodes)
+                          </h3>
+                          {lots.length > 0 && (
+                            <button
+                              onClick={handlePrintAllLots}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> Print All Labels
+                            </button>
+                          )}
+                      </div>
+                      
+                      {isLoadingLots ? (
+                          <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                              <Loader2 className="w-4 h-4 animate-spin" /> Loading generated lots...
+                          </div>
+                      ) : lots.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {lots.map(lot => (
+                                  <div key={lot.lotCode} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-blue-200 transition-colors group">
+                                      <div className="flex items-center gap-3 overflow-hidden">
+                                          <div className="w-8 h-8 bg-blue-50 text-blue-700 rounded flex items-center justify-center flex-shrink-0">
+                                              <QrCode className="w-4 h-4" />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                              <p className="text-sm font-mono font-bold text-gray-900 truncate" title={lot.lotCode}>{lot.lotCode}</p>
+                                              <p className="text-xs text-gray-500 truncate">
+                                                {lot.component?.componentName} • Qty: {lot.quantity}
+                                              </p>
+                                          </div>
+                                      </div>
+                                      <button 
+                                          onClick={() => handlePrintLot(lot)}
+                                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                          title="Print Label"
+                                      >
+                                          <Printer className="w-4 h-4" />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="text-sm text-gray-500 italic p-6 bg-gray-50 rounded-lg border border-gray-100 border-dashed text-center flex flex-col items-center justify-center">
+                              <QrCode className="w-6 h-6 mb-2 opacity-20" />
+                              No lot labels generated for this order.
+                          </div>
+                      )}
+                  </div>
+                )}
 
             </div>
         </div>

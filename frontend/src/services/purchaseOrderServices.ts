@@ -132,7 +132,7 @@ export interface UpdatePORequest {
 export interface ReceiveGoodsRequest {
   items: {
     componentId: number;
-    quantity: number;
+    initialQuantity: number;
     warehouseId: number;
   }[];
 }
