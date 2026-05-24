@@ -144,7 +144,7 @@ export const ProductionMonitor = (): JSX.Element => {
             <p className="text-xs font-bold text-gray-500 uppercase">Active Work Orders</p>
             <div className="flex items-end gap-3 mt-1">
                 <span className="text-3xl font-black text-gray-900">{totalActiveWOs}</span>
-                <span className="text-xs font-bold text-green-600 mb-1.5 flex items-center">↑ 2 mới</span>
+                <span className="text-xs font-bold text-green-600 mb-1.5 flex items-center">↑ 2 new</span>
             </div>
             <div className="absolute bottom-0 right-0 w-24 h-12 opacity-30">
                <ResponsiveContainer width="100%" height="100%">
@@ -157,7 +157,7 @@ export const ProductionMonitor = (): JSX.Element => {
 
         {/* Card 2: Throughput */}
         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
-            <p className="text-xs font-bold text-gray-500 uppercase">Throughput (Sản lượng)</p>
+            <p className="text-xs font-bold text-gray-500 uppercase">Throughput</p>
             <div className="flex items-end justify-between mt-1">
                 <div>
                    <span className="text-3xl font-black text-blue-700">{totalProduced.toLocaleString()}</span>

@@ -24,9 +24,6 @@ import { ProductCosts } from "./screens/Production/components/ProductCosts";
 
 import { WarehouseInformation } from "./screens/Warehouses/components/WarehouseInformation";
 import { MaterialIssuing } from "./screens/Warehouses/components/MaterialIssuing";
-import { Stocktaking } from "./screens/Warehouses/components/Stocktaking";
-import { ImportExport } from "./screens/Warehouses/components/ImportExport";
-import { TransferStock } from "./screens/Warehouses/components/TransferStock";
 import { ProductInduction } from "./screens/Warehouses/components/ProductInduction";
 
 import { Employees } from "./screens/HumanResources/components/Employees";
@@ -99,9 +96,6 @@ export default function App() {
               <Route path="info" element={<WarehouseInformation />} />
               <Route path="induction" element={<ProductInduction />} />
               <Route path="material-issuing" element={<MaterialIssuing />} />
-              <Route path="stocktaking" element={<Stocktaking />} />
-              <Route path="import-export" element={<ImportExport />} />
-              <Route path="transfer-stock" element={<TransferStock />} />
               <Route path="inventory-report" element={<InventoryReport />} />
             </Route>
 

@@ -116,7 +116,7 @@ export const MaterialIssuing = (): JSX.Element => {
         fetchRequests();
         setSelectedRequest(null);
     } catch (error) {
-        alert("Failed to reject request.");
+        console.error("Failed to reject request.", error);
     }
   };
 
