@@ -33,6 +33,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Work Orders', description: 'Managing production execution (The Factory Floor)' },
             { name: 'Inventory', description: 'Stock Management and Reporting' },
             { name: 'Material Requests', description: 'Warehouse Material Issue for Production' },
+            { name: 'Cost Reports', description: 'Material and product cost reports' },
+            { name: 'Production Reports', description: 'Production line output and quality reports' },
 
             // { name: 'Notifications', description: 'System alerts and messages' },
         ],
@@ -85,6 +87,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/sales/dashboard/salesDashboardRoutes.js',
         './src/production/dashboard/productionDashboardRoutes.ts',
         './dist/production/dashboard/productionDashboardRoutes.js',
+        './src/costs/costReportRoutes.ts',
+        './dist/costs/costReportRoutes.js',
 
         // --- NOTIFICATIONS ---
         // './src/notifications/notificationRoutes.ts',
@@ -109,6 +113,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/production/qualityChecks/qualityCheckRoutes.js',
         './src/production/workOrders/workOrderRoutes.ts',
         './dist/production/workOrders/workOrderRoutes.js',
+        './src/production/reports/productionReportRoutes.ts',
+        './dist/production/reports/productionReportRoutes.js',
 
         // --- WAREHOUSE OPS ---
         './src/warehouse-ops/inventory/inventoryRoutes.ts',

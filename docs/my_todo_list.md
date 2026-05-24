@@ -36,5 +36,7 @@
 - [ ] **Cost Reporting APIs**: Create `GET /api/costs/materials` and `GET /api/costs/products`.
 - [ ] **Line Performance**: Implement Production Line Performance Reporting API (`GET /api/production/reports/line-performance`).
 - [ ] **Spoilage Gap**: Address the "Spoilage / Supplementary Material Request" gap in Business logic.
+- [ ] **Role & Permission Audit**: Audit and document which modules/APIs need which roles, and refactor the list of roles required in this MES.
+- [ ] **Frontend Connection Testing**: Test the complete flow in the frontend to verify it is successfully connected to the backend.
 - [ ] **Cancel MR**: Implement "Cancel (and delete?) Material Request" logic (Gate: only if status is PENDING).
 

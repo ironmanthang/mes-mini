@@ -24,6 +24,7 @@ import qualityRoutes from './production/qualityChecks/qualityCheckRoutes.js';
 import productionRequestRoutes from './production/productionRequests/productionRequestRoutes.js';
 import workOrderRoutes from './production/workOrders/workOrderRoutes.js';
 import publicWarrantyRoutes from './public/warranties/warrantyRoutes.js';
+import costReportRoutes from './costs/costReportRoutes.js';
 
 const app: Express = express();
 
@@ -54,6 +55,7 @@ app.use('/api/master-data/quality-checklists', qualityChecklistRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/sales/dashboard', salesDashboardRoutes);
+app.use('/api/costs', costReportRoutes);
 app.use('/api/production-requests', productionRequestRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/production', productionRoutes);

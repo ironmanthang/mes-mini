@@ -3,6 +3,7 @@ import productionRequestRoutes from './productionRequests/productionRequestRoute
 import workOrderRoutes from './workOrders/workOrderRoutes.js';
 import productionLineRoutes from './productionLines/productionLineRoutes.js';
 import productionDashboardRoutes from './dashboard/productionDashboardRoutes.js';
+import productionReportRoutes from './reports/productionReportRoutes.js';
 
 const router = Router();
 
@@ -10,6 +11,7 @@ const router = Router();
 router.use('/work-orders', workOrderRoutes);
 router.use('/lines', productionLineRoutes);
 router.use('/dashboard', productionDashboardRoutes);
+router.use('/reports', productionReportRoutes);
 
 export default router;
 
