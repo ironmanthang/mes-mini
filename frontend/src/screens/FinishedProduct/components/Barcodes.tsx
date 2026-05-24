@@ -22,7 +22,6 @@ export const Barcodes = (): JSX.Element => {
   const fetchPendingLabels = async () => {
     setIsLoading(true);
     try {
-      // Chỉ lấy status PENDING_QC theo đặc tả D.2
       const response = await ProductInstanceServices.getAllProductInstances({ 
         status: 'PENDING_QC',
         limit: 1000 
@@ -84,7 +83,7 @@ export const Barcodes = (): JSX.Element => {
       setSelectedIds([]);
       setViewMode('LIST');
     } catch (error) {
-        alert("Error saving print log.");
+        console.error("Error saving print log.", error);
     } finally {
       setIsUpdating(false);
     }
@@ -300,7 +299,6 @@ export const Barcodes = (): JSX.Element => {
         </div>
       </div>
 
-      {/* PRINT-ONLY SECTION */}
       <div className="hidden print:block">
          {selectedData.map((inst, i) => (
             <div key={i} className="w-[50mm] h-[30mm] border border-black p-1.5 flex flex-col items-center justify-between break-inside-avoid mb-4 mx-auto bg-white">

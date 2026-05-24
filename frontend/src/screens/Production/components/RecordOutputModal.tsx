@@ -54,7 +54,6 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
 
         setIsSubmitting(true);
         try {
-            // Map exactly 100% of the 4 data variables to the CompleteWorkOrderRequest Interface
             const payload: CompleteWorkOrderRequest = {
                 quantityProduced: Number(quantityProduced),
                 customBatchCode: customBatchCode,

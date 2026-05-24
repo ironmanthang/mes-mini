@@ -20,18 +20,15 @@ export const MaterialRequests = (): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   
-  // State quản lý các Modal
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<number | null>(null);
 
-  // FETCH DATA TỪ API THẬT
   const fetchRequests = async () => {
     setIsLoading(true);
     try {
       const response = await MaterialRequestServices.getAllMaterialRequests();
       const dataArray = Array.isArray(response) ? response : (response as any).data || [];
       
-      // Sắp xếp mặc định: Phiếu mới nhất lên đầu dựa theo requestDate
       const sortedData = dataArray.sort((a: any, b: any) => 
           new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
       );
@@ -217,14 +214,12 @@ export const MaterialRequests = (): JSX.Element => {
         </div>
       </div>
 
-      {/* MODAL TẠO MỚI */}
       <NewMaterialRequestModal 
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         onSuccess={() => fetchRequests()} 
       />
 
-      {/* MODAL XEM CHI TIẾT */}
       <ViewMaterialRequestModal 
         isOpen={viewRequestId !== null}
         onClose={() => setViewRequestId(null)}

@@ -131,7 +131,7 @@ export const ComponentBarcodes = (): JSX.Element => {
       setSelectedTx(null);
       fetchIssuedMaterials(); // Refresh the pending list
     } catch (error) {
-      alert("Error updating printed status.");
+      console.error("Error updating printed status.", error);
     } finally {
       setIsUpdating(false);
     }
@@ -335,7 +335,6 @@ export const ComponentBarcodes = (): JSX.Element => {
         </div>
       </div>
  
-      {/* ZONE ONLY VISIBLE WHEN PRINTING (PRINT-ONLY) */}
       <div className="hidden print:block">
          {Array.from({ length: labelQty }).map((_, i) => (
             <div key={i} className="w-[50mm] h-[30mm] border border-black p-1 flex flex-col items-center justify-between break-inside-avoid mb-2 mx-auto">

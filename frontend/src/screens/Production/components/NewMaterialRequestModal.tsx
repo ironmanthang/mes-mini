@@ -31,7 +31,6 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
     
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Fetch Work Orders list when Modal is opened
     useEffect(() => {
         if (isOpen) {
             setIsLoadingWOs(true);
@@ -48,13 +47,11 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
         }
     }, [isOpen]);
 
-    // GET ACTUAL BOM DATA FROM PRODUCT SERVICES
     useEffect(() => {
         if (selectedWoId) {
             const wo = workOrders.find(w => w.workOrderId === Number(selectedWoId));
             setSelectedWo(wo || null);
 
-            // If Work Order is found and has productId
             if (wo && wo.productId) {
                 setIsFetchingBom(true);
                 
@@ -67,7 +64,6 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                             componentName: bomItem.component.componentName,
                             unit: bomItem.component.unit,
                             bomRatio: bomItem.quantityNeeded,
-                            // Calculate total quantity to issue (Auto-BOM Logic)
                             requestQty: bomItem.quantityNeeded * wo.quantity 
                         }));
                         setBomTableData(tableData);

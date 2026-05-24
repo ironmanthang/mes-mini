@@ -86,7 +86,8 @@ export const QualityChecks = (): JSX.Element => {
               setInspectorNotes(parsed.inspectorNotes || "");
               setEvidenceImages(parsed.evidenceImages || []);
               triggerToast("Previous draft restored.");
-            } catch (e) {
+            } catch (err) {
+              console.error(err);
               resetForm();
             }
           } else {
