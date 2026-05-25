@@ -3,7 +3,6 @@ import {
   Filter, 
   Plus, 
   Eye, 
-  XCircle,
   Loader2,
   PackageSearch,
   Calendar
@@ -77,18 +76,7 @@ export const MaterialRequests = (): JSX.Element => {
     }
   };
 
-  // ACTION
-  const handleCancel = async (_id: number, code: string) => {
-    if(window.confirm(`Are you sure you want to cancel the request: ${code}? This action cannot be undone.`)) {
-        try {
-            // Gọi API Cancel (Yêu cầu BE cung cấp API này nếu chưa có)
-            alert(`Successfully cancelled request: ${code}`);
-            fetchRequests(); 
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Error cancelling material request.");
-        }
-    }
-  };
+
 
   return (
     <div className="flex flex-col gap-6 pb-12 animate-in fade-in duration-300">
@@ -187,16 +175,7 @@ export const MaterialRequests = (): JSX.Element => {
                                 <Eye className="w-4 h-4" />
                             </button>
                             
-                            {/* Ràng buộc bảo vệ dữ liệu: Chỉ phiếu PENDING mới được hủy */}
-                            {req.status === 'PENDING' && (
-                                <button 
-                                  onClick={() => handleCancel(req.requestId, req.code)}
-                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
-                                  title="Cancel Request"
-                                >
-                                <XCircle className="w-4 h-4" />
-                                </button>
-                            )}
+
                             </div>
                         </td>
                     </tr>

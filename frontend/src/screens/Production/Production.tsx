@@ -1,4 +1,4 @@
-import { ClipboardList, Settings, Factory, PackageSearch, Activity, Monitor, DollarSign } from "lucide-react";
+import { ClipboardList, Settings, Factory, PackageSearch, DollarSign } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Production = () => {
@@ -11,18 +11,11 @@ export const Production = () => {
       description: "Create new manufacturing requests"
     },
     { 
-      id: "monitor",
-      label: "Production Monitor",
-      icon: Monitor,
-      to: "/production/monitor",
-      description: "Real-time tracking of work order execution"
-    },
-    { 
       id: "work-orders",
       label: "Work Orders", 
       icon: ClipboardList,
       to: "/production/work-orders",
-      description: "Assign requests to production lines"
+      description: "Schedule and track manufacturing orders"
     },
     { 
       id: "material-requests",
@@ -39,15 +32,8 @@ export const Production = () => {
       description: "Setup batches & instances"
     },
     { 
-      id: "execution", 
-      label: "Production Execution", 
-      icon: Activity, 
-      to: "/production/execution",
-      description: "Track and control production" 
-    },
-    { 
       id: "product-costs",
-      label: "Product Costs",
+      label: "Product Costs", 
       icon: DollarSign,
       to: "/production/product-costs",
       description: "Analyze manufacturing costs and absorption"

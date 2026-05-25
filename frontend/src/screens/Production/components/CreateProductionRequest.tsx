@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Clock,
   PlayCircle,
+  Send,
+  CheckCircle,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { ProductionRequestServices, type ProductionRequest } from "../../../services/productionRequestServices";
@@ -29,6 +31,32 @@ export const CreateProductionRequest = (): JSX.Element => {
   const [selectedViewId, setSelectedViewId] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
+
+  const handleSubmitDraft = async (id: number) => {
+    if (!window.confirm("Submit this draft for review?")) return;
+    try {
+      await ProductionRequestServices.submitProductionRequest(id);
+      fetchRequests();
+      setMessage("Production Request submitted successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Failed to submit request.");
+    }
+  };
+
+  const handleApprove = async (id: number) => {
+    if (!window.confirm("Approve this production request?")) return;
+    try {
+      await ProductionRequestServices.approveProductionRequest(id);
+      fetchRequests();
+      setMessage("Production Request approved!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Failed to approve request.");
+    }
+  };
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -68,18 +96,22 @@ export const CreateProductionRequest = (): JSX.Element => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'DRAFT':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wider">Draft</span>;
+      case 'PENDING':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-yellow-50 text-yellow-700 border border-yellow-200 uppercase tracking-wider">Pending</span>;
       case 'APPROVED': 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200"><CheckCircle2 className="w-3 h-3"/> Approved</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wider"><CheckCircle2 className="w-3 h-3"/> Approved</span>;
       case 'WAITING_MATERIAL': 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200"><AlertTriangle className="w-3 h-3"/> Waiting Material</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider"><AlertTriangle className="w-3 h-3"/> Waiting Mat.</span>;
       case 'IN_PROGRESS': 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200"><PlayCircle className="w-3 h-3"/> In Progress</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider"><PlayCircle className="w-3 h-3"/> In Progress</span>;
       case 'FULFILLED': 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">Fulfilled</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">Fulfilled</span>;
       case 'CANCELLED': 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">Cancelled</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-50 text-gray-400 border border-gray-200 uppercase tracking-wider">Cancelled</span>;
       default: 
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{status}</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-50 text-gray-700 uppercase tracking-wider">{status}</span>;
     }
   };
 
@@ -199,13 +231,45 @@ export const CreateProductionRequest = (): JSX.Element => {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={() => setSelectedUpdateId(req.productionRequestId)}
-                            className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
-                            title="Update / Recheck"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          
+                          {req.status === 'DRAFT' && (
+                            <>
+                              <button 
+                                onClick={() => setSelectedUpdateId(req.productionRequestId)}
+                                className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
+                                title="Edit Draft"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleSubmitDraft(req.productionRequestId)}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
+                                title="Submit Request"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+
+                          {req.status === 'PENDING' && (
+                            <button 
+                              onClick={() => handleApprove(req.productionRequestId)}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
+                              title="Approve Request"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {req.status !== 'DRAFT' && (
+                            <button 
+                              onClick={() => setSelectedUpdateId(req.productionRequestId)}
+                              className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
+                              title="Update / Recheck"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

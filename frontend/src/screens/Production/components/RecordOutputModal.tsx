@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { WorkOrderServices, type WorkOrderListItem, type CompleteWorkOrderRequest } from "../../../services/workOrderServices";
+import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 
 interface RecordOutputModalProps {
     isOpen: boolean;
@@ -17,7 +18,11 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
     const [customBatchCode, setCustomBatchCode] = useState("");
     const [expiryDate, setExpiryDate] = useState("");
     const [targetWarehouseIdOverride, setTargetWarehouseIdOverride] = useState<number | "">("");
+    const [laborCost, setLaborCost] = useState<number | "">("");
+    const [overheadCost, setOverheadCost] = useState<number | "">("");
     
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -32,6 +37,22 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
             setExpiryDate(nextYear.toISOString().split('T')[0]);
 
             setTargetWarehouseIdOverride(workOrder.targetSalesWarehouseId || "");
+            setLaborCost(0);
+            setOverheadCost(0);
+
+            const fetchWarehouses = async () => {
+                setIsLoadingWarehouses(true);
+                try {
+                    const whRes = await WarehouseServices.getAllWarehouse();
+                    const whList = Array.isArray(whRes) ? whRes : (whRes as any).data || [];
+                    setWarehouses(whList);
+                } catch (error) {
+                    console.error("Failed to fetch warehouses:", error);
+                } finally {
+                    setIsLoadingWarehouses(false);
+                }
+            };
+            fetchWarehouses();
         }
     }, [isOpen, workOrder]);
 
@@ -49,16 +70,24 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
             return alert("Please enter both batch code and expiry date!");
         }
         if (targetWarehouseIdOverride === "") {
-            return alert("Please enter the Target Warehouse ID for finished products!");
+            return alert("Please select the Target Warehouse for finished products!");
+        }
+        if (laborCost === "" || Number(laborCost) < 0) {
+            return alert("Labor cost must be 0 or greater!");
+        }
+        if (overheadCost === "" || Number(overheadCost) < 0) {
+            return alert("Overhead cost must be 0 or greater!");
         }
 
         setIsSubmitting(true);
         try {
             const payload: CompleteWorkOrderRequest = {
                 quantityProduced: Number(quantityProduced),
-                customBatchCode: customBatchCode,
+                batchCode: customBatchCode,
                 expiryDate: new Date(expiryDate).toISOString(), // Parse to Backend standard ISO
-                targetWarehouseIdOverride: Number(targetWarehouseIdOverride)
+                warehouseId: Number(targetWarehouseIdOverride),
+                laborCost: Number(laborCost),
+                overheadCost: Number(overheadCost)
             };
 
             await WorkOrderServices.completeWorkOrder(workOrder.workOrderId, payload);
@@ -192,19 +221,68 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                 </div>
                             </div>
 
-                            {/* 4. Target Warehouse ID */}
+                            {/* 4. Target Warehouse Dropdown */}
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="target-warehouse">
-                                    Target Warehouse ID
+                                    Target Sales Warehouse (QC Pass)
                                 </label>
                                 <div className="relative">
-                                    <Store className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                    <Store className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />
+                                    {isLoadingWarehouses ? (
+                                        <div className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 flex items-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                                            <span className="text-sm text-gray-400">Loading warehouses...</span>
+                                        </div>
+                                    ) : (
+                                        <select 
+                                            id="target-warehouse"
+                                            value={targetWarehouseIdOverride}
+                                            onChange={(e) => setTargetWarehouseIdOverride(e.target.value === "" ? "" : Number(e.target.value))}
+                                            disabled={isLocked}
+                                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 cursor-pointer bg-white"
+                                        >
+                                            <option value="">-- Select Sales Warehouse --</option>
+                                            {warehouses.filter(w => w.warehouseType === 'SALES').map(wh => (
+                                                <option key={wh.warehouseId} value={wh.warehouseId}>
+                                                    {wh.warehouseName} ({wh.code})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 5. Labor Cost */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="labor-cost">
+                                    Labor Cost
+                                </label>
+                                <div className="relative">
+                                    <Hash className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                                     <input 
-                                        id="target-warehouse"
-                                        type="number" min="1"
-                                        value={targetWarehouseIdOverride} onChange={(e) => setTargetWarehouseIdOverride(e.target.value === "" ? "" : Number(e.target.value))}
+                                        id="labor-cost"
+                                        type="number" min="0" step="any"
+                                        value={laborCost} onChange={(e) => setLaborCost(e.target.value === "" ? "" : Number(e.target.value))}
                                         disabled={isLocked}
-                                        placeholder="Storage Warehouse ID..."
+                                        placeholder="Labor Cost..."
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 6. Overhead Cost */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-700 uppercase" htmlFor="overhead-cost">
+                                    Overhead Cost
+                                </label>
+                                <div className="relative">
+                                    <Hash className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                    <input 
+                                        id="overhead-cost"
+                                        type="number" min="0" step="any"
+                                        value={overheadCost} onChange={(e) => setOverheadCost(e.target.value === "" ? "" : Number(e.target.value))}
+                                        disabled={isLocked}
+                                        placeholder="Overhead Cost..."
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                                     />
                                 </div>
@@ -247,7 +325,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || isLocked || quantityProduced === "" || !customBatchCode || !expiryDate || targetWarehouseIdOverride === ""}
+                        disabled={isSubmitting || isLocked || quantityProduced === "" || !customBatchCode || !expiryDate || targetWarehouseIdOverride === "" || laborCost === "" || overheadCost === ""}
                         className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95"
                     >
                         {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 

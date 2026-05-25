@@ -155,9 +155,11 @@ export interface UpdateWorkOrderRequest {
 
 export interface CompleteWorkOrderRequest {
     quantityProduced: number;
-    customBatchCode: string;
+    batchCode: string;
     expiryDate: string | Date;
-    targetWarehouseIdOverride: number;
+    warehouseId: number;
+    laborCost: number;
+    overheadCost: number;
 }
 
 export const WorkOrderServices = {

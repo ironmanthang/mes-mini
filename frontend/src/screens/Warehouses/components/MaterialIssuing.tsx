@@ -1,10 +1,11 @@
 import { 
   Search, ArrowLeft, PackageCheck,
   CheckCircle2, Send, Loader2, Layers,
-  AlertCircle, XCircle, ClipboardCheck
+  AlertCircle, ClipboardCheck
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { MaterialRequestServices, type MaterialRequest, type ValidationLine } from "../../../services/materialRequestServices";
+import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 
 export const MaterialIssuing = (): JSX.Element => {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -17,7 +18,20 @@ export const MaterialIssuing = (): JSX.Element => {
   const [hasValidated, setHasValidated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const CURRENT_WAREHOUSE_ID = 1;
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | "">("");
+
+  useEffect(() => {
+    WarehouseServices.getAllWarehouse({ type: 'COMPONENT' })
+      .then((data: any) => {
+        const list = Array.isArray(data) ? data : data?.data || [];
+        setWarehouses(list);
+        if (list.length > 0) {
+          setSelectedWarehouseId(list[0].warehouseId);
+        }
+      })
+      .catch(err => console.error("Failed to load warehouses:", err));
+  }, []);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -43,13 +57,13 @@ export const MaterialIssuing = (): JSX.Element => {
   }, []);
 
   const handleValidate = async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest || !selectedWarehouseId) return;
     
     setIsValidating(true);
     try {
       const res = await MaterialRequestServices.validateMaterial(
         selectedRequest.requestId, 
-        CURRENT_WAREHOUSE_ID
+        selectedWarehouseId
       );
       setValidationLines(res.lines || []);
       setHasValidated(true);
@@ -66,7 +80,7 @@ export const MaterialIssuing = (): JSX.Element => {
   }, [hasValidated, validationLines]);
 
   const handleConfirmIssue = async () => {
-    if (!isAllAvailable || !selectedRequest) return;
+    if (!isAllAvailable || !selectedRequest || !selectedWarehouseId) return;
 
     setIsSubmitting(true);
     try {
@@ -93,30 +107,19 @@ export const MaterialIssuing = (): JSX.Element => {
       }
 
       await MaterialRequestServices.completeMaterialIssue(selectedRequest.requestId, {
-        warehouseId: CURRENT_WAREHOUSE_ID,
+        warehouseId: selectedWarehouseId,
         consumedLots: consumedLotsPayload 
       });
       
       alert("Material components issued successfully!");
       fetchRequests(); 
       setSelectedRequest(null);
+      setHasValidated(false);
+      setValidationLines([]);
     } catch (e: any) {
       alert(e?.response?.data?.message || "Error during material issuing.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedRequest) return;
-    if (!window.confirm("Are you sure you want to reject (cancel) this request?")) return;
-
-    try {
-        alert("Request rejected.");
-        fetchRequests();
-        setSelectedRequest(null);
-    } catch (error) {
-        console.error("Failed to reject request.", error);
     }
   };
 
@@ -288,10 +291,36 @@ export const MaterialIssuing = (): JSX.Element => {
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
             <h3 className="text-sm font-bold text-gray-900 uppercase border-b pb-3">Actions</h3>
             
+            {/* WAREHOUSE SELECTOR */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-700" htmlFor="select-warehouse">
+                Source Component Warehouse <span className="text-red-500">*</span>
+              </label>
+              <select 
+                value={selectedWarehouseId}
+                onChange={(e) => {
+                  setSelectedWarehouseId(Number(e.target.value) || "");
+                  setHasValidated(false);
+                  setValidationLines([]);
+                }}
+                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                id="select-warehouse"
+                name="warehouseId"
+                disabled={isValidating || isSubmitting}
+              >
+                <option value="">-- Select Warehouse --</option>
+                {warehouses.map(wh => (
+                  <option key={wh.warehouseId} value={wh.warehouseId}>
+                    {wh.warehouseName} ({wh.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-3">
                 <button 
                     onClick={handleValidate}
-                    disabled={isValidating || isSubmitting}
+                    disabled={isValidating || isSubmitting || !selectedWarehouseId}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-lg hover:bg-blue-100 transition-all disabled:opacity-50 cursor-pointer"
                 >
                     {isValidating ? <Loader2 className="w-5 h-5 animate-spin"/> : <ClipboardCheck className="w-5 h-5" />} 
@@ -300,7 +329,7 @@ export const MaterialIssuing = (): JSX.Element => {
 
                 <button 
                     onClick={handleConfirmIssue}
-                    disabled={!isAllAvailable || isSubmitting}
+                    disabled={!isAllAvailable || isSubmitting || !selectedWarehouseId}
                     className={`w-full flex items-center justify-center gap-2 py-4 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 cursor-pointer
                         ${isAllAvailable ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 grayscale cursor-not-allowed opacity-60'}
                     `}
@@ -308,27 +337,19 @@ export const MaterialIssuing = (): JSX.Element => {
                     {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5" />} 
                     Step 2: Complete & Issue
                 </button>
-
-                <button 
-                    onClick={handleReject}
-                    disabled={isSubmitting}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-red-200 text-red-500 font-bold rounded-lg hover:bg-red-50 transition-all cursor-pointer mt-4"
-                >
-                    <XCircle className="w-5 h-5" /> Reject Request
-                </button>
             </div>
 
             {!hasValidated && (
                 <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
                     <p className="text-[11px] text-orange-700 leading-relaxed">
-                        <b>Instructions:</b> You must click <b>Validate Stock</b> to check inventory before issuing components.
+                        <b>Instructions:</b> Select a warehouse and click <b>Validate Stock</b> to check inventory before issuing components.
                     </p>
                 </div>
             )}
             {hasValidated && !isAllAvailable && (
                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
                     <p className="text-[11px] text-red-700 leading-relaxed font-bold">
-                        Insufficient stock! Cannot proceed with issuing. Please check physical inventory or reject the request.
+                        Insufficient stock! Cannot proceed with issuing. Please check physical inventory.
                     </p>
                 </div>
             )}

@@ -121,7 +121,7 @@ export const MaterialRequestServices = {
     },
 
     getDispatchSlip: async (id: number) => {
-        const response = await api.get<DispatchSlip>(`/warehouse-ops/material-requests/${id}/dispatch-slip`);
+        const response = await api.get<DispatchSlip>(`/warehouse-ops/material-requests/${id}/slip`);
         return response.data;
     }
 };

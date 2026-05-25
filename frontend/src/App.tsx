@@ -17,7 +17,7 @@ import { ComponentReceipts } from "./screens/Components/Components/ComponentRece
 import { ComponentBarcodes } from "./screens/Components/Components/ComponentBarcodes";
 
 import { CreateProductionRequest } from "./screens/Production/components/CreateProductionRequest";
-import { CreateWorkOrder } from "./screens/Production/components/CreateWorkOrder";
+import { WorkOrders } from "./screens/Production/components/WorkOrders";
 import { MaterialRequests } from "./screens/Production/components/MaterialRequests";
 import { ConfigureProductionLots } from "./screens/Production/components/ConfigureProductionLots";
 import { ProductCosts } from "./screens/Production/components/ProductCosts";
@@ -36,9 +36,7 @@ import { Information as FinishedProductInformation } from "./screens/FinishedPro
 import { Barcodes as FinishedProductBarcodes } from "./screens/FinishedProduct/components/Barcodes";
 import { QualityChecks as FinishedProductQuality } from "./screens/FinishedProduct/components/QualityChecks";
 import { Orders as FinishedProductOrders } from "./screens/FinishedProduct/components/Orders";
-import { ProductionExecution as FinishedProductExecution } from "./screens/Production/components/ProductionExecution";
 import { InboundRequests as FinishedProductInbound } from "./screens/FinishedProduct/components/InboundRequests";
-import { ProductionMonitor as FinishedProductMonitor } from "./screens/Production/components/ProductionMonitor";
 import { InventoryReport } from "./screens/Warehouses/components/InventoryReport";
 import { Reports } from "./screens/Reports";
 import { Performance } from "./screens/Reports/components/Performance";
@@ -103,12 +101,10 @@ export default function App() {
             <Route path="/production" element={<Production />}>
               <Route index element={<Navigate to="requests" replace />} />
               <Route path="requests" element={<CreateProductionRequest />} />
-              <Route path="monitor" element={<FinishedProductMonitor />} />
               <Route path="product-costs" element={<ProductCosts />} />
-              <Route path="work-orders" element={<CreateWorkOrder />} />
+              <Route path="work-orders" element={<WorkOrders />} />
               <Route path="material-requests" element={<MaterialRequests />} />
               <Route path="configure-lots" element={<ConfigureProductionLots />} />
-              <Route path="execution" element={<FinishedProductExecution />} />
             </Route>
 
             {/* Finished Products */}

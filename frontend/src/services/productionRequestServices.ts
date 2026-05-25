@@ -123,6 +123,21 @@ export const ProductionRequestServices = {
         return response.data;
     },
 
+    submitProductionRequest: async (id: number) => {
+        const response = await api.put<ProductionRequest & { mrpResult?: any }>(`/production-requests/${id}/submit`);
+        return response.data;
+    },
+
+    approveProductionRequest: async (id: number) => {
+        const response = await api.put<ProductionRequest>(`/production-requests/${id}/approve`);
+        return response.data;
+    },
+
+    updateProductionRequest: async (id: number, data: Partial<CreateProductionRequest>) => {
+        const response = await api.put<ProductionRequest>(`/production-requests/${id}`, data);
+        return response.data;
+    },
+
     cancelProductionRequest: async (id: number, reason: string) => {
         const response = await api.put<ProductionRequest>(`/production-requests/${id}/cancel`, { reason });
         return response.data;

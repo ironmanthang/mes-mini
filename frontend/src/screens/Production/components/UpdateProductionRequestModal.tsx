@@ -1,9 +1,12 @@
 import { 
     X, RefreshCcw, Ban, AlertTriangle, CheckCircle2, 
-    ShoppingCart, Loader2 
+    ShoppingCart, Loader2, Send, CheckCircle, Save, Search
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
-import { ProductionRequestServices, type ProductionRequest, type DraftPurchaseOrderResponse } from "../../../services/productionRequestServices";
+import { useNavigate } from "react-router-dom";
+import { ProductionRequestServices, type ProductionRequest, type DraftPurchaseOrderResponse, type PRPriority } from "../../../services/productionRequestServices";
+import { ProductServices } from "../../../services/productServices";
+import { InventoryServices } from "../../../services/inventoryServices";
 
 interface UpdateProductionRequestModalProps {
   isOpen: boolean;
@@ -13,11 +16,22 @@ interface UpdateProductionRequestModalProps {
 }
 
 export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuccess }: UpdateProductionRequestModalProps): JSX.Element | null => {
+  const navigate = useNavigate();
   const [requestData, setRequestData] = useState<ProductionRequest | null>(null);
   const [draftPO, setDraftPO] = useState<DraftPurchaseOrderResponse | null>(null);
   
+  // --- Edit States for DRAFT ---
+  const [editQty, setEditQty] = useState<number | "">("");
+  const [editPriority, setEditPriority] = useState<PRPriority>("MEDIUM");
+  const [editDueDate, setEditDueDate] = useState<string>("");
+  const [editNote, setEditNote] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // --- Live BOM Check ---
+  const [isCheckingBom, setIsCheckingBom] = useState(false);
+  const [bomResult, setBomResult] = useState<any[]>([]);
 
   useEffect(() => {
     if (isOpen && requestId) {
@@ -25,14 +39,69 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
     } else {
       setRequestData(null);
       setDraftPO(null);
+      setEditQty("");
+      setEditPriority("MEDIUM");
+      setEditDueDate("");
+      setEditNote("");
+      setBomResult([]);
     }
   }, [isOpen, requestId]);
+
+  useEffect(() => {
+    const checkBomFeasibility = async () => {
+        if (requestData && requestData.status === 'DRAFT' && editQty && Number(editQty) > 0) {
+            setIsCheckingBom(true);
+            try {
+                const [bomData, invData] = await Promise.all([
+                    ProductServices.getBOMById(requestData.productId),
+                    InventoryServices.getConsolidatedInventory({ limit: 2000 })
+                ]);
+
+                const inventoryList = invData.data || [];
+
+                const result = bomData.map((bItem: any) => {
+                    const requiredQty = bItem.quantityNeeded * Number(editQty);
+                    const stockItem = inventoryList.find((i: any) => i.componentId === bItem.componentId);
+                    const inStock = stockItem ? stockItem.availableQuantity : 0;
+
+                    return {
+                        name: bItem.component.componentName,
+                        required: requiredQty,
+                        inStock: inStock,
+                        status: inStock >= requiredQty ? 'Available' : 'Shortage'
+                    };
+                });
+
+                setBomResult(result);
+            } catch (error) {
+                console.error("Failed to check BOM:", error);
+                setBomResult([]);
+            } finally {
+                setIsCheckingBom(false);
+            }
+        } else {
+            setBomResult([]);
+        }
+    };
+
+    const timeoutId = setTimeout(() => {
+        checkBomFeasibility();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+}, [requestData?.productId, editQty, requestData?.status]);
 
   const fetchRequestDetails = async (id: number) => {
     setIsLoading(true);
     try {
       const data = await ProductionRequestServices.getProductionRequestById(id);
       setRequestData(data);
+
+      // Initialize edit states
+      setEditQty(data.quantity);
+      setEditPriority(data.priority);
+      setEditDueDate(data.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : "");
+      setEditNote(data.note || "");
       
       if (data.status === 'WAITING_MATERIAL') {
          const poData = await ProductionRequestServices.getDraftPurchaseOrder(id);
@@ -42,6 +111,31 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
       console.error("Failed to load request details", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUpdateDraft = async () => {
+    if (!requestId || !requestData) return;
+    if (!editQty || Number(editQty) <= 0) {
+        alert("Quantity must be greater than 0");
+        return;
+    }
+
+    setIsActionLoading(true);
+    try {
+        await ProductionRequestServices.updateProductionRequest(requestId, {
+            quantity: Number(editQty),
+            priority: editPriority,
+            dueDate: editDueDate || undefined,
+            note: editNote
+        });
+        alert("✅ Draft updated successfully!");
+        fetchRequestDetails(requestId); // Refresh data
+        onSuccess(); // Refresh parent list
+    } catch (error: any) {
+        alert(error.response?.data?.message || "Failed to update draft.");
+    } finally {
+        setIsActionLoading(false);
     }
   };
 
@@ -84,6 +178,45 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
     }
   };
 
+  const handleSubmitRequest = async () => {
+    if (!requestId) return;
+
+    // Check shortage for DRAFTs before submission
+    const hasShortage = bomResult.some(item => item.status === 'Shortage');
+    if (hasShortage) {
+        if (!window.confirm("Shortages detected! Your inventory does not have enough components. The request will move to WAITING_MATERIAL status. Do you want to proceed?")) {
+            return;
+        }
+    }
+
+    setIsActionLoading(true);
+    try {
+      await ProductionRequestServices.submitProductionRequest(requestId);
+      alert("✅ Production Request submitted successfully!");
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Failed to submit request.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleApproveRequest = async () => {
+    if (!requestId) return;
+    setIsActionLoading(true);
+    try {
+      await ProductionRequestServices.approveProductionRequest(requestId);
+      alert("✅ Production Request approved!");
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Failed to approve request.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   if (!isOpen || !requestId) return null;
 
   return (
@@ -111,13 +244,146 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
             </div>
           ) : requestData ? (
             <>
-              {/* General Info */}
-              <div className="grid grid-cols-2 gap-4 text-sm bg-white p-4 rounded-lg border border-gray-200">
-                <div><span className="text-gray-500">Product:</span> <span className="font-bold text-gray-900 ml-1">{requestData.product?.productName}</span></div>
-                <div><span className="text-gray-500">Quantity:</span> <span className="font-bold text-gray-900 ml-1">{requestData.quantity} {requestData.product?.unit}</span></div>
-                <div><span className="text-gray-500">Priority:</span> <span className="font-bold text-gray-900 ml-1">{requestData.priority}</span></div>
-                <div><span className="text-gray-500">Type:</span> <span className="font-bold text-gray-900 ml-1">{requestData.soDetailId ? 'MTO (Sales Order)' : 'MTS (Make to Stock)'}</span></div>
+              {/* General Info / Edit Form */}
+              <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-50">
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Product Information</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${requestData.soDetailId ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                        {requestData.soDetailId ? 'MTO (Linked to SO)' : 'MTS (Make to Stock)'}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Target Product</label>
+                        <div className="font-bold text-gray-900 border-b border-transparent py-1">{requestData.product?.productName}</div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity ({requestData.product?.unit})</label>
+                        {requestData.status === 'DRAFT' ? (
+                            <input 
+                                type="number" 
+                                value={editQty} 
+                                onChange={(e) => setEditQty(e.target.value === '' ? '' : Number(e.target.value))}
+                                className="w-full text-sm font-bold text-blue-600 bg-blue-50/50 border border-blue-100 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400 Transition-all"
+                            />
+                        ) : (
+                            <div className="font-bold text-gray-900 py-1">{requestData.quantity}</div>
+                        )}
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Priority</label>
+                        {requestData.status === 'DRAFT' ? (
+                           <select 
+                             value={editPriority}
+                             onChange={(e) => setEditPriority(e.target.value as PRPriority)}
+                             className="w-full text-sm font-bold text-blue-600 bg-blue-50/50 border border-blue-100 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                           >
+                                <option value="LOW">LOW</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="HIGH">HIGH</option>
+                           </select>
+                        ) : (
+                            <div className="font-bold text-gray-900 py-1 uppercase">{requestData.priority}</div>
+                        )}
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Due Date</label>
+                        {requestData.status === 'DRAFT' ? (
+                            <input 
+                                type="date"
+                                value={editDueDate}
+                                onChange={(e) => setEditDueDate(e.target.value)}
+                                className="w-full text-sm font-bold text-blue-600 bg-blue-50/50 border border-blue-100 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                            />
+                        ) : (
+                            <div className="font-bold text-gray-900 py-1">{requestData.dueDate ? new Date(requestData.dueDate).toLocaleDateString() : 'N/A'}</div>
+                        )}
+                    </div>
+
+                    <div className="col-span-2 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Note / Justification</label>
+                        {requestData.status === 'DRAFT' ? (
+                            <textarea 
+                                value={editNote}
+                                onChange={(e) => setEditNote(e.target.value)}
+                                rows={2}
+                                className="w-full text-sm font-medium text-blue-800 bg-blue-50/30 border border-blue-100 rounded px-3 py-2 outline-none focus:ring-1 focus:ring-blue-400 resize-none"
+                                placeholder="Add specifics why this request is needed..."
+                            />
+                        ) : (
+                            <div className="text-sm text-gray-600 italic py-1">{requestData.note || 'No notes provided.'}</div>
+                        )}
+                    </div>
+                </div>
+
+                {requestData.status === 'DRAFT' && (
+                    <div className="flex justify-end pt-2">
+                        <button 
+                            onClick={handleUpdateDraft}
+                            disabled={isActionLoading}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-600 rounded text-xs font-bold hover:bg-gray-200 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                            {isActionLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Save className="w-3 h-3" />}
+                            Save Draft Changes
+                        </button>
+                    </div>
+                )}
               </div>
+
+              {/* Automated BOM Check for Drafts */}
+              {requestData.status === 'DRAFT' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-gray-200 bg-white flex justify-between items-center">
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <Search className="w-4 h-4 text-blue-500" /> Automated BOM Check
+                    </h3>
+                    {isCheckingBom && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                  </div>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-100/50 text-gray-400 font-bold border-b border-gray-100">
+                            <tr>
+                                <th className="px-4 py-2">Component Name</th>
+                                <th className="px-4 py-2 text-right">Required</th>
+                                <th className="px-4 py-2 text-right">In Stock</th>
+                                <th className="px-4 py-2 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                            {bomResult.length > 0 ? (
+                                bomResult.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50/50">
+                                        <td className="px-4 py-2.5 font-medium text-gray-700">{item.name}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold">{item.required}</td>
+                                        <td className="px-4 py-2.5 text-right text-gray-500">{item.inStock}</td>
+                                        <td className="px-4 py-2.5 text-center">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                item.status === 'Available' 
+                                                ? 'bg-green-50 text-green-600 border-green-100' 
+                                                : 'bg-red-50 text-red-600 border-red-100'
+                                            }`}>
+                                                {item.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400 italic">
+                                        {isCheckingBom ? 'Calculating components...' : 'No BOM data available for this product.'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Status & Actions Area (Traffic Light Logic) */}
               {requestData.status === 'WAITING_MATERIAL' && (
@@ -146,6 +412,7 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
                                         <th className="px-4 py-2 text-right">Required</th>
                                         <th className="px-4 py-2 text-right">Available</th>
                                         <th className="px-4 py-2 text-right">Shortage</th>
+                                        <th className="px-4 py-2 text-center">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -155,6 +422,24 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
                                             <td className="px-4 py-2 text-right">{comp.requiredQty}</td>
                                             <td className="px-4 py-2 text-right text-green-600">{comp.availableQty}</td>
                                             <td className="px-4 py-2 text-right font-bold text-red-600">{comp.shortageQty}</td>
+                                            <td className="px-4 py-2 text-center">
+                                                <button 
+                                                    onClick={() => {
+                                                        onClose();
+                                                        navigate('/components/create-order', { 
+                                                        state: { 
+                                                            draftPO: {
+                                                                ...draftPO,
+                                                                components: [comp]
+                                                            }
+                                                        } 
+                                                    });
+                                                    }}
+                                                    className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold hover:bg-blue-100 transition-colors cursor-pointer"
+                                                >
+                                                    Create PO
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -171,6 +456,30 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
                           <h3 className="text-base font-bold text-green-800">Ready for Production</h3>
                           <p className="text-sm text-green-700 mt-1">
                               All required materials are available and reserved. You can now convert this request into a Work Order.
+                          </p>
+                      </div>
+                  </div>
+              )}
+
+              {requestData.status === 'PENDING' && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-5 rounded-lg flex items-start gap-3">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+                      <div>
+                          <h3 className="text-base font-bold text-yellow-800">Pending Approval</h3>
+                          <p className="text-sm text-yellow-700 mt-1">
+                              This request has been submitted and is currently awaiting manager review and approval.
+                          </p>
+                      </div>
+                  </div>
+              )}
+
+              {requestData.status === 'DRAFT' && (
+                  <div className="bg-gray-50 border border-gray-200 p-5 rounded-lg flex items-start gap-3">
+                      <AlertTriangle className="w-6 h-6 text-gray-400 flex-shrink-0" />
+                      <div>
+                          <h3 className="text-base font-bold text-gray-700">Draft Request</h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                              This request is still a draft. Please review the details and submit it for processing.
                           </p>
                       </div>
                   </div>
@@ -197,14 +506,48 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
                 </button>
                 
                 {requestData?.status === 'WAITING_MATERIAL' && (
-                    <button 
-                        onClick={handleRecheck} 
-                        disabled={isActionLoading} 
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
-                    >
-                        {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCcw className="w-4 h-4" />} 
-                        {isActionLoading ? "Checking..." : "Re-check Feasibility"}
-                    </button>
+                      <div className="flex gap-2">
+                        <button 
+                            onClick={() => {
+                                onClose();
+                                navigate('/components/create-order', { state: { draftPO } });
+                            }}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
+                        >
+                            <ShoppingCart className="w-4 h-4" /> 
+                            Create Draft PO
+                        </button>
+                        <button 
+                            onClick={handleRecheck} 
+                            disabled={isActionLoading} 
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
+                        >
+                            {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCcw className="w-4 h-4" />} 
+                            {isActionLoading ? "Checking..." : "Re-check Feasibility"}
+                        </button>
+                      </div>
+                    )}
+
+                {requestData?.status === 'DRAFT' && (
+                  <button 
+                      onClick={handleSubmitRequest} 
+                      disabled={isActionLoading} 
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
+                  >
+                      {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />} 
+                      {isActionLoading ? "Submitting..." : "Submit Request"}
+                  </button>
+                )}
+
+                {requestData?.status === 'PENDING' && (
+                  <button 
+                      onClick={handleApproveRequest} 
+                      disabled={isActionLoading} 
+                      className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
+                  >
+                      {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4" />} 
+                      {isActionLoading ? "Approving..." : "Approve Request"}
+                  </button>
                 )}
             </div>
         </div>

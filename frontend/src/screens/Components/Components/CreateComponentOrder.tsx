@@ -3,6 +3,7 @@ import {
   Save, Send, FileText, Loader2, Paperclip, X, Building2, Mail, Phone, MapPin, Search
 } from "lucide-react";
 import { useState, useEffect, type JSX, useRef } from "react";
+import { useLocation } from "react-router-dom";
 
 import { supplierService, type Supplier, type SupplierComponent } from "../../../services/supplierServices";
 import { componentService } from "../../../services/componentServices";
@@ -18,9 +19,13 @@ interface OrderRow {
   quantity: number;
   unitPrice: number;
   total: number;
+  productionRequestId?: number;
 }
 
 export const CreateComponentOrder = (): JSX.Element => {
+  const location = useLocation();
+  const draftPO = location.state?.draftPO;
+
   const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
   const [componentsList, setComponentsList] = useState<SupplierComponent[]>([]); 
   
@@ -36,9 +41,17 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(draftPO ? `Auto-generated for PR: ${draftPO.productionRequestCode}` : "");
 
-  const [rows, setRows] = useState<OrderRow[]>([]);
+  const [rows, setRows] = useState<OrderRow[]>(draftPO ? draftPO.components.map((c: any, index: number) => ({
+    id: Date.now() + index,
+    componentId: c.componentId,
+    componentName: c.componentName,
+    quantity: c.shortageQty,
+    unitPrice: 0,
+    total: 0,
+    productionRequestId: draftPO.productionRequestId
+  })) : []);
 
   const [taxRate, setTaxRate] = useState<number>(10);
   const [shippingCost, setShippingCost] = useState<number>(0);
@@ -60,8 +73,7 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [foundComponents, setFoundComponents] = useState<any[]>([]);
   const [foundSuppliers, setFoundSuppliers] = useState<Supplier[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchStep, setSearchStep] = useState<'COMPONENT' | 'SUPPLIER'>('COMPONENT');
-
+  const [searchStep, setSearchStep] = useState<'COMPONENT' | 'SUPPLIER'>('COMPONENT');    const isSearchingRef = useRef(false);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -80,6 +92,15 @@ export const CreateComponentOrder = (): JSX.Element => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const autoFindSuppliers = async () => {
+      if (draftPO && draftPO.components.length > 0) {
+        const firstComp = draftPO.components[0];
+        await handleSelectComponent(firstComp.componentId);
+      }
+    };
+    autoFindSuppliers();
+  }, [suppliersList]);
   useEffect(() => {
     const fetchComponentsBySupplier = async () => {
       if (!selectedSupplierId) {
@@ -101,14 +122,54 @@ export const CreateComponentOrder = (): JSX.Element => {
 
     fetchComponentsBySupplier();
   }, [selectedSupplierId]);
+  useEffect(() => {
+    if (selectedSupplierId && !isLoadingComponents && rows.length > 0) {
+      setRows(currentRows => {
+        // Only perform validation if the componentsList has actually been populated
+        if (componentsList.length === 0) return currentRows;
 
+        let removedCount = 0;
+        const validRows = currentRows.filter(row => {
+          if (row.componentId === 0) return true;
+          const isProvided = componentsList.some(c => c.componentId === row.componentId);
+          if (!isProvided) removedCount++;
+          return isProvided;
+        });
+
+        const newRows = validRows.map(row => {
+          const matchingComponent = componentsList.find(c => c.componentId === row.componentId);
+          if (matchingComponent && row.unitPrice !== (matchingComponent.suggestedPrice || 0)) {
+            return {
+              ...row,
+              unitPrice: matchingComponent.suggestedPrice || 0,
+              total: row.quantity * (matchingComponent.suggestedPrice || 0)
+            };
+          }
+          return row;
+        });
+
+        if (removedCount > 0 || JSON.stringify(currentRows) !== JSON.stringify(newRows)) {
+          if (removedCount > 0) {
+            setMessageWarning(`Removed ${removedCount} item(s) because they are not provided by this supplier.`);
+            setShowWarning(true);
+          }
+          return newRows;
+        }
+        
+        return currentRows;
+      });
+    }
+  }, [componentsList, isLoadingComponents, selectedSupplierId]);
   const handleSupplierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = Number(e.target.value);
     setSelectedSupplierId(id);
     const supplier = suppliersList.find(s => s.supplierId === id);
     setSupplierInfo(supplier || null);
     
-    setRows([]);
+    // Don't wipe out rows if we have a pre-filled draft PO. Let the useEffect update their prices.
+    if (!draftPO) {
+      setRows([]);
+    }
   };
 
   const handleFindSupplier = async () => {
@@ -143,26 +204,39 @@ export const CreateComponentOrder = (): JSX.Element => {
   };
 
   const handleSelectComponent = async (componentId: number) => {
+    if (isSearchingRef.current) return;
+    isSearchingRef.current = true;
     setIsSearching(true);
     try {
       const suppliers = await componentService.getComponentSuppliers(componentId);
       
-      const matchedSuppliers = suppliersList.filter(s => 
+      // IMPORTANT: If suppliersList is still empty, we must wait for it to load
+      // or fetch it manually here to avoid the "No approved suppliers" false positive.
+      let currentSuppliers = suppliersList;
+      if (currentSuppliers.length === 0) {
+        const fetchedSuppliers = await supplierService.getAllSuppliers();
+        currentSuppliers = Array.isArray(fetchedSuppliers) ? fetchedSuppliers : (fetchedSuppliers as any).data || [];
+      }
+
+      const matchedSuppliers = currentSuppliers.filter(s => 
         suppliers.some(ss => ss.supplierId === s.supplierId)
       );
 
       setFoundSuppliers(matchedSuppliers);
       setSearchStep('SUPPLIER');
+      setShowSupplierSearch(true);
       if (matchedSuppliers.length === 0) {
         setMessageWarning("No approved suppliers found for this component.");
         setShowWarning(true);
+        setShowSupplierSearch(false);
       }
     } catch (error) {
       console.error("Error finding suppliers:", error);
-      setMessageWarning("An error occurred while fetching suppliers.");
+      setMessageWarning("An error occurred while searching for components.");
       setShowWarning(true);
     } finally {
       setIsSearching(false);
+      isSearchingRef.current = false;
     }
   };
 
@@ -278,7 +352,8 @@ export const CreateComponentOrder = (): JSX.Element => {
         details: rows.map(r => ({
           componentId: r.componentId,
           quantity: r.quantity,
-          unitPrice: r.unitPrice
+          unitPrice: r.unitPrice,
+          productionRequestId: r.productionRequestId || undefined
         }))
       });
 
@@ -533,10 +608,12 @@ export const CreateComponentOrder = (): JSX.Element => {
                     <select 
                       className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:bg-gray-100"
                       value={row.componentId}
-                      disabled={!selectedSupplierId || isLoadingComponents}
-                      onChange={(e) => handleComponentSelect(row.id, e.target.value)}
-                    >
-                      <option value="0">{isLoadingComponents ? "Loading..." : "Select Component..."}</option>
+                        onChange={(e) => handleComponentSelect(row.id, e.target.value)}
+                      >
+                        <option value="0">{isLoadingComponents ? "Loading..." : "Select Component..."}</option>
+                        {row.componentId !== 0 && !componentsList.find(c => c.componentId === row.componentId) && (
+                          <option value={row.componentId}>{row.componentName}</option>
+                        )}
                       {componentsList.map(c => (
                         <option key={c.componentId} value={c.componentId}>{c.code} - {c.name}</option>
                       ))}

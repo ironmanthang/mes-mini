@@ -96,9 +96,11 @@ export const ConfigureProductionLots = (): JSX.Element => {
     try {
         await WorkOrderServices.completeWorkOrder(selectedWO.workOrderId, {
             quantityProduced: selectedWO.quantity,
-            customBatchCode: batchCode,
+            batchCode: batchCode,
             expiryDate: new Date(expiryDate).toISOString(),
-            targetWarehouseIdOverride: selectedWO.targetSalesWarehouseId ?? 3
+            warehouseId: selectedWO.targetSalesWarehouseId ?? 3,
+            laborCost: 0,
+            overheadCost: 0
         });
 
         const serials = Array.from({ length: selectedWO.quantity }, (_, i) => 

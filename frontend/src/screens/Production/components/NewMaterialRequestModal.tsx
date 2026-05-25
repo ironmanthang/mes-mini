@@ -34,7 +34,7 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
     useEffect(() => {
         if (isOpen) {
             setIsLoadingWOs(true);
-            WorkOrderServices.getAllWorkOrders({ limit: 500 })
+            WorkOrderServices.getAllWorkOrders({ limit: 500, missingMR: true })
                 .then(res => {
                     const data = res.data || [];
                     const validWOs = data.filter(w => w.status === 'IN_PROGRESS');
