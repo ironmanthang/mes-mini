@@ -158,11 +158,11 @@ export interface AttachmentConfirmPayload {
 }
 
 export interface Attachment {
-  id: number;
+  attachmentId: number;
   fileName: string;
-  fileUrl: string;
+  downloadUrl: string;
   category: string;
-  createdAt: string;
+  uploadedAt: string;
 }
 
 export const purchaseOrderService = {

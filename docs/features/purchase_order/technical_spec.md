@@ -108,5 +108,10 @@ To prevent inventory drift and race conditions during high-volume receiving:
 
 ### 6.2 Printing & Hardware Strategy
 *   **Production Goal (Direct Sockets)**: Node.js acts as a print server sending raw ZPL/ESC-POS commands directly to printer IPs.
-*   **Capstone/Demo (Virtual Printing)**: Uses `qrcode.react` to render scalable SVG barcodes on-screen. Scanning is handled via `@yudiel/react-qr-scanner` on worker phones, bypassing the need for specialized hardware.
+*   **Capstone/Demo (Virtual Printing)**: Uses `qrcode.js` inside a child print window to render high-contrast, scalable QR codes on-screen/paper. Scanning is handled via smartphone cameras on worker phones, bypassing the need for specialized hardware.
+*   **Virtual Print Layout Specifications**:
+    *   **Page Scaling**: Uses default browser paper sizes (A4/Letter) by setting page margins to `10mm` and avoiding static custom `@page` sizes (e.g., no `50mm 30mm` limitations), allowing flexible scaling.
+    *   **Isolate per Page**: Each label is wrapped in a `.label-card` container styled with `height: 100vh` and `page-break-after: always` (with `:last-child { page-break-after: auto }`) to ensure each lot label prints on a single isolated page.
+    *   **QR Code Sizing**: QR codes are generated with a base size of `400x400px` and styled using `width: 65vw !important; height: 65vw !important; max-width: 500px; max-height: 500px` to occupy 60-70% of the viewport/paper width.
+    *   **Text Sizing**: Lot codes are styled at `20px` monospace with `letter-spacing: 1px` and `margin-top: 16px` below the QR code to ensure visual separation and readability.
 *   **The "Slap" Rule**: API returns the generated `lotCode`, and the UI generates a virtual label for the worker to "slap" onto the physical box.

@@ -491,7 +491,7 @@ export const OrderDetailModal = ({
                     ) : attachments.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {attachments.map(att => (
-                                <div key={att.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-blue-200 transition-colors group">
+                                <div key={att.attachmentId} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-blue-200 transition-colors group">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded flex items-center justify-center flex-shrink-0">
                                             <FileText className="w-4 h-4" />
@@ -499,12 +499,12 @@ export const OrderDetailModal = ({
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium text-gray-900 truncate" title={att.fileName}>{att.fileName}</p>
                                             <p className="text-xs text-gray-500">
-                                              {att.category} • {new Date(att.createdAt).toLocaleDateString('vi-VN')}
+                                              {att.category} • {new Date(att.uploadedAt).toLocaleDateString('vi-VN')}
                                             </p>
                                         </div>
                                     </div>
                                     <a 
-                                        href={att.fileUrl} 
+                                        href={att.downloadUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
                                         className="p-2 text-gray-400 hover:text-blue-600 

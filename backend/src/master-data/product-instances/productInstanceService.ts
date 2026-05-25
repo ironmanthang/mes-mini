@@ -107,8 +107,10 @@ class ProductInstanceService {
         if (query.productId) {
             where.productId = query.productId;
         }
-        if (query.warehouseId) {
-            where.warehouseId = query.warehouseId;
+        const parsedWarehouseId = query.warehouseId ? Number(query.warehouseId) : undefined;
+
+        if (parsedWarehouseId) {
+            where.warehouseId = parsedWarehouseId;
         }
         if (query.serialNumber) {
             where.serialNumber = { contains: query.serialNumber, mode: 'insensitive' };

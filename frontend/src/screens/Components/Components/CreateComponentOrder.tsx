@@ -1,10 +1,11 @@
 import { 
   Plus, Trash2, 
-  Save, Send, FileText, Loader2, Paperclip, X, Building2, Mail, Phone, MapPin
+  Save, Send, FileText, Loader2, Paperclip, X, Building2, Mail, Phone, MapPin, Search
 } from "lucide-react";
 import { useState, useEffect, type JSX, useRef } from "react";
 
 import { supplierService, type Supplier, type SupplierComponent } from "../../../services/supplierServices";
+import { componentService } from "../../../services/componentServices";
 import { purchaseOrderService } from "../../../services/purchaseOrderServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
@@ -54,6 +55,13 @@ export const CreateComponentOrder = (): JSX.Element => {
   const [showWarning, setShowWarning] = useState(false);
   const [messageWarning, setMessageWarning] = useState("");
 
+  const [showSupplierSearch, setShowSupplierSearch] = useState(false);
+  const [searchComponent, setSearchComponent] = useState("");
+  const [foundComponents, setFoundComponents] = useState<any[]>([]);
+  const [foundSuppliers, setFoundSuppliers] = useState<Supplier[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchStep, setSearchStep] = useState<'COMPONENT' | 'SUPPLIER'>('COMPONENT');
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -101,6 +109,61 @@ export const CreateComponentOrder = (): JSX.Element => {
     setSupplierInfo(supplier || null);
     
     setRows([]);
+  };
+
+  const handleFindSupplier = async () => {
+    if (!searchComponent) {
+      setShowWarning(true);
+      setMessageWarning("Please enter a component code or name.");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const allComponents = await componentService.getAllComponents({ search: searchComponent });
+      const data = Array.isArray(allComponents) ? allComponents : (allComponents as any).data || [];
+      
+      if (data.length === 0) {
+        setFoundComponents([]);
+        setMessageWarning("No component found matching your search.");
+        setShowWarning(true);
+        return;
+      }
+
+      setFoundComponents(data);
+      setSearchStep('COMPONENT');
+      setShowSupplierSearch(true);
+    } catch (error) {
+      console.error("Error searching components:", error);
+      setMessageWarning("An error occurred while searching for components.");
+      setShowWarning(true);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectComponent = async (componentId: number) => {
+    setIsSearching(true);
+    try {
+      const suppliers = await componentService.getComponentSuppliers(componentId);
+      
+      const matchedSuppliers = suppliersList.filter(s => 
+        suppliers.some(ss => ss.supplierId === s.supplierId)
+      );
+
+      setFoundSuppliers(matchedSuppliers);
+      setSearchStep('SUPPLIER');
+      if (matchedSuppliers.length === 0) {
+        setMessageWarning("No approved suppliers found for this component.");
+        setShowWarning(true);
+      }
+    } catch (error) {
+      console.error("Error finding suppliers:", error);
+      setMessageWarning("An error occurred while fetching suppliers.");
+      setShowWarning(true);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   useEffect(() => {
@@ -292,6 +355,31 @@ export const CreateComponentOrder = (): JSX.Element => {
           <FileText className="w-4 h-4 text-blue-600" /> General Information
         </h3>
         
+        <div className="mb-8 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+          <label className="text-xs font-bold text-blue-700 uppercase tracking-wider block mb-2">Quick Sourcing</label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Find suppliers who sell a specific component..." 
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={searchComponent}
+                onChange={(e) => setSearchComponent(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleFindSupplier()}
+              />
+            </div>
+            <button 
+              onClick={handleFindSupplier}
+              disabled={isSearching}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium disabled:bg-blue-300 cursor-pointer"
+            >
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Find Supplier"}
+            </button>
+          </div>
+          <p className="text-[11px] text-blue-500 mt-2 italic">Tip: Enter a component code or name to see approved vendors.</p>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           <div className="space-y-4 border-r-0 lg:border-r border-gray-100 lg:pr-6">
@@ -644,6 +732,113 @@ export const CreateComponentOrder = (): JSX.Element => {
 
       <SuccessNotification isVisible={showSuccess} message={message}/>
       <WarningNotification isVisible={showWarning} message={messageWarning} onClose={() => {setShowWarning(false);}}/>
+      {showSupplierSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-900">
+                {searchStep === 'COMPONENT' ? 'Find Component' : 'Select Approved Supplier'}
+              </h3>
+              <button onClick={() => { setShowSupplierSearch(false); setFoundComponents([]); setFoundSuppliers([]); setSearchComponent(""); setSearchStep('COMPONENT'); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {searchStep === 'COMPONENT' ? (
+                <>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Enter component code or name..." 
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        value={searchComponent}
+                        onChange={(e) => setSearchComponent(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleFindSupplier()}
+                      />
+                    </div>
+                    <button 
+                      onClick={handleFindSupplier}
+                      disabled={isSearching}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium disabled:bg-blue-300 cursor-pointer"
+                    >
+                      {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                    </button>
+                  </div>
+                  
+                  {foundComponents.length > 0 && (
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Matching Components</p>
+                      {foundComponents.map(c => (
+                        <button 
+                          key={c.componentId}
+                          onClick={() => handleSelectComponent(c.componentId)}
+                          className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-all group flex justify-between items-center"
+                        >
+                          <div>
+                            <span className="block font-medium text-gray-900 group-hover:text-blue-700">{c.componentName}</span>
+                            <span className="block text-xs text-gray-500">{c.code}</span>
+                          </div>
+                          <div className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {foundComponents.length === 0 && !isSearching && searchComponent && (
+                    <div className="text-center py-6 text-gray-400 text-sm italic">
+                      No matching components found.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setSearchStep('COMPONENT')}
+                    className="text-xs text-blue-600 hover:underline mb-2 flex items-center gap-1"
+                  >
+                    ← Back to components
+                  </button>
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Approved Suppliers</p>
+                    {foundSuppliers.map(s => (
+                      <button 
+                        key={s.supplierId}
+                        onClick={() => {
+                          setSelectedSupplierId(s.supplierId);
+                          setSupplierInfo(s);
+                          setShowSupplierSearch(false);
+                          setFoundComponents([]);
+                          setFoundSuppliers([]);
+                          setSearchComponent("");
+                          setSearchStep('COMPONENT');
+                        }}
+                        className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-all group flex justify-between items-center"
+                      >
+                        <div>
+                          <span className="block font-medium text-gray-900 group-hover:text-blue-700">{s.supplierName}</span>
+                          <span className="block text-xs text-gray-500">{s.code}</span>
+                        </div>
+                        <div className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {foundSuppliers.length === 0 && (
+                    <div className="text-center py-6 text-gray-400 text-sm italic">
+                      No approved suppliers found for this component.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

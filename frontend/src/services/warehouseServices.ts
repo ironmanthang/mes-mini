@@ -18,5 +18,18 @@ export const WarehouseServices = {
         return response.data;
     },
 
-    
+    createWarehouse: async (data: { warehouseName: string; location?: string; warehouseType: string }) => {
+        const response = await api.post<Warehouse>(`/warehouses`, data);
+        return response.data;
+    },
+
+    updateWarehouse: async (id: number, data: { warehouseName: string; location?: string }) => {
+        const response = await api.put<Warehouse>(`/warehouses/${id}`, data);
+        return response.data;
+    },
+
+    deleteWarehouse: async (id: number) => {
+        const response = await api.delete(`/warehouses/${id}`);
+        return response.data;
+    }
 }

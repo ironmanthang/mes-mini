@@ -85,7 +85,7 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
 
     try {
       await purchaseOrderService.deleteAttachment(orderId, attachmentId);
-      setExistingAttachments(prev => prev.filter(att => att.id !== attachmentId));
+      setExistingAttachments(prev => prev.filter(att => att.attachmentId !== attachmentId));
     } catch (error: any) {
       alert(error?.response?.data?.message || "Failed to delete attachment.");
     }
@@ -326,19 +326,19 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                       <div className="grid grid-cols-1 gap-2 pt-2">
                           <p className="text-xs font-semibold text-gray-500 uppercase">Saved Files</p>
                           {existingAttachments.map((att) => (
-                              <div key={att.id} className="flex items-center justify-between gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                              <div key={att.attachmentId} className="flex items-center justify-between gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                       <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded flex items-center justify-center flex-shrink-0">
                                           <FileText className="w-4 h-4" />
                                       </div>
                                       <div className="flex flex-col min-w-0">
                                           <span className="text-sm text-gray-700 font-medium truncate" title={att.fileName}>{att.fileName}</span>
-                                          <span className="text-xs text-gray-400">Uploaded {new Date(att.createdAt).toLocaleDateString('vi-VN')}</span>
+                                          <span className="text-xs text-gray-400">Uploaded {new Date(att.uploadedAt).toLocaleDateString('vi-VN')}</span>
                                       </div>
                                   </div>
                                   <button 
                                       type="button"
-                                      onClick={() => handleDeleteExistingAttachment(att.id)}
+                                      onClick={() => handleDeleteExistingAttachment(att.attachmentId)}
                                       disabled={isSubmitting}
                                       className="p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer disabled:opacity-50"
                                       title="Delete from server"

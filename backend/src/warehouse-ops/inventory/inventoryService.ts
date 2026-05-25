@@ -15,6 +15,8 @@ class InventoryService {
         const { getPaginationParams, createPaginatedResponse } = await import('../../common/utils/pagination.js');
         const { page, limit, skip } = getPaginationParams(query);
 
+        const parsedWarehouseId = query.warehouseId ? Number(query.warehouseId) : undefined;
+
         const where: any = {};
         if (query.search) {
             where.componentName = { contains: query.search, mode: 'insensitive' };
@@ -28,7 +30,7 @@ class InventoryService {
                 orderBy: { componentName: 'asc' },
                 include: {
                     componentStocks: {
-                        where: query.warehouseId ? { warehouseId: query.warehouseId } : undefined,
+                        where: parsedWarehouseId ? { warehouseId: parsedWarehouseId } : undefined,
                         include: { warehouse: true }
                     }
                 }

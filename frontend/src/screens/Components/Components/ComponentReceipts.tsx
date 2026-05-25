@@ -13,7 +13,6 @@ interface ReceiptItem {
   componentId: number;
   remainingQty: number;
   receivingQty: number;
-  qcCheck: 'PASS' | 'FAIL';
 }
 
 export const ComponentReceipts = (): JSX.Element => {
@@ -88,17 +87,17 @@ export const ComponentReceipts = (): JSX.Element => {
         }
 
         const initialItems: Record<number, ReceiptItem> = {};
-        details.details?.forEach(item => {
+        if (details.details?.forEach(item => {
           const remaining = item.quantityOrdered - item.quantityReceived;
           if (remaining > 0) {
             initialItems[item.componentId] = {
               componentId: item.componentId,
               remainingQty: remaining,
               receivingQty: remaining,
-              qcCheck: 'PASS'
             };
           }
-        });
+        })) {
+        }
         setReceiptItems(initialItems);
 
       } catch (error) {
@@ -130,13 +129,6 @@ export const ComponentReceipts = (): JSX.Element => {
 
       return { ...prev, [componentId]: { ...item, receivingQty: validQty } };
     });
-  };
-
-  const handleQcChange = (componentId: number, status: 'PASS' | 'FAIL') => {
-    setReceiptItems(prev => ({
-      ...prev,
-      [componentId]: { ...prev[componentId], qcCheck: status }
-    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,16 +165,8 @@ export const ComponentReceipts = (): JSX.Element => {
     try {
       const poId = Number(selectedPoId);
 
-      const payload = {
-        items: itemsToReceive.map(item => ({
-          componentId: item.componentId,
-          initialQuantity: item.receivingQty,
-          warehouseId: Number(selectedWarehouseId)
-        }))
-      };
-
-      const res = await purchaseOrderService.receiveGoods(poId, payload);
-
+      // 1. Upload and register all attachments first while PO is still in ORDERED/RECEIVING status
+      const uploadedAttachments: { fileKey: string; fileName: string }[] = [];
       if (attachedFiles.length > 0) {
         for (const file of attachedFiles) {
           try {
@@ -200,11 +184,24 @@ export const ComponentReceipts = (): JSX.Element => {
               fileSize: file.size,
               category: "OTHER"
             });
+            uploadedAttachments.push({ fileKey: reqRes.fileKey, fileName: file.name });
           } catch (fileErr) {
             console.error(`Lỗi upload file ${file.name}:`, fileErr);
+            throw new Error(`Failed to upload evidence attachment: ${file.name}. Goods receipt aborted.`);
           }
         }
       }
+
+      // 2. Once all attachments are successfully registered, proceed to confirm receipt
+      const payload = {
+        items: itemsToReceive.map(item => ({
+          componentId: item.componentId,
+          initialQuantity: item.receivingQty,
+          warehouseId: Number(selectedWarehouseId)
+        }))
+      };
+
+      const res = await purchaseOrderService.receiveGoods(poId, payload);
 
       const lotsWithDetails = res.generatedLots.map(lot => {
         const detailItem = poDetails?.details?.find(d => d.componentId === lot.componentId);
@@ -226,7 +223,7 @@ export const ComponentReceipts = (): JSX.Element => {
       }, 1500);
 
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Lỗi khi nhập kho.");
+      alert(error.message || error?.response?.data?.message || "Lỗi khi nhập kho.");
     } finally {
       setIsSubmitting(false);
     }
@@ -445,15 +442,13 @@ export const ComponentReceipts = (): JSX.Element => {
                             <th className="p-4 text-center text-green-600">Received</th>
                             <th className="p-4 text-center text-orange-600">Remaining</th>
                             <th className="p-4 text-center bg-blue-50 w-40">Receiving Qty</th>
-                            <th className="p-4 text-center w-36">QC Check</th>
                         </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-gray-100">
                         {poDetails.details?.map(item => {
                             const remaining = item.quantityOrdered - item.quantityReceived;
                             if (remaining <= 0) return null;
-
-                            const state = receiptItems[item.componentId];
+    const state = receiptItems[item.componentId];
                             if (!state) return null;
 
                             return (
@@ -475,18 +470,6 @@ export const ComponentReceipts = (): JSX.Element => {
                                             onChange={(e) => handleQuantityChange(item.componentId, e.target.value)}
                                             className="w-full p-2 border border-blue-200 rounded text-center font-bold text-blue-700 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                                         />
-                                    </td>
-                                    <td className="p-4">
-                                        <select 
-                                            value={state.qcCheck}
-                                            onChange={(e) => handleQcChange(item.componentId, e.target.value as any)}
-                                            className={`w-full p-2 border rounded text-xs font-bold outline-none cursor-pointer ${
-                                                state.qcCheck === 'PASS' ? 'border-green-200 text-green-700 bg-green-50' : 'border-red-200 text-red-700 bg-red-50'
-                                            }`}
-                                        >
-                                            <option value="PASS">✓ PASS</option>
-                                            <option value="FAIL">✕ FAIL</option>
-                                        </select>
                                     </td>
                                 </tr>
                             )

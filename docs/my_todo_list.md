@@ -29,14 +29,15 @@
 - [x] **Work Order Cost**: Implemented Work Order Operational Cost Input (`laborCost`, `overheadCost`) upon completion, triggering atomic cost absorption.
 - [x] **Backend Integration Testing Framework**: Implemented a comprehensive test suite for 7 core MES modules (`Purchase Orders`, `Receive PO`, `Product Induction`, `Material Requests`, `Work Orders`, `Quality Control`, `Production Requests`). Enforced **TC Isolation** principles and automated sequential execution in Docker. Documented in `docs/features/backend_testing_standard.md`.
 - [x] **Sequential Test Verification**: Verified the stability of the entire test suite (21/21 tests passed) when run tuần tự as independent commands.
+- [x] **Lot Label Print Layout Refactor**: Standardized printable QR code scaling (65vw, max 500px), removed conflicting static sizes (50mm x 30mm), and implemented CSS page breaks to ensure single-page isolation across `ComponentReceipts` and `OrderDetailModal` screens.
+- [x] **Cost Reporting APIs**: Created `/api/costs/materials` and `/api/costs/products` reporting endpoints for direct material spend and work order absorbed costs.
+- [x] **Line Performance API**: Implemented `/api/production/reports/line-performance` to calculate live throughput, pass rates, and yield performance metrics.
+- [x] **Reports and Dashboards Hub**: Built and integrated the three-tab Reports Hub in the frontend (Line Yield, Inventory Status, and Cost & Financials).
+- [x] **Dynamic Array Safety**: Standardized defensive array checking across master data and reporting screens to eliminate `products.map is not a function` runtime crashes.
 
 ## Pending Objectives (Next Session)
 - [ ] **Frontend Integration**: Integrate the new FIFO Pick List and Warranty Activation endpoints into the React dashboard.
 - [ ] **Audit Logs**: Review the `InventoryTransaction` note format for better traceability during FIFO violations.
-- [ ] **Cost Reporting APIs**: Create `GET /api/costs/materials` and `GET /api/costs/products`.
-- [ ] **Line Performance**: Implement Production Line Performance Reporting API (`GET /api/production/reports/line-performance`).
 - [ ] **Spoilage Gap**: Address the "Spoilage / Supplementary Material Request" gap in Business logic.
 - [ ] **Role & Permission Audit**: Audit and document which modules/APIs need which roles, and refactor the list of roles required in this MES.
-- [ ] **Frontend Connection Testing**: Test the complete flow in the frontend to verify it is successfully connected to the backend.
 - [ ] **Cancel MR**: Implement "Cancel (and delete?) Material Request" logic (Gate: only if status is PENDING).
-

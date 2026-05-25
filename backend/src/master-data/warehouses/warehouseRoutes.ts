@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllWarehouses } from './warehouseController.js';
+import { getAllWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from './warehouseController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import { PERM } from '../../common/constants/permissions.js';
 
@@ -10,6 +10,21 @@ router.use(protect);
 router.get('/', 
     authorize(PERM.WH_STOCK_READ), 
     getAllWarehouses
+);
+
+router.post('/', 
+    authorize(PERM.WH_MANAGE),
+    createWarehouse
+);
+
+router.put('/:id', 
+    authorize(PERM.WH_MANAGE),
+    updateWarehouse
+);
+
+router.delete('/:id', 
+    authorize(PERM.WH_MANAGE),
+    deleteWarehouse
 );
 
 /**

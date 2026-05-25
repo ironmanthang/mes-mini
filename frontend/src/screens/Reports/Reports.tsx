@@ -1,14 +1,28 @@
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Box, TrendingUp } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Reports = () => {
   const tabs = [
     { 
       id: "performance", 
-      label: "Performance Management", 
+      label: "Line Performance", 
       icon: BarChart3,
       to: "/reports/performance",
-      description: "Analyze line efficiency and staff productivity"
+      description: "Analyze production line efficiency, yield, and output"
+    },
+    { 
+      id: "inventory", 
+      label: "Inventory Summary", 
+      icon: Box,
+      to: "/reports/inventory",
+      description: "View real-time stock levels for components and finished products across warehouses"
+    },
+    { 
+      id: "costs", 
+      label: "Cost & Financials", 
+      icon: TrendingUp,
+      to: "/reports/costs",
+      description: "Track procurement spend, manufacturing costs, and labor/overhead distribution"
     },
   ];
 

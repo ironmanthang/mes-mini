@@ -79,7 +79,8 @@ export async function seedProductInstances(): Promise<void> {
     const admin = await prisma.employee.findFirst();
     const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
     const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
-    const line = await prisma.productionLine.findFirst();
+    const lines = await prisma.productionLine.findMany();
+    const line = lines.length > 0 ? lines[0] : null;
 
     // Create a dummy PR for genealogy (MTS)
     const pr = await prisma.productionRequest.upsert({
@@ -126,7 +127,8 @@ export async function seedProductInstances(): Promise<void> {
         data: {
             batchCode: 'BATCH-OPENING-' + Date.now(),
             productionDate: new Date(),
-            workOrderId: workOrder.workOrderId
+            workOrderId: workOrder.workOrderId,
+            productionLineId: line?.productionLineId
         }
     });
 
@@ -134,13 +136,15 @@ export async function seedProductInstances(): Promise<void> {
     console.log('   Creating 50 Laptops in Stock...');
     const instancesData = [];
     for (let i = 1; i <= 50; i++) {
+        // Target ~85% pass rate for demo data
+        const isPassed = Math.random() > 0.15;
         instancesData.push({
             productId: laptop.productId,
             serialNumber: `SN-${new Date().getFullYear()}-LAPTOP-${i.toString().padStart(4, '0')}`,
-            status: ProductInstanceStatus.IN_STOCK_SALES,
+            status: isPassed ? ProductInstanceStatus.IN_STOCK_SALES : ProductInstanceStatus.FAILED_QC,
             unitProductionCost: 1500000, // Mock cost
             productionBatchId: prodBatch.productionBatchId, // REQUIRED LINK
-            warehouseId: fgWarehouse?.warehouseId // FIXED: added warehouse
+            warehouseId: isPassed ? fgWarehouse?.warehouseId : defectWarehouse?.warehouseId
         });
     }
 
@@ -315,6 +319,9 @@ export async function seedDemoProductInstances(): Promise<void> {
 
     const admin = await prisma.employee.findFirst();
     if (!admin) return;
+    
+    // Fetch lines once to distribute the workload
+    const lines = await prisma.productionLine.findMany();
 
     // Helper: create instances for a product via a dummy work order + batch
     async function createInstances(productCode: string, count: number, prefix: string, warehouseId: number) {
@@ -322,7 +329,7 @@ export async function seedDemoProductInstances(): Promise<void> {
         if (!product) return;
 
         const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
-        const line = await prisma.productionLine.findFirst();
+        const randomLine = lines.length > 0 ? lines[Math.floor(Math.random() * lines.length)] : null;
 
         // Create PR for traceability
         const pr = await prisma.productionRequest.upsert({
@@ -348,7 +355,7 @@ export async function seedDemoProductInstances(): Promise<void> {
                 quantity: count, 
                 employeeId: admin!.employeeId, 
                 productId: product.productId, 
-                productionLineId: line?.productionLineId,
+                productionLineId: randomLine?.productionLineId,
                 targetSalesWarehouseId: warehouseId,
                 targetErrorWarehouseId: defectWarehouse?.warehouseId,
                 laborCost: count * 1000,
@@ -367,19 +374,21 @@ export async function seedDemoProductInstances(): Promise<void> {
         let batch = await prisma.productionBatch.findFirst({ where: { batchCode } });
         if (!batch) {
             batch = await prisma.productionBatch.create({
-                data: { batchCode, productionDate: new Date(), workOrderId: wo.workOrderId }
+                data: { batchCode, productionDate: new Date(), workOrderId: wo.workOrderId, productionLineId: randomLine?.productionLineId }
             });
         }
 
         const instances = [];
         for (let i = 1; i <= count; i++) {
+            // Target ~85% pass rate for demo data
+            const isPassed = Math.random() > 0.15;
             instances.push({
                 productId: product.productId,
                 serialNumber: `SN-DEMO-${prefix}-${i.toString().padStart(4, '0')}`,
-                status: ProductInstanceStatus.IN_STOCK_SALES,
+                status: isPassed ? ProductInstanceStatus.IN_STOCK_SALES : ProductInstanceStatus.FAILED_QC,
                 unitProductionCost: 1200000,
                 productionBatchId: batch.productionBatchId,
-                warehouseId: warehouseId
+                warehouseId: isPassed ? warehouseId : (await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } }))?.warehouseId
             });
         }
         await prisma.productInstance.createMany({ data: instances, skipDuplicates: true });

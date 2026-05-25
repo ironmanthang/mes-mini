@@ -42,6 +42,7 @@ import { ProductionMonitor as FinishedProductMonitor } from "./screens/Productio
 import { InventoryReport } from "./screens/Warehouses/components/InventoryReport";
 import { Reports } from "./screens/Reports";
 import { Performance } from "./screens/Reports/components/Performance";
+import { CostReport } from "./screens/Reports/components/CostReport";
 import { ProductLookup } from "./screens/PublicPortal/ProductLookup";
 
 export default function App() {
@@ -96,7 +97,6 @@ export default function App() {
               <Route path="info" element={<WarehouseInformation />} />
               <Route path="induction" element={<ProductInduction />} />
               <Route path="material-issuing" element={<MaterialIssuing />} />
-              <Route path="inventory-report" element={<InventoryReport />} />
             </Route>
 
             {/* Production */}
@@ -125,6 +125,8 @@ export default function App() {
             <Route path="/reports" element={<Reports />}>
               <Route index element={<Navigate to="performance" replace />} />
               <Route path="performance" element={<Performance />} />
+              <Route path="inventory" element={<InventoryReport />} />
+              <Route path="costs" element={<CostReport />} />
             </Route>
 
             {/* Catch-all */}
