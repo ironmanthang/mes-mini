@@ -1,6 +1,5 @@
 import { 
   Settings, 
-  Zap, 
   Printer, 
   Info,
   QrCode,
@@ -15,7 +14,7 @@ export const ConfigureProductionLots = (): JSX.Element => {
   const [workOrders, setWorkOrders] = useState<WorkOrderListItem[]>([]);
   const [productionLines, setProductionLines] = useState<ProductionLine[]>([]);
   const [isLoadingInit, setIsLoadingInit] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting,] = useState(false);
 
   const [selectedWOId, setSelectedWOId] = useState<number | "">("");
   const [selectedWO, setSelectedWO] = useState<WorkOrderListItem | null>(null);
@@ -88,35 +87,6 @@ export const ConfigureProductionLots = (): JSX.Element => {
       setGeneratedSerials([]);
     }
   }, [selectedWOId, productionDate, workOrders]);
-
-  const handleGenerateInstances = async () => {
-    if (!selectedWO || !selectedLineId) return alert("Please select Work Order and Production Line");
-    
-    setIsSubmitting(true);
-    try {
-        await WorkOrderServices.completeWorkOrder(selectedWO.workOrderId, {
-            quantityProduced: selectedWO.quantity,
-            batchCode: batchCode,
-            expiryDate: new Date(expiryDate).toISOString(),
-            warehouseId: selectedWO.targetSalesWarehouseId ?? 3,
-            laborCost: 0,
-            overheadCost: 0
-        });
-
-        const serials = Array.from({ length: selectedWO.quantity }, (_, i) => 
-            `SN-${selectedWO.product.code}-${batchCode}-${(i + 1).toString().padStart(3, '0')}`
-        );
-        
-        setGeneratedSerials(serials);
-        setIsGenerated(true);
-        alert(`Generated ${selectedWO.quantity} product instances successfully!`);
-        
-    } catch (error: any) {
-        alert(error?.response?.data?.message || "Lỗi khi sinh mã định danh sản phẩm.");
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
 
   const handlePrint = () => {
     const printContent = document.getElementById("barcode-grid");
@@ -262,22 +232,7 @@ export const ConfigureProductionLots = (): JSX.Element => {
                         Print Batch Barcodes
                     </button>
                     
-                    <button
-                        onClick={handleGenerateInstances}
-                        disabled={!selectedWO || !selectedLineId || isGenerated || isSubmitting}
-                        className={`flex items-center justify-center gap-2 px-6 py-2.5 text-white font-bold rounded-lg transition-all shadow-md text-sm cursor-pointer
-                            ${isGenerated ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#22c55e] hover:bg-[#16a34a] active:scale-95'}
-                        `}
-                    >
-                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Zap className={`w-4 h-4 ${isGenerated ? '' : 'fill-white'}`} />}
-                        {isGenerated ? "Product Instances Generated" : "Generate Product Instances"}
-                    </button>
                 </div>
-                {isGenerated && (
-                  <p className="text-[11px] text-right text-gray-400 mt-2 font-medium italic">
-                    * Data is locked to prevent duplicate serial generation.
-                  </p>
-                )}
             </div>
         </div>
       ) : (

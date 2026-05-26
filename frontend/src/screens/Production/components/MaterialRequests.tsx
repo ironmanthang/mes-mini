@@ -122,7 +122,7 @@ export const MaterialRequests = (): JSX.Element => {
                 id="status-material"
                 name="statusMaterial"
               >
-                <option value="ALL">All Statuses</option>
+                <option value="ALL">All Status</option>
                 <option value="PENDING">Pending</option>
                 <option value="ISSUED">Issued</option>
                 <option value="CANCELLED">Cancelled</option>

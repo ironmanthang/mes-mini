@@ -130,11 +130,6 @@ export const ProductInduction = (): JSX.Element => {
     }
   }, [serialQuery, stagingList, setSearchParams]);
 
-  // ==========================================
-  // STATISTICS & LIST PROCESSING LOGIC
-  // ==========================================
-  
-  // Calculate Quick Stats from the local Staging List.
   const stats = useMemo(() => {
     const passCount = stagingList.filter(i => i.status === 'PASSED_QC').length;
     const failCount = stagingList.filter(i => i.status === 'FAILED_QC').length;
@@ -283,7 +278,7 @@ export const ProductInduction = (): JSX.Element => {
                             <td className="p-3 text-center">
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-black border ${isPass ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                     {isPass ? <CheckCircle2 className="w-3.5 h-3.5"/> : <AlertTriangle className="w-3.5 h-3.5"/>}
-                                    {isPass ? "PASSED_QC" : "FAILED_QC"}
+                                    {isPass ? "PASSED" : "FAILED"}
                                 </span>
                             </td>
                             <td className="p-3">

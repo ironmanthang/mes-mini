@@ -215,8 +215,8 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                         disabled={isSubmitting || isPriorityLocked}
                         className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:bg-gray-100 disabled:text-gray-500"
                     >
-                        <option value="URGENT">High (Urgent)</option>
-                        <option value="NORMAL">Medium (Normal)</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
                         <option value="LOW">Low</option>
                     </select>
                 </div>

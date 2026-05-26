@@ -164,7 +164,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="bg-transparent text-sm p-1 outline-none text-gray-700 font-medium cursor-pointer"
               >
-                <option value="All">All Statuses</option>
+                <option value="All">All Status</option>
                 <option value="APPROVED">Approved (Ready)</option>
                 <option value="WAITING_MATERIAL">Waiting Material</option>
                 <option value="IN_PROGRESS">In Progress</option>
