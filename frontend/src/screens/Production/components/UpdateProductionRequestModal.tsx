@@ -506,27 +506,15 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
                 </button>
                 
                 {requestData?.status === 'WAITING_MATERIAL' && (
-                      <div className="flex gap-2">
-                        <button 
-                            onClick={() => {
-                                onClose();
-                                navigate('/components/create-order', { state: { draftPO } });
-                            }}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
-                        >
-                            <ShoppingCart className="w-4 h-4" /> 
-                            Create Draft PO
-                        </button>
-                        <button 
-                            onClick={handleRecheck} 
-                            disabled={isActionLoading} 
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
-                        >
-                            {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCcw className="w-4 h-4" />} 
-                            {isActionLoading ? "Checking..." : "Re-check Feasibility"}
-                        </button>
-                      </div>
-                    )}
+                    <button 
+                        onClick={handleRecheck} 
+                        disabled={isActionLoading} 
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-sm"
+                    >
+                        {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCcw className="w-4 h-4" />} 
+                        {isActionLoading ? "Checking..." : "Re-check Feasibility"}
+                    </button>
+                )}
 
                 {requestData?.status === 'DRAFT' && (
                   <button 

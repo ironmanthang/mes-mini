@@ -146,7 +146,7 @@ export const ComponentReceipts = (): JSX.Element => {
     if (!selectedWarehouseId) {
       {
         setShowWarning(true);
-        setMessageWarning("Please select a destination warehouse");
+        setMessageWarning("Destination warehouse not found on the selected Purchase Order");
         return;
       }
     }
@@ -410,20 +410,13 @@ export const ComponentReceipts = (): JSX.Element => {
                     </div>
                 </div>
 
-                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 flex flex-col justify-center">
                     <label className="text-xs font-bold text-blue-800 uppercase flex items-center gap-1.5 mb-2">
-                        <MapPin className="w-4 h-4" /> Destination Warehouse <span className="text-red-500">*</span>
+                        <MapPin className="w-4 h-4" /> Destination Warehouse
                     </label>
-                    <select 
-                        value={selectedWarehouseId}
-                        onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
-                        className="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white"
-                    >
-                        <option value="">-- Select Storage Location --</option>
-                        {warehouses.map(wh => (
-                            <option key={wh.warehouseId} value={wh.warehouseId}>{wh.warehouseName}</option>
-                        ))}
-                    </select>
+                    <p className="text-sm font-bold text-gray-900 mt-1">
+                        {warehouses.find(wh => wh.warehouseId === selectedWarehouseId)?.warehouseName || "N/A"}
+                    </p>
                 </div>
             </div>
           </div>

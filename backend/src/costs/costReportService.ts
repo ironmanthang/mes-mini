@@ -77,10 +77,10 @@ class CostReportService {
             where: {
                 transactionType: InventoryTransactionType.IMPORT_PO,
                 ...(query.componentId ? { componentId: query.componentId } : {}),
-                ...(query.startDate || query.endDate ? { transactionDate: dateRangeWhere(query) } : {}),
                 purchaseOrder: {
                     status: { not: PurchaseOrderStatus.CANCELLED },
-                    ...(query.supplierId ? { supplierId: query.supplierId } : {})
+                    ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+                    ...(query.startDate || query.endDate ? { orderDate: dateRangeWhere(query) } : {})
                 }
             },
             include: {
@@ -91,11 +91,16 @@ class CostReportService {
                         code: true,
                         supplierId: true,
                         supplier: { select: { supplierId: true, supplierName: true, code: true } },
+                        orderDate: true,
                         details: { select: { componentId: true, unitPrice: true } }
                     }
                 }
             },
-            orderBy: { transactionDate: 'asc' }
+            orderBy: {
+                purchaseOrder: {
+                    orderDate: 'asc'
+                }
+            }
         });
 
         let totalMaterialCost = 0;
@@ -115,7 +120,7 @@ class CostReportService {
             totalMaterialCost += cost;
             totalQuantityReceived += quantity;
 
-            const date = toDateKey(tx.transactionDate);
+            const date = toDateKey(tx.purchaseOrder.orderDate);
             const dailyRow = daily.get(date) ?? { totalCost: 0, quantity: 0 };
             dailyRow.totalCost += cost;
             dailyRow.quantity += quantity;

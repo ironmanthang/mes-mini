@@ -50,7 +50,7 @@ export const Information = (): JSX.Element => {
       return (
         product.productName?.toLowerCase().includes(searchLower) || 
         product.code?.toLowerCase().includes(searchLower) ||
-        (product.category && product.category.toLowerCase().includes(searchLower))
+        (product.category?.categoryName && product.category.categoryName.toLowerCase().includes(searchLower))
       );
     });
   }, [products, searchQuery]);
@@ -138,7 +138,7 @@ export const Information = (): JSX.Element => {
                       <td className="p-4 font-bold text-blue-600">{product.productName}</td>
                       <td className="p-4">
                         <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
-                          {product.category || 'Uncategorized'}
+                          {product.category?.categoryName || 'Uncategorized'}
                         </span>
                       </td>
                       <td className="p-4 text-center font-medium text-gray-600">

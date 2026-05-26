@@ -28,6 +28,7 @@ export interface ProductInstanceListItem {
         productId: number;
         productName: string;
         code: string;
+        checklistId?: number | null;
     };
     warehouse: {
         warehouseName: string;
@@ -63,6 +64,18 @@ export interface ProductInstanceDetail {
         code: string;
         unit: string;
         category: { categoryId: number; categoryName: string } | null;
+        bom?: {
+            productId: number;
+            componentId: number;
+            quantityNeeded: number;
+            component: {
+                componentId: number;
+                componentName: string;
+                code: string;
+                description: string | null;
+                unit: string;
+            };
+        }[];
     };
     productionBatch: {
         productionBatchId: number;
@@ -121,6 +134,13 @@ export const ProductInstanceServices = {
 
     getProductInstanceById: async (id: number | string) => {
         const response = await api.get<ProductInstanceDetail>(`/product-instances/${id}`);
+        return response.data;
+    },
+
+    inductProducts: async (serialNumbers: string[]) => {
+        const response = await api.post<{ inducted: any[]; totalInducted: number }>('/warehouse-ops/product-induction', {
+            serialNumbers
+        });
         return response.data;
     }
 };

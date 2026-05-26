@@ -1,6 +1,8 @@
 import { X, Save, Loader2, Package } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductServices, type CreateNewProduct } from "../../../services/productServices";
+import { QualityChecklistServices, type QualityChecklist } from "../../../services/qualityChecklistServices";
+import { ProductCategoryServices, type ProductCategory } from "../../../services/productCategoryServices";
 
 interface CreateNewProductModalProps {
   isOpen: boolean;
@@ -12,6 +14,10 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
   const [code, setCode] = useState("");
   const [productName, setProductName] = useState("");
   const [unit, setUnit] = useState("pcs");
+  const [checklistId, setChecklistId] = useState<number | "">("");
+  const [checklistsList, setChecklistsList] = useState<QualityChecklist[]>([]);
+  const [categoryId, setCategoryId] = useState<number | "">("");
+  const [categoriesList, setCategoriesList] = useState<ProductCategory[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -19,6 +25,18 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
       setCode("");
       setProductName("");
       setUnit("pcs");
+      setChecklistId("");
+      setCategoryId("");
+      
+      Promise.all([
+        QualityChecklistServices.getAllChecklists(),
+        ProductCategoryServices.getAllCategories()
+      ])
+        .then(([checklists, categories]) => {
+          setChecklistsList(checklists);
+          setCategoriesList(categories);
+        })
+        .catch(err => console.error("Failed to load form data", err));
     }
   }, [isOpen]);
 
@@ -32,7 +50,9 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
       const payload: CreateNewProduct = {
         code,
         productName,
-        unit
+        unit,
+        categoryId: categoryId === "" ? null : Number(categoryId),
+        checklistId: checklistId === "" ? null : Number(checklistId)
       };
 
       await ProductServices.createNewProduct(payload);
@@ -102,6 +122,36 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
               <option value="kg">Kilograms (kg)</option>
               <option value="meters">Meters (m)</option>
               <option value="liters">Liters (L)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">Category</label>
+            <select 
+              value={categoryId} 
+              onChange={e => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+              disabled={isSubmitting}
+              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">-- No Category --</option>
+              {categoriesList.map(c => (
+                <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700">Quality Checklist</label>
+            <select 
+              value={checklistId} 
+              onChange={e => setChecklistId(e.target.value === "" ? "" : Number(e.target.value))}
+              disabled={isSubmitting}
+              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">-- No Checklist Assigned --</option>
+              {checklistsList.map(c => (
+                <option key={c.checklistId} value={c.checklistId}>{c.checklistName}</option>
+              ))}
             </select>
           </div>
         </div>

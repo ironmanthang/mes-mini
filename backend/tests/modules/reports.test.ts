@@ -98,6 +98,7 @@ describe('Reporting API Tests', () => {
                 supplierId: supplier.supplierId,
                 warehouseId: componentWarehouseId,
                 status: PurchaseOrderStatus.COMPLETED,
+                orderDate: new Date('2099-01-10T08:00:00.000Z'),
                 details: {
                     create: {
                         componentId: component.componentId,

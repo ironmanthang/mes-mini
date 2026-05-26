@@ -1,6 +1,6 @@
 import api from "./api";
 
-export type InspectionType = 'BOOLEAN' | 'MEASUREMENT' | 'VISUAL' | string;
+export type InspectionType = 'BINARY' | 'MEASUREMENT' | 'SELECTION';
 
 export interface InspectionPoint {
     inspectionPointId: number;

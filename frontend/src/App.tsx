@@ -37,6 +37,8 @@ import { Barcodes as FinishedProductBarcodes } from "./screens/FinishedProduct/c
 import { QualityChecks as FinishedProductQuality } from "./screens/FinishedProduct/components/QualityChecks";
 import { Orders as FinishedProductOrders } from "./screens/FinishedProduct/components/Orders";
 import { InboundRequests as FinishedProductInbound } from "./screens/FinishedProduct/components/InboundRequests";
+import { QualityChecklists as FinishedProductChecklists } from "./screens/FinishedProduct/components/QualityChecklists";
+import { ProductCategories as FinishedProductCategories } from "./screens/FinishedProduct/components/ProductCategories";
 import { InventoryReport } from "./screens/Warehouses/components/InventoryReport";
 import { Reports } from "./screens/Reports";
 import { Performance } from "./screens/Reports/components/Performance";
@@ -113,6 +115,8 @@ export default function App() {
               <Route path="info" element={<FinishedProductInformation />} />
               <Route path="barcodes" element={<FinishedProductBarcodes />} />
               <Route path="quality" element={<FinishedProductQuality />} />
+              <Route path="checklists" element={<FinishedProductChecklists />} />
+              <Route path="categories" element={<FinishedProductCategories />} />
               <Route path="inbound" element={<FinishedProductInbound />} />
               <Route path="orders" element={<FinishedProductOrders />} />
             </Route>

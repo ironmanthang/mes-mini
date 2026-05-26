@@ -28,6 +28,18 @@ interface ProductInstanceDetail {
         code: string;
         unit: string;
         category: { categoryId: number; categoryName: string } | null;
+        bom?: {
+            productId: number;
+            componentId: number;
+            quantityNeeded: number;
+            component: {
+                componentId: number;
+                componentName: string;
+                code: string;
+                description: string | null;
+                unit: string;
+            };
+        }[];
     };
     productionBatch: {
         productionBatchId: number;
@@ -138,7 +150,8 @@ class ProductInstanceService {
                         select: {
                             productId: true,
                             productName: true,
-                            code: true
+                            code: true,
+                            checklistId: true
                         }
                     },
                     warehouse: {
@@ -161,45 +174,110 @@ class ProductInstanceService {
     }
 
     async getProductInstanceById(id: string | number): Promise<ProductInstanceDetail> {
-        const instanceId = typeof id === 'string' ? parseInt(id) : id;
-        const instance = await prisma.productInstance.findUnique({
-            where: { productInstanceId: instanceId },
-            include: {
-                product: { include: { category: true } },
-                productionBatch: {
-                    include: {
-                        workOrder: {
-                            include: {
-                                employee: { select: { employeeId: true, fullName: true } },
-                                productionLine: { select: { productionLineId: true, lineName: true, location: true } },
-                                targetSalesWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } },
-                                targetErrorWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } }
+        let instance = null;
+
+        // Try querying by productInstanceId first if the parameter is a valid number representation
+        const isNumeric = typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id));
+        if (isNumeric) {
+            const instanceId = typeof id === 'string' ? parseInt(id, 10) : id;
+            instance = await prisma.productInstance.findUnique({
+                where: { productInstanceId: instanceId },
+                include: {
+                    product: { 
+                        include: { 
+                            category: true,
+                            bom: {
+                                include: {
+                                    component: true
+                                }
                             }
-                        },
-                        productionLine: { select: { productionLineId: true, lineName: true, location: true } }
-                    }
-                },
-                salesOrder: {
-                    include: {
-                        agent: { select: { agentId: true, agentName: true } }
-                    }
-                },
-                warehouse: { select: { warehouseId: true, warehouseName: true, warehouseType: true, code: true } },
-                qualityChecks: {
-                    include: {
-                        checklist: { select: { checklistId: true, checklistName: true } },
-                        employee: { select: { employeeId: true, fullName: true } }
-                    }
-                },
-                warranty: {
-                    include: {
-                        customer: { select: { customerId: true, customerName: true, email: true } }
+                        } 
+                    },
+                    productionBatch: {
+                        include: {
+                            workOrder: {
+                                include: {
+                                    employee: { select: { employeeId: true, fullName: true } },
+                                    productionLine: { select: { productionLineId: true, lineName: true, location: true } },
+                                    targetSalesWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } },
+                                    targetErrorWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } }
+                                }
+                            },
+                            productionLine: { select: { productionLineId: true, lineName: true, location: true } }
+                        }
+                    },
+                    salesOrder: {
+                        include: {
+                            agent: { select: { agentId: true, agentName: true } }
+                        }
+                    },
+                    warehouse: { select: { warehouseId: true, warehouseName: true, warehouseType: true, code: true } },
+                    qualityChecks: {
+                        include: {
+                            checklist: { select: { checklistId: true, checklistName: true } },
+                            employee: { select: { employeeId: true, fullName: true } }
+                        }
+                    },
+                    warranty: {
+                        include: {
+                            customer: { select: { customerId: true, customerName: true, email: true } }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
+        // If not found by primary key ID (or parameter is a serial number string), query by serialNumber
+        if (!instance && typeof id === 'string') {
+            instance = await prisma.productInstance.findUnique({
+                where: { serialNumber: id },
+                include: {
+                    product: { 
+                        include: { 
+                            category: true,
+                            bom: {
+                                include: {
+                                    component: true
+                                }
+                            }
+                        } 
+                    },
+                    productionBatch: {
+                        include: {
+                            workOrder: {
+                                include: {
+                                    employee: { select: { employeeId: true, fullName: true } },
+                                    productionLine: { select: { productionLineId: true, lineName: true, location: true } },
+                                    targetSalesWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } },
+                                    targetErrorWarehouse: { select: { warehouseId: true, warehouseName: true, code: true } }
+                                }
+                            },
+                            productionLine: { select: { productionLineId: true, lineName: true, location: true } }
+                        }
+                    },
+                    salesOrder: {
+                        include: {
+                            agent: { select: { agentId: true, agentName: true } }
+                        }
+                    },
+                    warehouse: { select: { warehouseId: true, warehouseName: true, warehouseType: true, code: true } },
+                    qualityChecks: {
+                        include: {
+                            checklist: { select: { checklistId: true, checklistName: true } },
+                            employee: { select: { employeeId: true, fullName: true } }
+                        }
+                    },
+                    warranty: {
+                        include: {
+                            customer: { select: { customerId: true, customerName: true, email: true } }
+                        }
+                    }
+                }
+            });
+        }
+
         if (!instance) throw new Error('Product Instance not found');
-        return instance as ProductInstanceDetail;
+        return instance as unknown as ProductInstanceDetail;
     }
 }
 

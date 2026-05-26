@@ -2,7 +2,7 @@ import 'dotenv/config';
 import prisma from '../../src/common/lib/prisma.js';
 
 import { seedRoles, seedPermissions, seedRolePermissions, seedEmployees, seedWarehouses, seedProductionLines, seedCodeSequences } from './seeders/system.js';
-import { seedSuppliers, seedAgents, seedComponents, seedQualityChecklists, seedProducts, seedSupplierComponents } from './seeders/masterData.js';
+import { seedSuppliers, seedAgents, seedComponents, seedQualityChecklists, seedProducts, seedSupplierComponents, seedProductCategories } from './seeders/masterData.js';
 import { seedMaterialRequests, seedProductInstances, seedDemoAgents, seedDemoSuppliers, seedDemoComponents, seedDemoProducts, seedDemoSupplierComponents, seedDemoComponentStock, seedDemoProductInstances, seedDemoPurchaseOrders, seedDemoSalesOrders, seedDemoProductionRequests } from './seeders/demoData.js';
 import { seedProductionScenarios, seedQcTestingScenario } from './seeders/scenarios.js';
 
@@ -47,6 +47,7 @@ async function main(): Promise<void> {
     if (SEED_CONFIG.COMPONENTS) await seedComponents();
     if (SEED_CONFIG.WAREHOUSES) await seedWarehouses();
     if (SEED_CONFIG.PRODUCTS) {
+        await seedProductCategories();
         await seedQualityChecklists();
         await seedProducts();
     }

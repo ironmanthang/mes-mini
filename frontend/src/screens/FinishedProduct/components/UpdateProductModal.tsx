@@ -1,6 +1,8 @@
 import { X, Save, Package, Loader2 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductServices, type UpdateProduct } from "../../../services/productServices";
+import { QualityChecklistServices, type QualityChecklist } from "../../../services/qualityChecklistServices";
+import { ProductCategoryServices, type ProductCategory } from "../../../services/productCategoryServices";
 
 interface UpdateProductModalProps {
   isOpen: boolean;
@@ -13,25 +15,40 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
   const [code, setCode] = useState("");
   const [productName, setProductName] = useState("");
   const [unit, setUnit] = useState("pcs");
-  const [categoryId, setCategoryId] = useState<number | "">(""); 
+  const [categoryId, setCategoryId] = useState<number | "">("");
+  const [checklistId, setChecklistId] = useState<number | "">("");
+  const [checklistsList, setChecklistsList] = useState<QualityChecklist[]>([]);
+  const [categoriesList, setCategoriesList] = useState<ProductCategory[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen && productId) {
+    if (isOpen) {
       setIsLoading(true);
-      ProductServices.getProductById(productId)
-        .then(data => {
-          setCode(data.code || "");
-          setProductName(data.productName || "");
-          setUnit(data.unit || "pcs");
-          setCategoryId(data.categoryId || "");
+      
+      const promises: [Promise<QualityChecklist[]>, Promise<ProductCategory[]>, Promise<any> | null] = [
+        QualityChecklistServices.getAllChecklists(),
+        ProductCategoryServices.getAllCategories(),
+        productId ? ProductServices.getProductById(productId) : null
+      ];
+
+      Promise.all(promises)
+        .then(([checklists, categories, productData]) => {
+          setChecklistsList(checklists);
+          setCategoriesList(categories);
+          if (productData) {
+            setCode(productData.code || "");
+            setProductName(productData.productName || "");
+            setUnit(productData.unit || "pcs");
+            setCategoryId(productData.categoryId || "");
+            setChecklistId(productData.checklistId || "");
+          }
         })
         .catch(err => console.error("Failed to load product details", err))
         .finally(() => setIsLoading(false));
     } else {
-      setCode(""); setProductName(""); setUnit("pcs"); setCategoryId("");
+      setCode(""); setProductName(""); setUnit("pcs"); setCategoryId(""); setChecklistId("");
     }
   }, [isOpen, productId]);
 
@@ -47,7 +64,8 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
         code,
         productName,
         unit,
-        categoryId: Number(categoryId) || 0
+        categoryId: categoryId === "" ? null : Number(categoryId),
+        checklistId: checklistId === "" ? null : Number(checklistId)
       };
 
       await ProductServices.updateProduct(productId, payload);
@@ -129,16 +147,34 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">Category ID</label>
-                        <input 
-                            type="number" min="0"
-                            placeholder="Optional"
-                            value={categoryId} 
-                            onChange={e => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
-                            disabled={isSubmitting}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" 
-                        />
-                    </div>
+                    <label className="text-sm font-bold text-gray-700">Category</label>
+                    <select
+                        value={categoryId}
+                        onChange={e => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+                        disabled={isSubmitting}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                        <option value="">-- No Category --</option>
+                        {categoriesList.map(c => (
+                            <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>
+                        ))}
+                    </select>
+                </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">Quality Checklist</label>
+                    <select 
+                        value={checklistId}
+                        onChange={e => setChecklistId(e.target.value === "" ? "" : Number(e.target.value))}
+                        disabled={isSubmitting}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                        <option value="">-- No Checklist Assigned --</option>
+                        {checklistsList.map(c => (
+                            <option key={c.checklistId} value={c.checklistId}>{c.checklistName}</option>
+                        ))}
+                    </select>
                 </div>
             </>
           )}

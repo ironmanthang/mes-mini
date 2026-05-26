@@ -5,6 +5,7 @@ import {
   ClipboardCheck, ShieldCheck, AlertTriangle, Calendar,
   Cpu, ChevronRight, Phone, Shield, ArrowLeft
 } from "lucide-react";
+import { ProductInstanceServices } from "../../services/productInstanceServices";
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface ProductPassport {
@@ -42,47 +43,6 @@ interface ProductPassport {
   } | null;
 }
 
-// ─── Mock Data ───────────────────────────────────────────────────────
-const MOCK_DB: Record<string, ProductPassport> = {
-  "SN-SW-001234": {
-    serialNumber: "SN-SW-001234",
-    productName: "Smart Watch Pro X",
-    productCode: "PROD-SW-001",
-    status: "IN_STOCK_SALES",
-    batch: { batchCode: "BATCH-2024-0512", productionDate: "2024-05-12", expiryDate: null },
-    origin: { lineName: "Assembly Line Alpha", location: "Building A, Floor 2" },
-    workOrder: { code: "WO-2024-0089" },
-    qualityCheck: { result: "PASSED", checkDate: "2024-05-13", checklistName: "Final QC Checklist v3" },
-    components: [
-      { id: 1, code: "COMP-001", componentName: "Snapdragon W5 Gen 1", specification: "4nm process, 1.7GHz" },
-      { id: 2, code: "COMP-002", componentName: 'AMOLED Display 1.9"', specification: "466x466px, 2000nits" },
-      { id: 3, code: "COMP-003", componentName: "Battery 430mAh", specification: "Li-Ion, 18-day life" },
-      { id: 4, code: "COMP-004", componentName: "GPS Module", specification: "L1+L5 dual-band" },
-    ],
-    warranty: {
-      activationDate: "2024-06-01",
-      expiryDate: "2026-06-01",
-      customerName: "Nguyen Van Long",
-    },
-  },
-  "SN-EB-005678": {
-    serialNumber: "SN-EB-005678",
-    productName: "Bluetooth Earbuds Pro",
-    productCode: "PROD-EB-002",
-    status: "SHIPPED",
-    batch: { batchCode: "BATCH-2024-0489", productionDate: "2024-04-20", expiryDate: null },
-    origin: { lineName: "Assembly Line Beta", location: "Building B, Floor 1" },
-    workOrder: { code: "WO-2024-0067" },
-    qualityCheck: { result: "PASSED", checkDate: "2024-04-21", checklistName: "Audio QC Checklist v2" },
-    components: [
-      { id: 1, code: "COMP-010", componentName: "Bluetooth Chip QCC3050", specification: "BT 5.3, aptX Lossless" },
-      { id: 2, code: "COMP-011", componentName: "Driver 10mm Dynamic", specification: "20Hz-20kHz, 32Ω" },
-      { id: 3, code: "COMP-012", componentName: "Battery 55mAh (each bud)", specification: "Li-Ion, 8h playtime" },
-    ],
-    warranty: null,
-  },
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────
 const maskName = (name: string) => {
   const parts = name.split(" ");
@@ -117,14 +77,57 @@ export const ProductLookup = () => {
   const [data, setData] = useState<ProductPassport | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
-  const doLookup = (sn: string) => {
+  const doLookup = async (sn: string) => {
     if (!sn.trim()) return;
     setStatus("loading");
-    setTimeout(() => {
-      const found = MOCK_DB[sn.trim().toUpperCase()] ?? MOCK_DB[sn.trim()];
-      if (found) { setData(found); setStatus("found"); }
-      else { setData(null); setStatus("not_found"); }
-    }, 800);
+    try {
+      const instance = await ProductInstanceServices.getProductInstanceById(sn.trim());
+      
+      const mappedData: ProductPassport = {
+        serialNumber: instance.serialNumber,
+        productName: instance.product.productName,
+        productCode: instance.product.code,
+        status: instance.status,
+        batch: {
+          batchCode: instance.productionBatch.batchCode,
+          productionDate: instance.productionBatch.productionDate,
+          expiryDate: instance.productionBatch.expiryDate,
+        },
+        origin: instance.productionBatch.productionLine ? {
+          lineName: instance.productionBatch.productionLine.lineName,
+          location: instance.productionBatch.productionLine.location,
+        } : (instance.productionBatch.workOrder.productionLine ? {
+          lineName: instance.productionBatch.workOrder.productionLine.lineName,
+          location: instance.productionBatch.workOrder.productionLine.location,
+        } : null),
+        workOrder: {
+          code: instance.productionBatch.workOrder.code,
+        },
+        qualityCheck: instance.qualityChecks?.[0] ? {
+          result: instance.qualityChecks[0].result,
+          checkDate: instance.qualityChecks[0].checkDate,
+          checklistName: instance.qualityChecks[0].checklist.checklistName,
+        } : null,
+        components: instance.product.bom?.map((b: any) => ({
+          id: b.component.componentId,
+          code: b.component.code,
+          componentName: b.component.componentName,
+          specification: b.component.description || "",
+        })) || [],
+        warranty: instance.warranty ? {
+          activationDate: instance.warranty.activationDate,
+          expiryDate: instance.warranty.expiryDate,
+          customerName: instance.warranty.customer?.customerName || "Customer",
+        } : null,
+      };
+
+      setData(mappedData);
+      setStatus("found");
+    } catch (error) {
+      console.error("Lookup failed:", error);
+      setData(null);
+      setStatus("not_found");
+    }
   };
 
   useEffect(() => {
@@ -186,9 +189,9 @@ export const ProductLookup = () => {
         </div>
 
         <p className="text-center text-xs text-gray-400 font-medium mb-12">
-          Try: <button onClick={() => { setQuery("SN-SW-001234"); doLookup("SN-SW-001234"); }} className="text-blue-500 hover:underline font-bold">SN-SW-001234</button>
+          Try: <button onClick={() => { setQuery("SN-DEMO-SW-0001"); doLookup("SN-DEMO-SW-0001"); }} className="text-blue-500 hover:underline font-bold">SN-DEMO-SW-0001</button>
           {" · "}
-          <button onClick={() => { setQuery("SN-EB-005678"); doLookup("SN-EB-005678"); }} className="text-blue-500 hover:underline font-bold">SN-EB-005678</button>
+          <button onClick={() => { setQuery("SN-DEMO-GPC-0001"); doLookup("SN-DEMO-GPC-0001"); }} className="text-blue-500 hover:underline font-bold">SN-DEMO-GPC-0001</button>
         </p>
 
         {/* ── Not Found ── */}
@@ -206,48 +209,33 @@ export const ProductLookup = () => {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
             {/* MỤC 1: Identity & Verification */}
-            <div className="bg-white rounded-3xl border border-gray-200 shadow-lg overflow-hidden">
-              <div className="grid grid-cols-1 lg:grid-cols-2">
-                {/* Left: Image */}
-                <div className="bg-gradient-to-br from-slate-100 to-blue-50 flex items-center justify-center p-12 min-h-[320px]">
-                  <img
-                    src="/product-placeholder.png"
-                    alt={data.productName}
-                    className="max-h-64 max-w-full object-contain drop-shadow-2xl"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
+            <div className="bg-white rounded-3xl border border-gray-200 shadow-lg p-10">
+              <div className="max-w-3xl mx-auto flex flex-col gap-6">
+                {/* Verification Badge */}
+                <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2 w-fit">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <span className="text-sm font-bold text-green-800">Database Record Verified</span>
                 </div>
-                {/* Right: Info */}
-                <div className="p-10 flex flex-col justify-center gap-5">
-                  {/* Verification Badge */}
-                  <div className="inline-flex items-center gap-3 bg-green-50 border-2 border-green-200 rounded-2xl px-5 py-3 w-fit">
-                    <CheckCircle2 className="w-7 h-7 text-green-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-black text-green-600 uppercase tracking-widest">Verified</p>
-                      <p className="text-sm font-black text-green-800">Genuine Product — Hàng Chính Hãng</p>
-                    </div>
-                  </div>
 
-                  <div>
-                    <h2 className="text-3xl font-black text-gray-900 leading-tight">{data.productName}</h2>
-                    <p className="text-sm text-gray-400 font-bold mt-1">{data.productCode}</p>
-                  </div>
+                <div>
+                  <h2 className="text-3xl font-black text-gray-900 leading-tight">{data.productName}</h2>
+                  <p className="text-sm text-gray-400 font-bold mt-1">{data.productCode}</p>
+                </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                      <span className="text-sm font-bold text-gray-500">Serial Number</span>
-                      <span className="font-mono font-black text-gray-900 text-sm bg-gray-100 px-3 py-1 rounded-lg">{data.serialNumber}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                      <span className="text-sm font-bold text-gray-500">Product Status</span>
-                      <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase ${statusLabel[data.status]?.color ?? "bg-gray-100 text-gray-600"}`}>
-                        {statusLabel[data.status]?.label ?? data.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <span className="text-sm font-bold text-gray-500">Production Date</span>
-                      <span className="text-sm font-bold text-gray-700">{new Date(data.batch.productionDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <span className="text-sm font-bold text-gray-500">Serial Number</span>
+                    <span className="font-mono font-black text-gray-900 text-sm bg-gray-100 px-3 py-1 rounded-lg">{data.serialNumber}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <span className="text-sm font-bold text-gray-500">Product Status</span>
+                    <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase ${statusLabel[data.status]?.color ?? "bg-gray-100 text-gray-600"}`}>
+                      {statusLabel[data.status]?.label ?? data.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm font-bold text-gray-500">Production Date</span>
+                    <span className="text-sm font-bold text-gray-700">{new Date(data.batch.productionDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                   </div>
                 </div>
               </div>
@@ -298,15 +286,15 @@ export const ProductLookup = () => {
                 </div>
 
                 {/* Card 4: Quality */}
-                <div className={`rounded-2xl border shadow-sm p-5 ${data.qualityCheck?.result === "PASSED" ? "bg-green-50 border-green-200" : "bg-orange-50 border-orange-200"}`}>
+                <div className={`rounded-2xl border shadow-sm p-5 ${data.qualityCheck?.result === "PASSED" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-3 shadow-sm">
-                    <ShieldCheck className={`w-5 h-5 ${data.qualityCheck?.result === "PASSED" ? "text-green-600" : "text-orange-500"}`} />
+                    <ShieldCheck className={`w-5 h-5 ${data.qualityCheck?.result === "PASSED" ? "text-green-600" : "text-red-500"}`} />
                   </div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Quality Assurance</p>
                   {data.qualityCheck ? (
                     <>
-                      <p className={`font-black text-sm ${data.qualityCheck.result === "PASSED" ? "text-green-700" : "text-orange-700"}`}>
-                        {data.qualityCheck.result === "PASSED" ? "✓ 100% Passed" : "⚠ Conditional"}
+                      <p className={`font-black text-sm uppercase ${data.qualityCheck.result === "PASSED" ? "text-green-700" : "text-red-700"}`}>
+                        {data.qualityCheck.result === "PASSED" ? "✓ PASSED" : "⚠ FAILED"}
                       </p>
                       <p className="text-xs text-gray-500 font-medium mt-1 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />

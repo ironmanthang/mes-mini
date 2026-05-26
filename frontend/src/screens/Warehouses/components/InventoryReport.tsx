@@ -266,7 +266,6 @@ export const InventoryReport = (): JSX.Element => {
                      <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                   </div>
                ) : null}
-
                <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-gray-100 text-[11px] uppercase text-gray-600 font-black sticky top-0 z-10 shadow-sm">
                      <tr>
@@ -278,13 +277,20 @@ export const InventoryReport = (): JSX.Element => {
                            <div className="flex items-center gap-2">Item Name <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
                         </th>
                         <th className="p-4 text-center">Unit</th>
-                        <th className="p-4 text-right cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('onHand')}>
-                           <div className="flex items-center justify-end gap-2">Physical Stock <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
-                        </th>
-                        <th className="p-4 text-right text-orange-700">Reserved</th>
-                        <th className="p-4 text-right cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('available')}>
-                           <div className="flex items-center justify-end gap-2 text-blue-800">Available <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
-                        </th>
+                        {activeTab === 'COMPONENT' ? (
+                           <th className="p-4 text-right cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('onHand')}>
+                              <div className="flex items-center justify-end gap-2">Stock Quantity <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
+                           </th>
+                        ) : (
+                           <>
+                              <th className="p-4 text-right cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('onHand')}>
+                                 <div className="flex items-center justify-end gap-2">Physical Stock <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
+                              </th>
+                              <th className="p-4 text-right cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('available')}>
+                                 <div className="flex items-center justify-end gap-2 text-blue-800">Available <ArrowUpDown className="w-3 h-3 text-gray-400" /></div>
+                              </th>
+                           </>
+                        )}
                         <th className="p-4 text-center">Alerts</th>
                      </tr>
                   </thead>
@@ -299,11 +305,16 @@ export const InventoryReport = (): JSX.Element => {
                               <td className="p-4 font-mono font-black text-gray-900">{item.code}</td>
                               <td className="p-4 font-bold text-gray-800 truncate max-w-[250px]">{item.name}</td>
                               <td className="p-4 text-center text-gray-500 font-medium">{item.unit}</td>
-                              <td className="p-4 text-right font-black text-gray-700">{item.onHand.toLocaleString()}</td>
-                              <td className="p-4 text-right font-bold text-orange-600">{item.reserved.toLocaleString()}</td>
-                              <td className={`p-4 text-right font-black text-lg ${isOutOfStock ? 'text-gray-400' : isLow ? 'text-red-600' : 'text-blue-700'}`}>
-                                 {item.available.toLocaleString()}
-                              </td>
+                              {activeTab === 'COMPONENT' ? (
+                                 <td className="p-4 text-right font-black text-gray-700">{item.onHand.toLocaleString()}</td>
+                              ) : (
+                                 <>
+                                    <td className="p-4 text-right font-black text-gray-700">{item.onHand.toLocaleString()}</td>
+                                    <td className={`p-4 text-right font-black text-lg ${isOutOfStock ? 'text-gray-400' : isLow ? 'text-red-600' : 'text-blue-700'}`}>
+                                       {item.available.toLocaleString()}
+                                    </td>
+                                 </>
+                              )}
                               <td className="p-4 text-center">
                                  {isOutOfStock ? (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-200 text-gray-600 uppercase">Out of Stock</span>
@@ -317,7 +328,7 @@ export const InventoryReport = (): JSX.Element => {
                         )
                      })}
                      {paginatedData.length === 0 && !isLoading && (
-                        <tr><td colSpan={8} className="p-16 text-center text-gray-500 font-medium text-lg">No data found matching current filters.</td></tr>
+                        <tr><td colSpan={activeTab === 'COMPONENT' ? 6 : 7} className="p-16 text-center text-gray-500 font-medium text-lg">No data found matching current filters.</td></tr>
                      )}
                   </tbody>
                </table>

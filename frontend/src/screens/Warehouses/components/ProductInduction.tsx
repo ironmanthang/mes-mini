@@ -3,6 +3,7 @@ import {
   Trash2, Loader2, Boxes, Check
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, type JSX, type KeyboardEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ProductInstanceServices } from "../../../services/productInstanceServices";
 
 interface StagedProduct {
@@ -16,6 +17,9 @@ interface StagedProduct {
 }
 
 export const ProductInduction = (): JSX.Element => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serialQuery = searchParams.get("search") || "";
+
   const [stagingList, setStagingList] = useState<StagedProduct[]>([]);
   const [currentScan, setCurrentScan] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -79,7 +83,12 @@ export const ProductInduction = (): JSX.Element => {
       setScanStatus('SUCCESS');
       
       // Add to Staging List
-      setStagingList(prev => [validatedData, ...prev]);
+      setStagingList(prev => {
+        if (prev.some(item => item.serialNumber === validatedData.serialNumber)) {
+          return prev;
+        }
+        return [validatedData, ...prev];
+      });
       
       // Reset input and keep focus
       setCurrentScan(""); 
@@ -104,6 +113,23 @@ export const ProductInduction = (): JSX.Element => {
     }
   };
 
+  // Automatically submit scan when search query is passed in URL
+  useEffect(() => {
+    if (serialQuery) {
+      if (!stagingList.some(item => item.serialNumber.toLowerCase() === serialQuery.toLowerCase())) {
+        handleScanSubmit(serialQuery);
+      }
+      // Clean up search query parameter
+      setSearchParams(
+        prev => {
+          prev.delete("search");
+          return prev;
+        },
+        { replace: true }
+      );
+    }
+  }, [serialQuery, stagingList, setSearchParams]);
+
   // ==========================================
   // STATISTICS & LIST PROCESSING LOGIC
   // ==========================================
@@ -125,24 +151,30 @@ export const ProductInduction = (): JSX.Element => {
       inputRef.current?.focus();
   };
 
-  // Confirm Induction action. This uses a local notice while the official POST endpoint is pending.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Confirm Induction action. This calls the backend to induct products.
   const handleConfirmInduction = async () => {
       if (stagingList.length === 0 || isSubmitting) return;
 
       setIsSubmitting(true);
       try {
-          alert(`Warehouse induction request for ${stagingList.length} item(s) has been recorded locally. The official POST Induction endpoint is still pending implementation.`);
+          const serialNumbers = stagingList.map(item => item.serialNumber);
+          await ProductInstanceServices.inductProducts(serialNumbers);
+          alert(`Warehouse induction request for ${stagingList.length} item(s) completed successfully.`);
           setStagingList([]);
-          setScanStatus('IDLE');
-          setFeedbackMessage("");
-          inputRef.current?.focus();
-      } catch (error){
+          setScanStatus('SUCCESS');
+          setFeedbackMessage(`Induction completed for: ${serialNumbers.join(", ")}`);
+          setTimeout(() => inputRef.current?.focus(), 50);
+      } catch (error: any) {
           console.error(error);
+          alert(error?.response?.data?.message || "Error during warehouse induction.");
+          setScanStatus('ERROR');
+          setFeedbackMessage(error?.response?.data?.message || "Induction failed.");
+      } finally {
           setIsSubmitting(false);
       }
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inputApiClasses = useMemo(() => {
     const base = "w-full pl-12 pr-12 py-3 border rounded-xl text-lg font-mono font-bold outline-none transition-all duration-150 shadow-inner";

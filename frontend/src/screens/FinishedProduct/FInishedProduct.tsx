@@ -5,6 +5,8 @@ import {
   ClipboardCheck, 
   ShoppingCart,
   PackagePlus,
+  ClipboardList,
+  Tag,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -30,6 +32,20 @@ export const FinishedProduct = (): JSX.Element => {
       icon: ClipboardCheck, 
       to: "/finished-products/quality",
       description: "QA/QC inspections & logs" 
+    },
+    { 
+      id: "checklists", 
+      label: "QC Checklists", 
+      icon: ClipboardList, 
+      to: "/finished-products/checklists",
+      description: "Manage QC templates & parameters" 
+    },
+    { 
+      id: "categories", 
+      label: "Categories", 
+      icon: Tag, 
+      to: "/finished-products/categories",
+      description: "Manage product categories" 
     },
     { 
       id: "inbound", 

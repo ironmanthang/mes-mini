@@ -12,7 +12,10 @@ export async function seedMaterialRequests(): Promise<void> {
     console.log('...Seeding Material Requests (Rule: WOs must have MRs)');
     
     const workOrders = await prisma.workOrder.findMany({
-        where: { status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+        where: { 
+            status: { in: ['IN_PROGRESS', 'COMPLETED'] },
+            code: { notIn: ['WO-DEMO-PR009', 'WO-DEMO-PR010', 'WO-DEMO-PR011'] }
+        },
         include: { product: { include: { bom: true } } }
     });
 
@@ -453,6 +456,7 @@ export async function seedDemoPurchaseOrders(): Promise<void> {
     ];
 
     const mainWh = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
+    if (!mainWh) { console.warn('   ⚠️ Missing main warehouse (WH-MAIN) - purchase orders cannot be seeded'); return; }
 
     for (const po of poSeeds) {
         const supplier = await sup(po.supplierCode);
@@ -490,8 +494,16 @@ export async function seedDemoPurchaseOrders(): Promise<void> {
                 employeeId: purchaser.employeeId,
                 status: po.status,
                 priority: po.priority,
-                orderDate: new Date(2026, 2, Math.floor(Math.random() * 10) + 1), // March 1-10
-                expectedDeliveryDate: new Date(2026, 2, 20),
+                orderDate: (() => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - Math.floor(Math.random() * 15) - 1);
+                    return date;
+                })(),
+                expectedDeliveryDate: (() => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + 5);
+                    return date;
+                })(),
                 totalAmount: subtotal,
                 warehouseId: mainWh.warehouseId,
                 shippingCost: 0, 
@@ -613,8 +625,16 @@ export async function seedDemoSalesOrders(): Promise<void> {
                 employeeId: sales.employeeId,
                 status: so.status,
                 priority: so.priority,
-                orderDate: new Date(2026, 2, Math.floor(Math.random() * 10) + 1),
-                expectedShipDate: new Date(2026, 2, 25),
+                orderDate: (() => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - Math.floor(Math.random() * 15) - 1);
+                    return date;
+                })(),
+                expectedShipDate: (() => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + 10);
+                    return date;
+                })(),
                 totalAmount: subtotal,
                 discount: 0, agentShippingPrice: 0, tax: 0,
                 approverId: so.approved ? manager.employeeId : null,
@@ -685,6 +705,12 @@ export async function seedDemoProductionRequests(): Promise<void> {
             soDetailId: null, note: 'Manual Request (MTS) — partial WO created' },
         { code: 'PR-20260310-0008', productCode: 'PROD-LAPTOP-X1', qty: 50, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.HIGH, // FIXED: Downgraded to IN_PROGRESS
             soDetailId: null, note: 'Manual Request (MTS) — fully converted to WO' },
+        { code: 'PR-20260310-0009', productCode: 'PROD-TABLET-A1', qty: 15, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.MEDIUM,
+            soDetailId: null, note: 'Manual Request (MTS) — for MR test 1' },
+        { code: 'PR-20260310-0010', productCode: 'PROD-DESKTOP-Z5', qty: 5, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.HIGH,
+            soDetailId: null, note: 'Manual Request (MTS) — for MR test 2' },
+        { code: 'PR-20260310-0011', productCode: 'PROD-SMARTWATCH', qty: 20, status: ProductionRequestStatus.IN_PROGRESS, priority: Priority.LOW,
+            soDetailId: null, note: 'Manual Request (MTS) — for MR test 3' },
     ];
 
     for (const pr of prSeeds) {
@@ -709,7 +735,11 @@ export async function seedDemoProductionRequests(): Promise<void> {
                 status: pr.status,
                 priority: pr.priority,
                 employeeId: manager.employeeId,
-                createdAt: new Date(2026, 2, 10),
+                createdAt: (() => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - Math.floor(Math.random() * 15) - 1);
+                    return date;
+                })(),
                 soDetailId: pr.soDetailId,
                 note: pr.note,
                 details: { create: detailsData },
@@ -722,8 +752,16 @@ export async function seedDemoProductionRequests(): Promise<void> {
 
     const prPartial = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0007' } });
     const prFull = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0008' } });
+    const prNew9 = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0009' } });
+    const prNew10 = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0010' } });
+    const prNew11 = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0011' } });
+    
     const monitor = await prod('PROD-MONITOR-M1');
     const laptop = await prod('PROD-LAPTOP-X1');
+    const tablet = await prod('PROD-TABLET-A1');
+    const desktop = await prod('PROD-DESKTOP-Z5');
+    const smartwatch = await prod('PROD-SMARTWATCH');
+
     const line = await prisma.productionLine.findFirst();
     const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
     const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
@@ -767,6 +805,69 @@ export async function seedDemoProductionRequests(): Promise<void> {
             where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prFull.productionRequestId } },
             update: {},
             create: { workOrderId: wo.workOrderId, productionRequestId: prFull.productionRequestId, quantity: 50 }
+        });
+    }
+
+    if (prNew9 && tablet && line) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-PR009' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-PR009', quantity: 15, employeeId: manager.employeeId,
+                productId: tablet.productId, productionLineId: line.productionLineId,
+                status: 'IN_PROGRESS',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 15000,
+                overheadCost: 7500
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prNew9.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prNew9.productionRequestId, quantity: 15 }
+        });
+    }
+
+    if (prNew10 && desktop && line) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-PR010' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-PR010', quantity: 5, employeeId: manager.employeeId,
+                productId: desktop.productId, productionLineId: line.productionLineId,
+                status: 'IN_PROGRESS',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 20000,
+                overheadCost: 10000
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prNew10.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prNew10.productionRequestId, quantity: 5 }
+        });
+    }
+
+    if (prNew11 && smartwatch && line) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-PR011' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-PR011', quantity: 20, employeeId: manager.employeeId,
+                productId: smartwatch.productId, productionLineId: line.productionLineId,
+                status: 'IN_PROGRESS',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 8000,
+                overheadCost: 4000
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prNew11.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prNew11.productionRequestId, quantity: 20 }
         });
     }
 

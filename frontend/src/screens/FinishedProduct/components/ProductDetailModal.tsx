@@ -62,7 +62,7 @@ export const ProductDetailModal = ({ isOpen, onClose, productId }: ProductDetail
                     <div>
                         <h3 className="text-lg font-bold text-gray-900">{productData.productName}</h3>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 mt-1 border border-blue-200">
-                            {productData.category || 'Uncategorized'}
+                            {productData.category?.categoryName || 'Uncategorized'}
                         </span>
                     </div>
                 </div>

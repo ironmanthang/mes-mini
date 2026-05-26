@@ -65,7 +65,30 @@ export async function seedComponents(): Promise<void> {
     }
 }
 
+export async function seedProductCategories(): Promise<void> {
+    console.log('...Seeding Product Categories');
+    const categories = [
+        { name: 'Laptops & Computers', description: 'Portable and desktop computing devices' },
+        { name: 'Monitors & Displays', description: 'Screens, monitors, and display panels' },
+        { name: 'Tablets & Smartphones', description: 'Mobile touch-screen devices' },
+        { name: 'Wearables', description: 'Smartwatches, fitness bands, and wearable tech' },
+        { name: 'Networking & Connectivity', description: 'Routers, switches, and network hardware' },
+    ];
+
+    for (const cat of categories) {
+        const existing = await prisma.productCategory.findFirst({
+            where: { categoryName: cat.name }
+        });
+        if (!existing) {
+            await prisma.productCategory.create({
+                data: { categoryName: cat.name, description: cat.description }
+            });
+        }
+    }
+}
+
 export async function seedQualityChecklists(): Promise<void> {
+
     console.log('...Seeding Quality Checklists');
 
     // 1. Electronics Standard Checklist

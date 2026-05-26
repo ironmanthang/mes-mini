@@ -18,6 +18,7 @@ export const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Employees', description: 'Staff & System Accounts' },
             { name: 'Roles', description: 'Permissions & Access Control' },
             { name: 'Products', description: 'Finished Goods (The devices you sell)' },
+            { name: 'Product Categories', description: 'Category Master Data for Finished Goods' },
             { name: 'Product Instances', description: 'Finished Goods Inventory — Serial Number level tracking' },
             { name: 'Components', description: 'Raw Materials (Resistors, PCBs, etc.)' },
             { name: 'Suppliers', description: 'Vendor Management' },
@@ -79,6 +80,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/master-data/warehouses/warehouseRoutes.js',
         './src/master-data/qualityChecklists/qualityChecklistRoutes.ts',
         './dist/master-data/qualityChecklists/qualityChecklistRoutes.js',
+        './src/master-data/productCategories/productCategoryRoutes.ts',
+        './dist/master-data/productCategories/productCategoryRoutes.js',
 
         // --- DASHBOARDS ---
         './src/warehouse-ops/dashboard/warehouseDashboardRoutes.ts',

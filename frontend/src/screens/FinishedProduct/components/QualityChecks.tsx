@@ -1,31 +1,50 @@
 import {
   CheckCircle2, XCircle, Search, AlertTriangle,
-  Save, Camera, Upload, ArrowRightCircle, Check, X, FileText, LayoutList, Loader2
+  Save, ArrowRightCircle, Check, X, FileText, LayoutList, Loader2
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ProductInstanceServices, type ProductInstanceListItem } from "../../../services/productInstanceServices";
 import { QualityCheckServices, type CreateCheckData } from "../../../services/qualityCheckServices";
 import { QualityChecklistServices, type InspectionPoint } from "../../../services/qualityChecklistServices";
 
-const DEFECT_TYPES = [
-  "Scratches / Dents",
-  "Cracks / Broken Glass",
-  "No Power / Boot Failure",
-  "Charging Failure / Battery Drain",
-  "Display / Screen Defects",
-  "Keyboard / Touchpad Malfunction",
-  "Port / Connectivity Error",
-  "Audio / Speaker / Mic Failure",
-  "Overheating",
-  "Missing Accessories / Wrong Label"
-];
 
 export const QualityChecks = (): JSX.Element => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serialQuery = searchParams.get("search") || "";
+
   // --- ZONE A STATE (LEFT COLUMN - LIST) ---
   const [pendingList, setPendingList] = useState<ProductInstanceListItem[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(serialQuery);
   const [selectedInstance, setSelectedInstance] = useState<ProductInstanceListItem | null>(null);
+
+  // Auto-select when serialQuery matches a pending instance
+  useEffect(() => {
+    if (serialQuery && pendingList.length > 0) {
+      const matched = pendingList.find(
+        item => item.serialNumber.toLowerCase() === serialQuery.toLowerCase()
+      );
+      if (matched) {
+        setSelectedInstance(matched);
+      }
+    }
+  }, [serialQuery, pendingList]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setSearchParams(
+      prev => {
+        if (val) {
+          prev.set("search", val);
+        } else {
+          prev.delete("search");
+        }
+        return prev;
+      },
+      { replace: true }
+    );
+  };
 
   // --- ZONE B STATE (MIDDLE COLUMN - CHECKLIST FROM API) ---
   const [inspectionPoints, setInspectionPoints] = useState<InspectionPoint[]>([]);
@@ -33,9 +52,7 @@ export const QualityChecks = (): JSX.Element => {
 
   // --- EVALUATION & RESULT STATE ---
   const [evaluations, setEvaluations] = useState<Record<number, 'PASS' | 'FAIL'>>({});
-  const [defectType, setDefectType] = useState("");
   const [inspectorNotes, setInspectorNotes] = useState("");
-  const [evidenceImages, setEvidenceImages] = useState<string[]>([]);
 
   // UI State
   const [showToast, setShowToast] = useState("");
@@ -70,10 +87,18 @@ export const QualityChecks = (): JSX.Element => {
     if (selectedInstance) {
       setIsLoadingChecklist(true);
 
-      QualityChecklistServices.getAllChecklists()
-        .then(checklists => {
-          const activeChecklist = checklists.length > 0 ? checklists[0] : null;
-          setInspectionPoints(activeChecklist?.inspectionPoints || []);
+      const targetChecklistId = selectedInstance.product.checklistId;
+      if (!targetChecklistId) {
+        setInspectionPoints([]);
+        setIsLoadingChecklist(false);
+        alert(`Product "${selectedInstance.product.productName}" has no QC checklist assigned. Assign a checklist before performing QC.`);
+        setSelectedInstance(null);
+        return;
+      }
+
+      QualityChecklistServices.getChecklistById(targetChecklistId)
+        .then(checklist => {
+          setInspectionPoints(checklist?.inspectionPoints || []);
 
           // Restore previous draft if available
           const draftKey = `qc_draft_${selectedInstance.serialNumber}`;
@@ -82,9 +107,7 @@ export const QualityChecks = (): JSX.Element => {
             try {
               const parsed = JSON.parse(savedDraft);
               setEvaluations(parsed.evaluations || {});
-              setDefectType(parsed.defectType || "");
               setInspectorNotes(parsed.inspectorNotes || "");
-              setEvidenceImages(parsed.evidenceImages || []);
               triggerToast("Previous draft restored.");
             } catch (err) {
               console.error(err);
@@ -110,9 +133,7 @@ export const QualityChecks = (): JSX.Element => {
 
   const resetForm = () => {
     setEvaluations({});
-    setDefectType("");
     setInspectorNotes("");
-    setEvidenceImages([]);
   };
 
   const triggerToast = (msg: string) => {
@@ -122,14 +143,10 @@ export const QualityChecks = (): JSX.Element => {
 
   // --- EVALUATION LOGIC (ZONE B) ---
   const handleEvaluate = (pointId: number, result: 'PASS' | 'FAIL') => {
-    setEvaluations(prev => {
-      const next = { ...prev, [pointId]: result };
-      // Automatically reset Defect Type if no more failures
-      if (result === 'PASS' && !Object.values(next).includes('FAIL')) {
-        setDefectType("");
-      }
-      return next;
-    });
+    setEvaluations(prev => ({
+      ...prev,
+      [pointId]: result
+    }));
   };
 
   const evaluatedCount = Object.keys(evaluations).length;
@@ -139,23 +156,19 @@ export const QualityChecks = (): JSX.Element => {
   const allPass = totalPoints > 0 && evaluatedCount === totalPoints && !hasFail;
 
   // --- BUTTON UNLOCK CONDITIONS (CROSS VALIDATION) ---
-  const isDirty = evaluatedCount > 0 || defectType !== "" || inspectorNotes !== "";
+  const isDirty = evaluatedCount > 0 || inspectorNotes !== "";
   const canSaveDraft = isDirty;
-  const canFail = hasFail && defectType !== "";
+  const canFail = hasFail;
   const canPass = allPass;
 
   // --- ACTIONS ---
   const handleSaveDraft = () => {
     if (!selectedInstance) return;
     const draftKey = `qc_draft_${selectedInstance.serialNumber}`;
-    const draftData = { evaluations, defectType, inspectorNotes, evidenceImages };
+    const draftData = { evaluations, inspectorNotes };
 
     localStorage.setItem(draftKey, JSON.stringify(draftData));
     triggerToast("Inspection progress saved (Draft).");
-  };
-
-  const handleMockImageUpload = () => {
-    setEvidenceImages([...evidenceImages, `mock_image_${Date.now()}.png`]);
   };
 
   // ==========================================
@@ -166,7 +179,7 @@ export const QualityChecks = (): JSX.Element => {
     setIsSubmitting(true);
 
     try {
-      const finalNote = finalResult === 'FAIL' ? `[${defectType}] - ${inspectorNotes}` : inspectorNotes;
+      const finalNote = inspectorNotes;
 
       // Match BE CreateCheckData Payload
       const payload: CreateCheckData = {
@@ -184,6 +197,11 @@ export const QualityChecks = (): JSX.Element => {
       localStorage.removeItem(`qc_draft_${selectedInstance.serialNumber}`);
       setPendingList(prev => prev.filter(item => item.productInstanceId !== selectedInstance.productInstanceId));
       setSelectedInstance(null);
+      setSearchQuery("");
+      setSearchParams(prev => {
+        prev.delete("search");
+        return prev;
+      }, { replace: true });
       triggerToast(`QC result finalized as [${finalResult}].`);
 
     } catch (error: any) {
@@ -217,7 +235,8 @@ export const QualityChecks = (): JSX.Element => {
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             <input
               type="text" placeholder="Search by Serial Number..."
-              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchQuery} 
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white"
             />
           </div>
@@ -323,20 +342,6 @@ export const QualityChecks = (): JSX.Element => {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
 
-              <div className={`space-y-2 transition-opacity duration-300 ${hasFail ? 'opacity-100' : 'opacity-40 pointer-events-none grayscale'}`}>
-                <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                  <AlertTriangle className={`w-4 h-4 ${hasFail ? 'text-red-500' : 'text-gray-400'}`} />
-                  Defect Type {hasFail && <span className="text-red-500">*</span>}
-                </label>
-                <select
-                  value={defectType} onChange={e => setDefectType(e.target.value)}
-                  disabled={!hasFail}
-                  className={`w-full p-2.5 border rounded-lg text-sm font-medium outline-none transition-all cursor-pointer ${hasFail && !defectType ? 'border-red-400 ring-2 ring-red-50 bg-red-50' : 'border-gray-300 focus:ring-2 focus:ring-blue-500 bg-white'}`}
-                >
-                  <option value="">-- Select defect code (Required) --</option>
-                  {DEFECT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
-              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
@@ -350,33 +355,7 @@ export const QualityChecks = (): JSX.Element => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-blue-500" /> Evidence Images
-                </label>
-                <div className="flex gap-3">
-                  <button onClick={handleMockImageUpload} className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer text-gray-600 bg-gray-50">
-                    <Camera className="w-5 h-5" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Capture</span>
-                  </button>
-                  <button onClick={handleMockImageUpload} className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer text-gray-600 bg-gray-50">
-                    <Upload className="w-5 h-5" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Upload</span>
-                  </button>
-                </div>
-                {evidenceImages.length > 0 && (
-                  <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                    {evidenceImages.map((_img, i) => (
-                      <div key={i} className="w-16 h-16 bg-gray-200 rounded border border-gray-300 flex items-center justify-center flex-shrink-0 relative group">
-                        <span className="text-[8px] text-gray-500 text-center font-bold">IMAGE<br />{i + 1}</span>
-                        <button className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 hidden group-hover:block cursor-pointer shadow-md" onClick={() => setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+
 
               <div className="p-4 rounded-xl border flex items-center gap-3 bg-gray-50 border-gray-200 shadow-inner">
                 <ArrowRightCircle className={`w-8 h-8 ${allPass ? 'text-green-500' : hasFail ? 'text-red-500' : 'text-gray-300'}`} />

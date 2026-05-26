@@ -10,17 +10,16 @@ import { PERM } from '../../common/constants/permissions.js';
 
 const router = Router();
 
+router.get('/:id',
+    getProductInstanceById
+);
+
 router.use(protect);
 
 router.get('/',
     authorize(PERM.PRODUCT_READ),
     validate(productInstanceQuerySchema),
     getAllProductInstances
-);
-
-router.get('/:id',
-    authorize(PERM.PRODUCT_READ),
-    getProductInstanceById
 );
 
 /**
@@ -109,9 +108,9 @@ router.get('/:id',
  * @swagger
  * /api/product-instances/{id}:
  *   get:
- *     summary: Get a single product instance by ID
+ *     summary: Get a single product instance by ID or Serial Number (Public)
  *     tags: [Product Instances]
- *     security: [{ bearerAuth: [] }]
+ *     security: []
  *     parameters:
  *       - in: path
  *         name: id

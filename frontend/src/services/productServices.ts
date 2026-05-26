@@ -4,24 +4,28 @@ export interface Product {
     productId: number;
     productName: string;
     categoryId: number | null;
+    checklistId: number | null;
     createdAt: string;
     updatedAt: string;
     code: string;
     unit: string;
-    category: string | null;
+    category: { categoryId: number; categoryName: string } | null;
 }
 
 export interface CreateNewProduct {
     code: string;
     productName: string;
     unit: string;
+    categoryId?: number | null;
+    checklistId?: number | null;
 }
 
 export interface UpdateProduct {
     code: string;
     productName: string;
     unit: string;
-    categoryId: number;
+    categoryId?: number | null;
+    checklistId?: number | null;
 }
 
 export interface ProductBarcode {

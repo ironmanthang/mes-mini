@@ -258,10 +258,37 @@ export const MaterialIssuing = (): JSX.Element => {
                     {(hasValidated ? validationLines : (selectedRequest.details || [])).map((line: any, idx) => {
                       const isSufficient = hasValidated ? (line as ValidationLine).isSufficient : null;
                       
+                      // Calculate lot allocations inline for picking guidance
+                      const allocations: { lotCode: string; quantityToTake: number; currentQuantity: number }[] = [];
+                      if (hasValidated && isSufficient) {
+                        let remainingToFulfill = (line as ValidationLine).requiredQuantity;
+                        if ((line as ValidationLine).availableLots && (line as ValidationLine).availableLots.length > 0) {
+                          for (const lot of (line as ValidationLine).availableLots) {
+                            if (remainingToFulfill <= 0) break;
+                            const qty = Math.min(remainingToFulfill, lot.currentQuantity);
+                            allocations.push({
+                              lotCode: lot.lotCode,
+                              quantityToTake: qty,
+                              currentQuantity: lot.currentQuantity
+                            });
+                            remainingToFulfill -= qty;
+                          }
+                        }
+                      }
+
                       return (
                         <tr key={idx} className="hover:bg-gray-50">
                             <td className="p-4 font-medium text-gray-900">
-                                {hasValidated ? (line as ValidationLine).componentName : line.component?.componentName}
+                                <div>{hasValidated ? (line as ValidationLine).componentName : line.component?.componentName}</div>
+                                {allocations.length > 0 && (
+                                  <div className="mt-1 pl-4 text-xs text-gray-500 font-mono space-y-0.5">
+                                    {allocations.map((alloc, aIdx) => (
+                                      <div key={aIdx}>
+                                        - {alloc.lotCode} (Pick {alloc.quantityToTake} / Stock {alloc.currentQuantity})
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                             </td>
                             <td className="p-4 text-right font-bold text-gray-700">
                                 {hasValidated ? (line as ValidationLine).requiredQuantity : line.quantity}
