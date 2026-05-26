@@ -1,13 +1,12 @@
 import api from "./api";
 
-// Cập nhật thêm roleCode dựa trên FormattedEmployee của backend
 export interface Role {
   roleId: number;
   roleCode: string;
   roleName: string;
 }
 
-export type EmployeeStatus = 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+export type EmployeeStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface Employee {
   employeeId: number;
@@ -26,7 +25,6 @@ export interface Employee {
   updatedAt?: string;
 }
 
-// Định dạng dữ liệu trả về cho danh sách có phân trang từ getPaginationParams backend
 export interface PaginatedEmployeeResponse {
   data: Employee[];
   total: number;
@@ -34,8 +32,6 @@ export interface PaginatedEmployeeResponse {
   limit: number;
 }
 
-// Bỏ username và password (backend tự sinh). 
-// Đổi address thành province, ward, street theo đúng EmployeeCreateData
 export interface CreateEmployeeRequest {
   fullName: string;
   email: string;
@@ -49,19 +45,17 @@ export interface CreateEmployeeRequest {
   status?: EmployeeStatus;
 }
 
-// Bỏ email và username (backend xóa bỏ trong logic update).
-// Đổi address thành cụm province, ward, street.
 export interface UpdateEmployeeRequest {
-  fullName?: string;
-  phoneNumber?: string;
-  province?: string;
-  ward?: string;
-  street?: string;
-  dateOfBirth?: string;
-  hireDate?: string;
-  terminationDate?: string | null;
-  roleIds?: number[];
-  status?: EmployeeStatus;
+  fullName: string;
+  phoneNumber: string;
+  province: string;
+  ward: string;
+  street: string;
+  dateOfBirth: string;
+  hireDate: string;
+  terminationDate: string | null;
+  roleIds: number[];
+  status: EmployeeStatus;
 }
 
 

@@ -72,7 +72,7 @@ export const FinishedProduct = (): JSX.Element => {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-fit">
+      <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <NavLink
             key={tab.id}

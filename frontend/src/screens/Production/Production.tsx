@@ -1,4 +1,4 @@
-import { ClipboardList, Settings, Factory, PackageSearch, DollarSign } from "lucide-react";
+import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 export const Production = () => {
@@ -31,13 +31,6 @@ export const Production = () => {
       to: "/production/configure-lots",
       description: "Setup batches & instances"
     },
-    { 
-      id: "product-costs",
-      label: "Product Costs", 
-      icon: DollarSign,
-      to: "/production/product-costs",
-      description: "Analyze manufacturing costs and absorption"
-    },
   ];
 
   return (
@@ -49,14 +42,14 @@ export const Production = () => {
         </p>
       </div>
 
-      <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto scrollbar-hide no-scrollbar">
+      <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}
             title={tab.description}
             className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-200 cursor-pointer flex-shrink-0 ${
+              `flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 cursor-pointer ${
                 isActive 
                   ? "bg-white text-blue-700 shadow-sm border border-gray-200/50" 
                   : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 border border-transparent"

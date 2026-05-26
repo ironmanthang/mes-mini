@@ -20,7 +20,6 @@ import { CreateProductionRequest } from "./screens/Production/components/CreateP
 import { WorkOrders } from "./screens/Production/components/WorkOrders";
 import { MaterialRequests } from "./screens/Production/components/MaterialRequests";
 import { ConfigureProductionLots } from "./screens/Production/components/ConfigureProductionLots";
-import { ProductCosts } from "./screens/Production/components/ProductCosts";
 
 import { WarehouseInformation } from "./screens/Warehouses/components/WarehouseInformation";
 import { MaterialIssuing } from "./screens/Warehouses/components/MaterialIssuing";
@@ -103,7 +102,6 @@ export default function App() {
             <Route path="/production" element={<Production />}>
               <Route index element={<Navigate to="requests" replace />} />
               <Route path="requests" element={<CreateProductionRequest />} />
-              <Route path="product-costs" element={<ProductCosts />} />
               <Route path="work-orders" element={<WorkOrders />} />
               <Route path="material-requests" element={<MaterialRequests />} />
               <Route path="configure-lots" element={<ConfigureProductionLots />} />

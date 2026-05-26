@@ -9,10 +9,10 @@ interface EditEmployeeModalProps {
   onClose: () => void;
   userData: Employee | null;
   onConfirm: () => void;
+  currentAdminId?: number;
 }
 
-export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: EditEmployeeModalProps): JSX.Element | null => {
-  // CẬP NHẬT: State formData khớp với UpdateEmployeeRequest mới
+export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm, currentAdminId }: EditEmployeeModalProps): JSX.Element | null => {
   const [formData, setFormData] = useState<UpdateEmployeeRequest>({
     fullName: "",
     phoneNumber: "",
@@ -21,6 +21,7 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
     street: "",
     dateOfBirth: "",
     hireDate: "",
+    terminationDate: null,
     status: "ACTIVE",
     roleIds: []
   });
@@ -31,17 +32,16 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
   const [provinces, setProvinces] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
 
-  // Load danh sách roles và tỉnh thành khi mở modal
   useEffect(() => {
     if (isOpen) {
       roleService.getAllRoles().then(data => setRoles(data));
       fetch("https://provinces.open-api.vn/api/p/")
         .then(res => res.json())
-        .then(data => setProvinces(data));
+        .then(data => setProvinces(data))
+        .catch(() => console.error("Unable to load the province list."));
     }
   }, [isOpen]);
 
-  // CẬP NHẬT: Map dữ liệu từ userData sang formData
   useEffect(() => {
     if (isOpen && userData) {
       setFormData({
@@ -49,13 +49,14 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
         phoneNumber: userData.phoneNumber || "",
         dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth).toISOString().split('T')[0] : "",
         hireDate: userData.hireDate ? new Date(userData.hireDate).toISOString().split('T')[0] : "",
+        terminationDate: userData.terminationDate ? new Date(userData.terminationDate).toISOString().split('T')[0] : null,
         status: userData.status,
         roleIds: userData.roles.map(r => r.roleId),
-        // Địa chỉ ban đầu từ backend là chuỗi gộp, người dùng sẽ chọn lại nếu cần update
         province: "", 
         ward: "",
         street: ""
       });
+      setError(null);
     }
   }, [isOpen, userData]);
 
@@ -64,9 +65,14 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
     setFormData(prev => ({ ...prev, province: province?.name || "", ward: "" }));
     
     if (provinceCode) {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      const data = await res.json();
-      setDistricts(data.districts || []);
+      try {
+        const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
+        const data = await res.json();
+        setDistricts(data.districts || []);
+      } catch (err) {
+        console.error(err);
+        setDistricts([]);
+      }
     } else {
       setDistricts([]);
     }
@@ -76,13 +82,33 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
     if (!userData) return;
     setIsLoading(true);
     setError(null);
+
     try {
-      // Gọi API update với ID và dữ liệu đã thay đổi
-      await employeeService.updateEmployee(userData.employeeId, formData);
+      const finalPayload: UpdateEmployeeRequest = { ...formData };
+
+      if (!finalPayload.province && userData.address) {
+        const addressParts = userData.address.split(",").map(p => p.trim());
+        if (addressParts.length >= 3) {
+          finalPayload.street = addressParts.slice(0, addressParts.length - 2).join(", ");
+          finalPayload.ward = addressParts[addressParts.length - 2];
+          finalPayload.province = addressParts[addressParts.length - 1];
+        } else {
+          finalPayload.street = userData.address;
+          finalPayload.ward = "";
+          finalPayload.province = "";
+        }
+      }
+
+      if (finalPayload.dateOfBirth) finalPayload.dateOfBirth = new Date(finalPayload.dateOfBirth).toISOString();
+      if (finalPayload.hireDate) finalPayload.hireDate = new Date(finalPayload.hireDate).toISOString();
+      if (finalPayload.terminationDate) finalPayload.terminationDate = new Date(finalPayload.terminationDate).toISOString();
+
+      await employeeService.updateEmployee(userData.employeeId, finalPayload);
+      
       onConfirm();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to update employee");
+      setError(err?.response?.data?.message || err.message || "An error occurred while updating the employee information.");
     } finally {
       setIsLoading(false);
     }
@@ -90,20 +116,25 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
 
   if (!isOpen) return null;
 
+  const isEditingSelf = userData?.employeeId === currentAdminId;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-800">Edit Employee Profile</h2>
-          <button onClick={onClose} className="p-2 cursor-pointer
-          hover:bg-gray-100 rounded-full transition-colors">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Edit Employee Profile</h2>
+            <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {userData?.employeeId} / Username: {userData?.username}</p>
+          </div>
+          <button onClick={onClose} className="p-2 cursor-pointer hover:bg-gray-100 rounded-full transition-colors">
             <X size={20} className="text-gray-500" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg font-medium">
               {error}
             </div>
           )}
@@ -115,7 +146,7 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
                 type="text"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
               />
             </div>
 
@@ -125,7 +156,7 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
                 type="text"
                 value={userData?.email || ""}
                 disabled
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg cursor-not-allowed text-sm font-medium"
               />
             </div>
 
@@ -135,7 +166,7 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
                 type="text"
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono font-medium"
               />
             </div>
 
@@ -144,30 +175,58 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isEditingSelf}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>
-                <option value="TERMINATED">TERMINATED</option>
               </select>
+              {isEditingSelf && (
+                 <p className="text-[10px] text-red-500 font-bold tracking-tight">Security Guard: You cannot change your own status.</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Date of Birth</label>
+              <input
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm font-medium focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Hire Date</label>
+              <input
+                type="date"
+                value={formData.hireDate}
+                onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm font-medium focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           </div>
 
-          {/* Address Section */}
+          {/* Structured address */}
           <div className="space-y-4 pt-4 border-t border-gray-50">
-            <h3 className="font-bold text-gray-800 uppercase text-xs tracking-wider">Update Address</h3>
+            <div>
+               <h3 className="font-bold text-gray-800 uppercase text-xs tracking-wider">Update Address</h3>
+               <p className="text-[11px] text-gray-400 mt-0.5">Current: {userData?.address || "Not updated"}</p>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <select 
                 onChange={(e) => handleProvinceChange(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm font-medium bg-white"
               >
-                <option value="">-- Select Province --</option>
+                <option value="">-- Change Province/City --</option>
                 {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
               </select>
 
               <select 
                 onChange={(e) => setFormData({ ...formData, ward: districts.find(d => d.code === parseInt(e.target.value))?.name || "" })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm font-medium bg-white"
+                disabled={districts.length === 0}
               >
                 <option value="">-- Select District/Ward --</option>
                 {districts.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
@@ -175,22 +234,21 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
             </div>
             <input
               type="text"
-              placeholder="Update street, building, house number..."
+              placeholder="Enter house number, street name, alley, or detailed address..."
               value={formData.street}
               onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none text-sm font-medium"
             />
           </div>
 
-          {/* Roles Management */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Assign Roles</label>
+          <div className="space-y-3 pt-4 border-t border-gray-50">
+            <label className="text-sm font-semibold text-gray-700 block">Assign Roles</label>
             <div className="flex flex-wrap gap-3">
               {roles.map((role) => (
-                <label key={role.roleId} className="flex items-center gap-2 p-2 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <label key={role.roleId} className="flex items-center gap-2 p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-all active:scale-95 select-none">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 text-blue-600 rounded"
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-0 cursor-pointer"
                     checked={formData.roleIds?.includes(role.roleId)}
                     onChange={(e) => {
                       const currentIds = formData.roleIds || [];
@@ -200,7 +258,9 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
                       setFormData({ ...formData, roleIds: newRoleIds });
                     }}
                   />
-                  <span className="text-sm text-gray-700">{role.roleName}</span>
+                  <div className="flex flex-col">
+                     <span className="text-sm font-bold text-gray-800">{role.roleName}</span>
+                  </div>
                 </label>
               ))}
             </div>
@@ -210,16 +270,15 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm }: Edit
         <div className="flex items-center justify-end gap-4 p-6 border-t border-gray-100 bg-gray-50">
           <button 
             onClick={onClose}
-            className="px-6 py-2 cursor-pointer
-            text-gray-600 font-semibold hover:bg-gray-200 rounded-lg transition-colors"
+            disabled={isLoading}
+            className="px-6 py-2 cursor-pointer text-gray-600 font-semibold hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
           >
             CANCEL
           </button>
           <button 
             onClick={handleEdit}
             disabled={isLoading}
-            className="px-8 py-2 cursor-pointer
-            bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-md"
+            className="px-8 py-2 cursor-pointer bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 shadow-md transition-all"
           >
             {isLoading ? <Loader2 className="animate-spin" size={18} /> : "SAVE CHANGES"}
           </button>
