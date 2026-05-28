@@ -100,6 +100,17 @@ export async function seedProductInstances(): Promise<void> {
         }
     });
 
+    // Calculate BOM material cost dynamically for Laptop
+    const laptopBom = await prisma.billOfMaterial.findMany({
+        where: { productId: laptop.productId },
+        include: { component: true }
+    });
+    const laptopUnitMatCost = laptopBom.reduce((sum, item) => sum + (item.quantityNeeded * Number(item.component.standardCost)), 0);
+    const laptopTotalMatCost = laptopUnitMatCost * 50;
+    const laptopLaborCost = 50000;
+    const laptopOverheadCost = 20000;
+    const laptopTotalProdCost = laptopTotalMatCost + laptopLaborCost + laptopOverheadCost;
+
     // Create Dummy Work Order (Required parent for Batch)
     const workOrder = await prisma.workOrder.upsert({
         where: { code: 'WO-OPENING-STOCK' },
@@ -113,8 +124,10 @@ export async function seedProductInstances(): Promise<void> {
             productionLineId: line?.productionLineId,
             targetSalesWarehouseId: fgWarehouse?.warehouseId,
             targetErrorWarehouseId: defectWarehouse?.warehouseId,
-            laborCost: 50000,
-            overheadCost: 20000
+            laborCost: laptopLaborCost,
+            overheadCost: laptopOverheadCost,
+            totalMaterialCost: laptopTotalMatCost,
+            totalProductionCost: laptopTotalProdCost
         }
     });
 
@@ -129,7 +142,7 @@ export async function seedProductInstances(): Promise<void> {
     const prodBatch = await prisma.productionBatch.create({
         data: {
             batchCode: 'BATCH-OPENING-' + Date.now(),
-            productionDate: new Date(),
+            productionDate: (() => { const d = new Date(); d.setDate(d.getDate() - 20); return d; })(),
             workOrderId: workOrder.workOrderId,
             productionLineId: line?.productionLineId
         }
@@ -297,15 +310,15 @@ export async function seedDemoComponentStock(): Promise<void> {
     if (!warehouse) return;
 
     const stockEntries: { componentCode: string; qty: number }[] = [
-        { componentCode: 'COM-DISPLAY-15', qty: 50 },
-        { componentCode: 'COM-SSD-512', qty: 80 },
-        { componentCode: 'COM-WIFI-AX', qty: 200 },
-        { componentCode: 'COM-CASE-ALLOY', qty: 100 },
-        { componentCode: 'COM-KB-MECH', qty: 60 },
-        { componentCode: 'COM-FAN-120', qty: 150 },
+        { componentCode: 'COM-DISPLAY-15', qty: 150 },
+        { componentCode: 'COM-SSD-512', qty: 250 },
+        { componentCode: 'COM-WIFI-AX', qty: 500 },
+        { componentCode: 'COM-CASE-ALLOY', qty: 300 },
+        { componentCode: 'COM-KB-MECH', qty: 180 },
+        { componentCode: 'COM-FAN-120', qty: 450 },
         // Also ensure existing gaming PC components have consistent stock
-        { componentCode: 'COM-CHIP-X1', qty: 300 },
-        { componentCode: 'COM-SCREW-M5', qty: 5000 },
+        { componentCode: 'COM-CHIP-X1', qty: 800 },
+        { componentCode: 'COM-SCREW-M5', qty: 20000 },
     ];
 
     for (const entry of stockEntries) {
@@ -327,7 +340,7 @@ export async function seedDemoProductInstances(): Promise<void> {
     const lines = await prisma.productionLine.findMany();
 
     // Helper: create instances for a product via a dummy work order + batch
-    async function createInstances(productCode: string, count: number, prefix: string, warehouseId: number) {
+    async function createInstances(productCode: string, count: number, prefix: string, warehouseId: number, productionDate: Date) {
         const product = await prisma.product.findUnique({ where: { code: productCode } });
         if (!product) return;
 
@@ -349,6 +362,16 @@ export async function seedDemoProductInstances(): Promise<void> {
             }
         });
 
+        const bom = await prisma.billOfMaterial.findMany({
+            where: { productId: product.productId },
+            include: { component: true }
+        });
+        const unitMaterialCost = bom.reduce((sum, item) => sum + (item.quantityNeeded * Number(item.component.standardCost)), 0);
+        const totalMaterialCost = unitMaterialCost * count;
+        const laborCost = count * 1000;
+        const overheadCost = count * 500;
+        const totalProductionCost = totalMaterialCost + laborCost + overheadCost;
+
         const woCode = `WO-DEMO-${prefix}`;
         const wo = await prisma.workOrder.upsert({
             where: { code: woCode },
@@ -359,10 +382,13 @@ export async function seedDemoProductInstances(): Promise<void> {
                 employeeId: admin!.employeeId, 
                 productId: product.productId, 
                 productionLineId: randomLine?.productionLineId,
+                status: 'COMPLETED',
                 targetSalesWarehouseId: warehouseId,
                 targetErrorWarehouseId: defectWarehouse?.warehouseId,
-                laborCost: count * 1000,
-                overheadCost: count * 500
+                laborCost,
+                overheadCost,
+                totalMaterialCost,
+                totalProductionCost
             }
         });
 
@@ -377,7 +403,7 @@ export async function seedDemoProductInstances(): Promise<void> {
         let batch = await prisma.productionBatch.findFirst({ where: { batchCode } });
         if (!batch) {
             batch = await prisma.productionBatch.create({
-                data: { batchCode, productionDate: new Date(), workOrderId: wo.workOrderId, productionLineId: randomLine?.productionLineId }
+                data: { batchCode, productionDate, workOrderId: wo.workOrderId, productionLineId: randomLine?.productionLineId }
             });
         }
 
@@ -403,11 +429,22 @@ export async function seedDemoProductInstances(): Promise<void> {
         return;
     }
 
-    await createInstances('PROD-GAMING-PC', 10, 'GPC', salesWarehouse.warehouseId);
-    await createInstances('PROD-SMARTWATCH', 30, 'SW', salesWarehouse.warehouseId);
-    await createInstances('PROD-TABLET-A1', 25, 'TAB', salesWarehouse.warehouseId);
-    await createInstances('PROD-DESKTOP-Z5', 15, 'DSK', salesWarehouse.warehouseId);
-    await createInstances('PROD-MONITOR-M1', 20, 'MON', salesWarehouse.warehouseId);
+    const today = new Date();
+    
+    const date15DaysAgo = new Date();
+    date15DaysAgo.setDate(today.getDate() - 15);
+
+    const date10DaysAgo = new Date();
+    date10DaysAgo.setDate(today.getDate() - 10);
+
+    const date5DaysAgo = new Date();
+    date5DaysAgo.setDate(today.getDate() - 5);
+
+    await createInstances('PROD-GAMING-PC', 10, 'GPC', salesWarehouse.warehouseId, date15DaysAgo);
+    await createInstances('PROD-SMARTWATCH', 30, 'SW', salesWarehouse.warehouseId, date10DaysAgo);
+    await createInstances('PROD-TABLET-A1', 25, 'TAB', salesWarehouse.warehouseId, date5DaysAgo);
+    await createInstances('PROD-DESKTOP-Z5', 15, 'DSK', salesWarehouse.warehouseId, today);
+    await createInstances('PROD-MONITOR-M1', 20, 'MON', salesWarehouse.warehouseId, today);
 
     console.log('   ✓ Demo product instances created');
 }

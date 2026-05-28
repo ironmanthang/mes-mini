@@ -41,7 +41,7 @@ class InventoryService {
         const report = components.map(comp => {
             // Principal Engineer Note: Stock is local (filtered by WH), but minStockLevel is Global.
             const availableQuantity = comp.componentStocks.reduce((sum, s) => sum + s.quantity, 0);
-            const status = availableQuantity < comp.minStockLevel ? 'LOW_STOCK' : 'OK';
+            const status = availableQuantity <= comp.minStockLevel ? 'LOW_STOCK' : 'OK';
 
             return {
                 componentId: comp.componentId,
@@ -62,7 +62,99 @@ class InventoryService {
         return createPaginatedResponse(report, total, page, limit);
     }
 
-    // 2. Unified Low Stock Details (The Drill-down API)
+    // 2. Get Product Inventory Status (Aggregated from DB — fixes SHIPPED bleed-through and magic-limit issues)
+    async getProductInventoryStatus(query: InventoryQuery = {}) {
+        const { getPaginationParams, createPaginatedResponse } = await import('../../common/utils/pagination.js');
+        const { page, limit, skip } = getPaginationParams(query);
+
+        const parsedWarehouseId = query.warehouseId ? Number(query.warehouseId) : undefined;
+
+        const where: any = {};
+        if (query.search) {
+            where.OR = [
+                { productName: { contains: query.search, mode: 'insensitive' } },
+                { code: { contains: query.search, mode: 'insensitive' } }
+            ];
+        }
+
+        const [products, total] = await Promise.all([
+            prisma.product.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { productName: 'asc' },
+                select: {
+                    productId: true,
+                    code: true,
+                    productName: true,
+                    unit: true,
+                    minStockLevel: true,
+                }
+            }),
+            prisma.product.count({ where })
+        ]);
+
+        const productIds = products.map(p => p.productId);
+
+        // Physical Stock: everything still in the building (exclude SHIPPED)
+        const physicalWhere: any = {
+            productId: { in: productIds },
+            status: { not: 'SHIPPED' }
+        };
+        if (parsedWarehouseId) physicalWhere.warehouseId = parsedWarehouseId;
+
+        // Available: only units cleared for sale
+        const availableWhere: any = {
+            productId: { in: productIds },
+            status: { in: ['IN_STOCK_SALES', 'PASSED_QC'] }
+        };
+        if (parsedWarehouseId) availableWhere.warehouseId = parsedWarehouseId;
+
+        const [physicalCounts, availableCounts] = await Promise.all([
+            prisma.productInstance.groupBy({
+                by: ['productId'],
+                where: physicalWhere,
+                _count: { productInstanceId: true }
+            }),
+            prisma.productInstance.groupBy({
+                by: ['productId'],
+                where: availableWhere,
+                _count: { productInstanceId: true }
+            })
+        ]);
+
+        const physicalMap = new Map(physicalCounts.map(r => [r.productId, r._count.productInstanceId]));
+        const availableMap = new Map(availableCounts.map(r => [r.productId, r._count.productInstanceId]));
+
+        const report = products.map(p => {
+            const physicalStock = physicalMap.get(p.productId) || 0;
+            const availableQuantity = availableMap.get(p.productId) || 0;
+
+            let status: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'OK';
+            if (availableQuantity === 0) {
+                status = 'OUT_OF_STOCK';
+            } else if (availableQuantity <= p.minStockLevel) {
+                status = 'LOW_STOCK';
+            } else {
+                status = 'OK';
+            }
+
+            return {
+                productId: p.productId,
+                code: p.code,
+                productName: p.productName,
+                unit: p.unit,
+                physicalStock,
+                availableQuantity,
+                minStockLevel: p.minStockLevel,
+                status
+            };
+        });
+
+        return createPaginatedResponse(report, total, page, limit);
+    }
+
+    // 3. Unified Low Stock Details (The Drill-down API)
     async getLowStockDetails(warehouseId?: number) {
         // A. Handle Products
         const productWhere: any = { status: 'IN_STOCK_SALES' };

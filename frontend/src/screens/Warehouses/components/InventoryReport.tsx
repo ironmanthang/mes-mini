@@ -4,9 +4,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect, type JSX } from "react";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
-import { InventoryServices, type InventoryStatusItem } from "../../../services/inventoryServices";
-import { ProductInstanceServices, type ProductInstanceListItem } from "../../../services/productInstanceServices";
-import { ProductServices, type Product } from "../../../services/productServices";
+import { InventoryServices, type InventoryStatusItem, type ProductInventoryStatusItem } from "../../../services/inventoryServices";
 
 type TabType = 'COMPONENT' | 'PRODUCT';
 
@@ -32,8 +30,7 @@ export const InventoryReport = (): JSX.Element => {
    // --- REAL DATA STATE ---
    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
    const [componentsStock, setComponentsStock] = useState<InventoryStatusItem[]>([]);
-   const [productInstances, setProductInstances] = useState<ProductInstanceListItem[]>([]);
-   const [productsList, setProductsList] = useState<Product[]>([]);
+   const [productsStock, setProductsStock] = useState<ProductInventoryStatusItem[]>([]);
    const [isLoading, setIsLoading] = useState<boolean>(false);
 
    // --- DATA TABLE STATE ---
@@ -75,20 +72,11 @@ export const InventoryReport = (): JSX.Element => {
             const res = await InventoryServices.getConsolidatedInventory(params);
             setComponentsStock(res.data);
          } else {
-            // Fetch product instances & products list
-            const params: any = {
-               page: 1,
-               limit: 5000
-            };
+            // Single aggregated call — DB does the groupBy, no magic limit needed
+            const params: any = { page: 1, limit: 1000 };
             if (warehouseId !== "ALL") params.warehouseId = Number(warehouseId);
-            
-            const [instancesRes, productsRes] = await Promise.all([
-               ProductInstanceServices.getAllProductInstances(params),
-               ProductServices.getAllProducts()
-            ]);
-            setProductInstances(instancesRes.data);
-            const dataArray = Array.isArray(productsRes) ? productsRes : (productsRes as any).data || [];
-            setProductsList(dataArray);
+            const res = await InventoryServices.getProductInventoryStatus(params);
+            setProductsStock(res.data);
          }
       } catch (err) {
          console.error("Failed to fetch inventory reports:", err);
@@ -116,37 +104,20 @@ export const InventoryReport = (): JSX.Element => {
             isLowStock: comp.status === 'LOW_STOCK'
          }));
       } else {
-         const map = new Map<number, DisplayInventoryItem>();
-         // Initialize all products in system
-         for (const p of productsList) {
-            map.set(p.productId, {
-               id: p.productId,
-               code: p.code,
-               name: p.productName,
-               unit: p.unit || "Box",
-               onHand: 0,
-               reserved: 0,
-               available: 0,
-               minStockLevel: 5, // default threshold limit
-               isLowStock: false
-            });
-         }
-         // Accumulate counts from matching product instances
-         for (const inst of productInstances) {
-            const entry = map.get(inst.product.productId);
-            if (entry) {
-               entry.onHand += 1;
-               if (inst.status === 'IN_STOCK_SALES' || inst.status === 'PASSED_QC') {
-                  entry.available += 1;
-               }
-            }
-         }
-         return Array.from(map.values()).map(item => ({
-            ...item,
-            isLowStock: item.available <= item.minStockLevel && item.available > 0
+         // Data is already aggregated by the backend — just map to display shape
+         return productsStock.map(p => ({
+            id: p.productId,
+            code: p.code,
+            name: p.productName,
+            unit: p.unit,
+            onHand: p.physicalStock,       // excludes SHIPPED (fixed Bug #1)
+            reserved: 0,
+            available: p.availableQuantity,
+            minStockLevel: p.minStockLevel, // real value from DB (fixed Bug #2)
+            isLowStock: p.status === 'LOW_STOCK'
          }));
       }
-   }, [activeTab, componentsStock, productInstances, productsList]);
+   }, [activeTab, componentsStock, productsStock]);
 
    // --- FILTERING ---
    const filteredData = useMemo(() => {
@@ -155,7 +126,7 @@ export const InventoryReport = (): JSX.Element => {
             item.name.toLowerCase().includes(searchQuery.toLowerCase());
 
          let matchStatus = true;
-         if (statusFilter === 'LOW_STOCK') matchStatus = item.available <= item.minStockLevel;
+         if (statusFilter === 'LOW_STOCK') matchStatus = item.available > 0 && item.available <= item.minStockLevel;
          if (statusFilter === 'OUT_OF_STOCK') matchStatus = item.available === 0;
 
          return matchSearch && matchStatus;
@@ -230,7 +201,7 @@ export const InventoryReport = (): JSX.Element => {
                   >
                      <option value="ALL">All status</option>
                      <option value="LOW_STOCK">Low Stock Alert</option>
-                     <option value="OUT_OF_STOCK">Out of Stock (Safety = 0)</option>
+                     <option value="OUT_OF_STOCK">Out of Stock</option>
                   </select>
                </div>
             </div>
@@ -300,7 +271,7 @@ export const InventoryReport = (): JSX.Element => {
                         const isLow = item.available <= item.minStockLevel && item.available > 0;
 
                         return (
-                           <tr key={item.id} className={`hover:bg-blue-50/30 transition-colors ${isOutOfStock ? 'bg-gray-50/50 opacity-60 grayscale' : ''}`}>
+                           <tr key={item.id} className={`hover:bg-blue-50/30 transition-colors ${isOutOfStock ? 'bg-red-50/20 opacity-75' : ''}`}>
                               <td className="p-4 text-center text-gray-400 font-mono">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                               <td className="p-4 font-mono font-black text-gray-900">{item.code}</td>
                               <td className="p-4 font-bold text-gray-800 truncate max-w-[250px]">{item.name}</td>
@@ -310,17 +281,21 @@ export const InventoryReport = (): JSX.Element => {
                               ) : (
                                  <>
                                     <td className="p-4 text-right font-black text-gray-700">{item.onHand.toLocaleString()}</td>
-                                    <td className={`p-4 text-right font-black text-lg ${isOutOfStock ? 'text-gray-400' : isLow ? 'text-red-600' : 'text-blue-700'}`}>
+                                    <td className={`p-4 text-right font-black text-lg ${isOutOfStock ? 'text-red-600 font-extrabold' : isLow ? 'text-red-600' : 'text-blue-700'}`}>
                                        {item.available.toLocaleString()}
                                     </td>
                                  </>
                               )}
                               <td className="p-4 text-center">
                                  {isOutOfStock ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-200 text-gray-600 uppercase">Out of Stock</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase tracking-wider shadow-sm">
+                                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                       Out of Stock
+                                    </span>
                                  ) : isLow ? (
-                                    <span title={`Below safety limit (${item.minStockLevel})`}>
-                                       <AlertTriangle className="w-5 h-5 text-red-500 mx-auto animate-pulse" />
+                                    <span title={`Below safety limit (${item.minStockLevel})`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-100 uppercase tracking-wider shadow-sm">
+                                       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                       Low Stock
                                     </span>
                                  ) : null}
                               </td>

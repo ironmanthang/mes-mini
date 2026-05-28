@@ -48,6 +48,24 @@ export interface DetailedStockStatus {
 }
 
 
+export interface ProductInventoryStatusItem {
+    productId: number;
+    code: string;
+    productName: string;
+    unit: string;
+    physicalStock: number;
+    availableQuantity: number;
+    minStockLevel: number;
+    status: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'OK';
+}
+
+export interface PaginatedProductInventoryStatus {
+    data: ProductInventoryStatusItem[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 export const InventoryServices = {
     getConsolidatedInventory: async (params?: { search?: string; warehouseId?: number; page?: number; limit?: number }) => {
         const response = await api.get<PaginatedInventoryStatus>(`/warehouse-ops/inventory/status`, { params });
@@ -61,6 +79,13 @@ export const InventoryServices = {
 
     getDetailedItemStockStatus: async (params: { id: number; type: ItemType; warehouseId?: number }) => {
         const response = await api.get<DetailedStockStatus>(`/warehouse-ops/inventory/stock-status`, { params });
+        return response.data;
+    },
+
+    getProductInventoryStatus: async (params?: { search?: string; warehouseId?: number; page?: number; limit?: number }) => {
+        const response = await api.get<PaginatedProductInventoryStatus>(`/warehouse-ops/inventory/status`, {
+            params: { ...params, type: 'PRODUCT' }
+        });
         return response.data;
     }
 };

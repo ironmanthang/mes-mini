@@ -40,13 +40,13 @@ export async function seedProductionScenarios(): Promise<void> {
     for (const c of components) {
         await prisma.component.upsert({
             where: { code: c.code },
-            update: { minStockLevel: c.stock }, // Reset stock level ensures consistent testing
+            update: { minStockLevel: c.code === 'COM-PSU-850W' ? 50 : c.stock }, // Reset stock level ensures consistent testing
             create: {
                 code: c.code,
                 componentName: c.name,
                 unit: c.unit,
                 standardCost: c.cost,
-                minStockLevel: c.stock
+                minStockLevel: c.code === 'COM-PSU-850W' ? 50 : c.stock
             }
         });
 
@@ -173,8 +173,8 @@ export async function seedProductionScenarios(): Promise<void> {
     // Put components in warehouse
     const mainWh = await prisma.warehouse.findFirst({ where: { code: 'WH-MAIN' } });
     if (mainWh) {
-        await injectComponentStock(screen.componentId, mainWh.warehouseId, 100, 'LOT-INIT-SCREEN');
-        await injectComponentStock(battery.componentId, mainWh.warehouseId, 100, 'LOT-INIT-BATTERY');
+        await injectComponentStock(screen.componentId, mainWh.warehouseId, 300, 'LOT-INIT-SCREEN');
+        await injectComponentStock(battery.componentId, mainWh.warehouseId, 300, 'LOT-INIT-BATTERY');
     }
 
     // Link BOM for Smartwatch
@@ -234,6 +234,17 @@ export async function seedQcTestingScenario(): Promise<void> {
         }
     });
 
+    // Calculate BOM material cost dynamically for product
+    const qcBom = await prisma.billOfMaterial.findMany({
+        where: { productId: product.productId },
+        include: { component: true }
+    });
+    const qcUnitMatCost = qcBom.reduce((sum, item) => sum + (item.quantityNeeded * Number(item.component.standardCost)), 0);
+    const qcTotalMatCost = qcUnitMatCost * 5;
+    const qcLaborCost = 5000;
+    const qcOverheadCost = 2000;
+    const qcTotalProdCost = qcTotalMatCost + qcLaborCost + qcOverheadCost;
+
     // 2. Create a COMPLETED Work Order
     const woCode = 'WO-QC-TEST';
     const wo = await prisma.workOrder.upsert({
@@ -248,8 +259,10 @@ export async function seedQcTestingScenario(): Promise<void> {
             status: 'COMPLETED',
             targetSalesWarehouseId: fgWarehouse.warehouseId,
             targetErrorWarehouseId: defectWarehouse.warehouseId,
-            laborCost: 5000,
-            overheadCost: 2000
+            laborCost: qcLaborCost,
+            overheadCost: qcOverheadCost,
+            totalMaterialCost: qcTotalMatCost,
+            totalProductionCost: qcTotalProdCost
         }
     });
 

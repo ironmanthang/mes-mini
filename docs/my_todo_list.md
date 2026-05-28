@@ -41,3 +41,14 @@
 - [ ] **Spoilage Gap**: Address the "Spoilage / Supplementary Material Request" gap in Business logic.
 - [ ] **Role & Permission Audit**: Audit and document which modules/APIs need which roles, and refactor the list of roles required in this MES.
 - [ ] **Cancel MR**: Implement "Cancel (and delete?) Material Request" logic (Gate: only if status is PENDING).
+- [ ] **InspectionType Refactor**: Review and refactor the `InspectionType` enum definition for business rule clarity.
+- [ ] **Warehouse User Detail View**: Implement capability for warehouse users to view comprehensive detail info (component lots, product instances, historical transfers) when clicking on a specific warehouse.
+- [ ] **Frontend RBAC Management Page**: Enhance the existing Human Resources > Roles screen to include full permission management capabilities:
+  - Add permission assignment interface to view/assign permissions to roles
+  - Implement permission catalog browser (search/filter by module)
+  - Add role-permission matrix displaying current assignments
+  - Connect to backend APIs: GET /api/roles/permissions, GET /api/roles/{id}/permissions, PUT /api/roles/{id}/permissions
+  - Create UI components for permission selection (checkboxes/multi-select)
+  - Add detailed role view showing assigned permissions
+  - Implement module-based permission grouping/Organization
+- [ ] delete the sales order in the front end
