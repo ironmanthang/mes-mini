@@ -1,5 +1,6 @@
 import prisma from '../../common/lib/prisma.js';
 import { ProductionLine, WorkOrderStatus } from '../../generated/prisma/index.js';
+import { AppError } from '../../common/utils/AppError.js';
 
 interface ProductionLineCreateData {
     lineName: string;
@@ -39,7 +40,7 @@ class ProductionLineService {
                 }
             }
         });
-        if (!line) throw new Error('Production Line not found');
+        if (!line) throw new AppError('Production Line not found', 404);
         return line;
     }
 
@@ -48,20 +49,20 @@ class ProductionLineService {
         const existing = await prisma.productionLine.findFirst({
             where: { lineName: { equals: data.lineName, mode: 'insensitive' } }
         });
-        if (existing) throw new Error(`Production Line "${data.lineName}" already exists.`);
+        if (existing) throw new AppError(`Production Line "${data.lineName}" already exists.`, 400);
 
         return prisma.productionLine.create({ data });
     }
 
     async updateProductionLine(id: number, data: Partial<ProductionLineCreateData>): Promise<ProductionLine> {
         const line = await prisma.productionLine.findUnique({ where: { productionLineId: id } });
-        if (!line) throw new Error('Production Line not found');
+        if (!line) throw new AppError('Production Line not found', 404);
 
         if (data.lineName && data.lineName !== line.lineName) {
             const exists = await prisma.productionLine.findFirst({
                 where: { lineName: { equals: data.lineName, mode: 'insensitive' } }
             });
-            if (exists) throw new Error(`Production Line "${data.lineName}" already exists.`);
+            if (exists) throw new AppError(`Production Line "${data.lineName}" already exists.`, 400);
         }
 
         return prisma.productionLine.update({
@@ -71,11 +72,23 @@ class ProductionLineService {
     }
 
     async deleteProductionLine(id: number): Promise<ProductionLine> {
-        // Check if has active work orders
-        const hasActiveWO = await prisma.workOrder.findFirst({
-            where: { productionLineId: id, status: { in: [WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROGRESS] } }
+        const line = await prisma.productionLine.findUnique({
+            where: { productionLineId: id },
+            include: {
+                _count: {
+                    select: {
+                        workOrders: true,
+                        productionBatches: true
+                    }
+                }
+            }
         });
-        if (hasActiveWO) throw new Error('Cannot delete: Line has active Work Orders.');
+
+        if (!line) throw new AppError('Production Line not found', 404);
+
+        if (line._count.workOrders > 0 || line._count.productionBatches > 0) {
+            throw new AppError('Cannot delete: Production Line is linked to existing Work Orders or Production Batches.', 400);
+        }
 
         return prisma.productionLine.delete({ where: { productionLineId: id } });
     }

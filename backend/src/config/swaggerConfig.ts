@@ -26,7 +26,7 @@ export const swaggerOptions: swaggerJsDoc.Options = {
             { name: 'Purchase Orders', description: 'Procurement: Buying Materials' },
             { name: 'Sales Orders', description: 'Sales: Selling Products' },
             { name: 'Warehouses', description: 'Master data for Warehouses' },
-            // { name: 'Production Lines', description: 'Manufacturing line management' },
+            { name: 'Production Lines', description: 'Manufacturing line management' },
             { name: 'Production Requests', description: 'Managing requests to produce items' },
             { name: 'Quality', description: 'Quality Control (QC) operations' },
             { name: 'Quality Master Data', description: 'Manage QC Checklists and Inspection Points' },
@@ -106,8 +106,8 @@ export const swaggerOptions: swaggerJsDoc.Options = {
         './dist/sales/salesOrders/salesOrderRoutes.js',
 
         // --- PRODUCTION ---
-        // './src/production/productionLines/productionLineRoutes.ts',
-        // './dist/production/productionLines/productionLineRoutes.js',
+        './src/production/productionLines/productionLineRoutes.ts',
+        './dist/production/productionLines/productionLineRoutes.js',
         './src/production/productionRequests/productionRequestRoutes.ts',
         './dist/production/productionRequests/productionRequestRoutes.js',
         './src/production/productionRoutes.ts',

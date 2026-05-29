@@ -11,7 +11,6 @@
 - [x] **WO API Simulation Guide**: Verified the full WO lifecycle end-to-end against a freshly seeded DB (DRAFT -> RELEASED -> IN_PROGRESS -> MR validate -> MR complete -> COMPLETED). Confirmed 5x `PENDING_QC` ProductInstances are generated on completion. Created `docs/features/work_order/02_api_simulation.md` as the permanent frontend reference.
 - [x] **Decoupled Material Request Flow**: Decoupled auto-MR creation from WO start. Exposed manual `POST /api/warehouse-ops/material-requests` API and added `IN_PROGRESS` state gate to MR creation. Updated Swagger docs.
 - [x] **Quality Control & Induction Refactor**: Decoupled QC inspection (`POST /api/quality`) from physical warehouse induction (`POST /api/warehouse-ops/product-induction`). Implemented granular checklist validation, all-or-nothing induction routing, automatic PR attribution, and atomic cost absorption upon batch completion. Created manual test plans.
-- [x] **Business Logic Audit**: Audited existing codebase against `docs/00_business_flows.md`.
 - [x] **Product Master Data Fix**: Fixed `productService` missing fields for Master Data linking (`checklistId`, `minStockLevel`, `warrantyPeriodDays`, `shelfLifeDays`).
 - [x] **Quality Master Data API**: Built module (CRUD for `QualityChecklist` and `InspectionPoint`) and added to Swagger documentation.
 - [x] **Quality Documentation**: Documented Quality Master Data historical preservation strategy in `docs/features/quality_check/01_logic.md`.
