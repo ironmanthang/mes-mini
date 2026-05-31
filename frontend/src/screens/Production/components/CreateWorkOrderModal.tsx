@@ -44,7 +44,24 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Reset all form and notification states when modal closes to prevent flickering on reopen
+      setSelectedRequestId("");
+      setSelectedLineId("");
+      setQuantityToProduce("");
+      setStartDate("");
+      setEndDate("");
+      setNote("");
+      setTargetSalesWarehouseId("");
+      setTargetErrorWarehouseId("");
+      setBomAllocation([]);
+      setShowSuccess(false);
+      setShowWarning(false);
+      setIsSubmitting(false);
+      setIsLoadingInit(true);
+      return;
+    }
+
     const initData = async () => {
       try {
         const [prRes, lineRes, whRes] = await Promise.all([

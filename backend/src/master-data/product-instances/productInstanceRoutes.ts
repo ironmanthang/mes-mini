@@ -47,6 +47,16 @@ router.get('/',
  *           type: integer
  *         description: Filter by current warehouse ID
  *       - in: query
+ *         name: productionRequestId
+ *         schema:
+ *           type: integer
+ *         description: Filter by production request ID (joins via WO/batches)
+ *       - in: query
+ *         name: workOrderId
+ *         schema:
+ *           type: integer
+ *         description: Filter by work order ID (joins via batches)
+ *       - in: query
  *         name: serialNumber
  *         schema:
  *           type: string

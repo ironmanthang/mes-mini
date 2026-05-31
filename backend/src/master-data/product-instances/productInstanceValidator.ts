@@ -10,6 +10,8 @@ export const productInstanceQuerySchema = Joi.object({
         }),
     productId: Joi.number().integer().positive().optional(),
     warehouseId: Joi.number().integer().positive().optional(),
+    productionRequestId: Joi.number().integer().positive().optional(),
+    workOrderId: Joi.number().integer().positive().optional(),
     serialNumber: Joi.string().trim().optional(),
     search: Joi.string().trim().optional(),
     page: Joi.number().integer().min(1).default(1),

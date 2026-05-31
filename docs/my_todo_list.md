@@ -50,4 +50,5 @@
   - Create UI components for permission selection (checkboxes/multi-select)
   - Add detailed role view showing assigned permissions
   - Implement module-based permission grouping/Organization
+- [ ] **BOM Management**: Add front end ability to manage products BOM.
 - [ ] delete the sales order in the front end

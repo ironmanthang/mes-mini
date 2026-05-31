@@ -6,6 +6,8 @@ interface ProductInstanceQuery {
     status?: ProductInstanceStatus;
     productId?: number;
     warehouseId?: number;
+    productionRequestId?: number;
+    workOrderId?: number;
     serialNumber?: string;
     search?: string;
 }
@@ -117,13 +119,33 @@ class ProductInstanceService {
             where.status = query.status;
         }
         if (query.productId) {
-            where.productId = query.productId;
+            where.productId = Number(query.productId);
         }
         const parsedWarehouseId = query.warehouseId ? Number(query.warehouseId) : undefined;
 
         if (parsedWarehouseId) {
             where.warehouseId = parsedWarehouseId;
         }
+
+        const parsedPRId = query.productionRequestId ? Number(query.productionRequestId) : undefined;
+        const parsedWOId = query.workOrderId ? Number(query.workOrderId) : undefined;
+
+        if (parsedPRId || parsedWOId) {
+            where.productionBatch = {};
+            if (parsedWOId) {
+                where.productionBatch.workOrderId = parsedWOId;
+            }
+            if (parsedPRId) {
+                where.productionBatch.workOrder = {
+                    workOrderFulfillments: {
+                        some: {
+                            productionRequestId: parsedPRId
+                        }
+                    }
+                };
+            }
+        }
+
         if (query.serialNumber) {
             where.serialNumber = { contains: query.serialNumber, mode: 'insensitive' };
         }
