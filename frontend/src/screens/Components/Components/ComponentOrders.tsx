@@ -1,7 +1,6 @@
 import { 
   Search, 
   Filter, 
-  Download, 
   Eye, 
   CheckCircle, 
   Loader2,
@@ -11,15 +10,20 @@ import {
   ChevronLeft,
   ChevronRight,
   XCircle,
-  StopCircle,
   AlertTriangle
 } from "lucide-react";
-import { useState, useEffect, useCallback, type JSX } from "react";
+import { useState, useEffect, useCallback, useRef, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
 import { purchaseOrderService, type PurchaseOrder } from "../../../services/purchaseOrderServices";
 import { UpdateOrderModal } from "./UpdateOrderModal";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+
+type ConfirmActionType = "SUBMIT" | "APPROVE" | "MARK_ORDERED";
 
 export const ComponentOrders = (): JSX.Element => {
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -32,10 +36,20 @@ export const ComponentOrders = (): JSX.Element => {
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    isOpen: boolean;
+    type: ConfirmActionType | null;
+    orderId: number | null;
+  }>({ isOpen: false, type: null, orderId: null });
+  const [isProcessingConfirm, setIsProcessingConfirm] = useState(false);
 
   const [actionModal, setActionModal] = useState<{
     isOpen: boolean;
-    type: 'REJECT' | 'CANCEL' | 'FORCE_CLOSE';
+    type: 'REJECT' | 'CANCEL';
     orderId: number | null;
   }>({ isOpen: false, type: 'CANCEL', orderId: null });
   const [actionReason, setActionReason] = useState("");
@@ -73,6 +87,37 @@ export const ComponentOrders = (): JSX.Element => {
     return () => clearTimeout(timeoutId);
   }, [fetchOrders]);
 
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showSuccessNotification = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 1200);
+  };
+
+  const showWarningNotification = (message: string) => {
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+
+    setWarningMessage(message);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+      warningTimeoutRef.current = null;
+    }, 2000);
+  };
+
   const handleViewDetails = async (orderId: number) => {
     try {
       const detail = await purchaseOrderService.getPOById(orderId);
@@ -80,63 +125,73 @@ export const ComponentOrders = (): JSX.Element => {
       setIsModalOpen(true);
     } catch (error) {
       console.error(error);
-      alert("Failed to load order details.");
+      showWarningNotification("Failed to load order details.");
     }
   };
 
   const handleUpdate = (id: number) => setSelectedUpdateId(id);
 
-  const handleSubmitDraft = async (id: number) => {
-    if (window.confirm("Submit this order for approval?")) {
-      try {
-        await purchaseOrderService.submitPO(id);
-        fetchOrders();
-      } catch (error: any) {
-        alert(error?.response?.data?.message || "Failed to submit.");
-      }
-    }
+  const openConfirmAction = (orderId: number, type: ConfirmActionType) => {
+    setConfirmAction({ isOpen: true, type, orderId });
   };
 
-  const handleApprove = async (id: number) => {
-    if (window.confirm("Are you sure you want to approve this order?")) {
-      try {
-        await purchaseOrderService.approvePO(id);
-        alert("Approved Successfully!");
-        fetchOrders();
+  const closeConfirmAction = () => {
+    if (isProcessingConfirm) return;
+    setConfirmAction({ isOpen: false, type: null, orderId: null });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction.orderId || !confirmAction.type) return;
+
+    setIsProcessingConfirm(true);
+    try {
+      if (confirmAction.type === "SUBMIT") {
+        await purchaseOrderService.submitPO(confirmAction.orderId);
+        showSuccessNotification("Order submitted for approval.");
+      } else if (confirmAction.type === "APPROVE") {
+        await purchaseOrderService.approvePO(confirmAction.orderId);
+        showSuccessNotification("Approved successfully!");
         setIsModalOpen(false);
-      } catch (error: any) {
-        alert(error?.response?.data?.message || "Failed to approve.");
+      } else if (confirmAction.type === "MARK_ORDERED") {
+        await purchaseOrderService.sendToSupplier(confirmAction.orderId);
+        showSuccessNotification("Purchase order marked as ordered.");
       }
+
+      fetchOrders();
+      setConfirmAction({ isOpen: false, type: null, orderId: null });
+    } catch (error: any) {
+      const fallbackMessage =
+        confirmAction.type === "SUBMIT"
+          ? "Failed to submit."
+          : confirmAction.type === "APPROVE"
+            ? "Failed to approve."
+            : "Failed to update status.";
+      setConfirmAction({ isOpen: false, type: null, orderId: null });
+      showWarningNotification(error?.response?.data?.message || fallbackMessage);
+    } finally {
+      setIsProcessingConfirm(false);
     }
   };
 
   const checkApprove = (id: number) => {
     const userStr = localStorage.getItem("user");
-    if (!userStr) return alert("User not found!");
+    if (!userStr) {
+      showWarningNotification("User not found!");
+      return;
+    }
     const user = JSON.parse(userStr);
     const hasPermission = user.roles.some(
       (role: { roleId: number; roleName: string }) => 
         role.roleName === "Production Manager" || role.roleName === "System Admin"
     );
     if (hasPermission) {
-      handleApprove(id);
+      openConfirmAction(id, "APPROVE");
     } else {
-      alert("You do not have permission to approve orders.");
+      showWarningNotification("You do not have permission to approve orders.");
     }
   };
 
-  const handleMarkAsOrdered = async (id: number) => {
-    if (window.confirm("Mark this Purchase Order as Ordered (Sent to supplier)?")) {
-      try {
-        await purchaseOrderService.sendToSupplier(id);
-        fetchOrders();
-      } catch (error: any) {
-        alert(error?.response?.data?.message || "Failed to update status.");
-      }
-    }
-  };
-
-  const openActionModal = (orderId: number, type: 'REJECT' | 'CANCEL' | 'FORCE_CLOSE') => {
+  const openActionModal = (orderId: number, type: 'REJECT' | 'CANCEL') => {
     setActionModal({ isOpen: true, type, orderId });
     setActionReason("");
   };
@@ -146,22 +201,18 @@ export const ComponentOrders = (): JSX.Element => {
 
     setIsProcessingAction(true);
     try {
-      if (actionModal.type === 'REJECT' || actionModal.type === 'CANCEL') {
-        await purchaseOrderService.cancelPO(actionModal.orderId, { note: actionReason });
-        alert(`Order ${actionModal.type.toLowerCase()}ed successfully.`);
-      } else if (actionModal.type === 'FORCE_CLOSE') {
-        alert(`Force Close order ${actionModal.orderId} with reason: ${actionReason}.\n\n(Lưu ý: Cần thêm API forceClosePO vào Backend để đổi sang COMPLETED)`);
-      }
+      await purchaseOrderService.cancelPO(actionModal.orderId, { note: actionReason });
+      showSuccessNotification(`Order ${actionModal.type.toLowerCase()}ed successfully.`);
       
       fetchOrders();
       setActionModal({ isOpen: false, type: 'CANCEL', orderId: null });
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Action failed.");
+      setActionModal({ isOpen: false, type: 'CANCEL', orderId: null });
+      showWarningNotification(error?.response?.data?.message || "Action failed.");
     } finally {
       setIsProcessingAction(false);
     }
   };
-
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
@@ -182,6 +233,38 @@ export const ComponentOrders = (): JSX.Element => {
   };
 
   const totalPages = Math.ceil(total / limit) || 1;
+  const confirmConfig = (() => {
+    switch (confirmAction.type) {
+      case "SUBMIT":
+        return {
+          title: "Submit Purchase Order",
+          message: "Submit this order for approval?",
+          confirmLabel: "Submit",
+          variant: "primary" as const,
+        };
+      case "APPROVE":
+        return {
+          title: "Approve Purchase Order",
+          message: "Are you sure you want to approve this order?",
+          confirmLabel: "Approve",
+          variant: "success" as const,
+        };
+      case "MARK_ORDERED":
+        return {
+          title: "Mark As Ordered",
+          message: "Mark this Purchase Order as Ordered and sent to supplier?",
+          confirmLabel: "Mark Ordered",
+          variant: "primary" as const,
+        };
+      default:
+        return {
+          title: "Confirm Action",
+          message: "Are you sure you want to continue?",
+          confirmLabel: "Confirm",
+          variant: "primary" as const,
+        };
+    }
+  })();
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
@@ -208,7 +291,7 @@ export const ComponentOrders = (): JSX.Element => {
             >
               <option value="All">All Status</option>
               <option value="DRAFT">Draft</option>
-              <option value="PENDING">Pending Approval</option>
+              <option value="PENDING">Pending</option>
               <option value="APPROVED">Approved</option>
               <option value="ORDERED">Ordered</option>
               <option value="RECEIVING">Receiving</option>
@@ -217,10 +300,6 @@ export const ComponentOrders = (): JSX.Element => {
             </select>
           </div>
         </div>
-
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer">
-          <Download className="w-4 h-4" /> Export List
-        </button>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden min-h-[400px]">
@@ -273,7 +352,7 @@ export const ComponentOrders = (): JSX.Element => {
                             <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Order">
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleSubmitDraft(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit for Approval">
+                            <button onClick={() => openConfirmAction(order.purchaseOrderId, "SUBMIT")} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit for Approval">
                               <Send className="w-4 h-4" />
                             </button>
                           </>
@@ -295,25 +374,13 @@ export const ComponentOrders = (): JSX.Element => {
 
                         {order.status === 'APPROVED' && (
                           <>
-                            <button onClick={() => handleMarkAsOrdered(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Mark as Ordered">
+                            <button onClick={() => openConfirmAction(order.purchaseOrderId, "MARK_ORDERED")} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Mark as Ordered">
                                 <Send className="w-4 h-4" />
                             </button>
                             <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order">
                                 <XCircle className="w-4 h-4" />
                             </button>
                           </>
-                        )}
-
-                        {order.status === 'ORDERED' && (
-                          <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order (Supplier Out of Stock)">
-                              <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {order.status === 'RECEIVING' && (
-                          <button onClick={() => openActionModal(order.purchaseOrderId, 'FORCE_CLOSE')} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Force Close Order">
-                              <StopCircle className="w-4 h-4 text-orange-500" />
-                          </button>
                         )}
                       </td>
                     </tr>
@@ -381,27 +448,15 @@ export const ComponentOrders = (): JSX.Element => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white w-[500px] p-6 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex items-start gap-4 mb-4">
-              <div
-                className={`p-3 rounded-full flex-shrink-0 ${
-                  actionModal.type === 'FORCE_CLOSE'
-                    ? 'bg-orange-100 text-orange-600'
-                    : 'bg-red-100 text-red-600'
-                }`}
-              >
+              <div className="p-3 rounded-full flex-shrink-0 bg-red-100 text-red-600">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">
-                  {actionModal.type === 'FORCE_CLOSE'
-                    ? 'Force Close Order'
-                    : 'Cancel / Reject Order'}
+                  Cancel / Reject Order
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Are you sure you want to{' '}
-                  {actionModal.type === 'FORCE_CLOSE'
-                    ? 'force close'
-                    : 'cancel / reject'}{' '}
-                  this order? This action cannot be undone.
+                  Are you sure you want to cancel / reject this order? This action cannot be undone.
                 </p>
               </div>
             </div>
@@ -436,13 +491,7 @@ export const ComponentOrders = (): JSX.Element => {
               <button
                 onClick={handleConfirmActionWithReason}
                 disabled={isProcessingAction || !actionReason.trim()}
-                className={`flex items-center gap-2 px-6 py-2 text-white font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-sm
-                  ${
-                    actionModal.type === 'FORCE_CLOSE'
-                      ? 'bg-orange-600 hover:bg-orange-700'
-                      : 'bg-red-600 hover:bg-red-700'
-                  }
-                `}
+                className="flex items-center gap-2 px-6 py-2 text-white font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-sm bg-red-600 hover:bg-red-700"
               >
                 {isProcessingAction && (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -453,6 +502,26 @@ export const ComponentOrders = (): JSX.Element => {
           </div>
         </div>
       )}
+
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      <ConfirmNotification
+        isOpen={confirmAction.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        variant={confirmConfig.variant}
+        isProcessing={isProcessingConfirm}
+        onConfirm={handleConfirmAction}
+        onClose={closeConfirmAction}
+      />
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
 
     </div>
   );

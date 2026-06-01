@@ -2,9 +2,12 @@ import {
     X, CheckCircle2, Save, Loader2, PackageCheck, 
     AlertOctagon, Boxes, Hash, Calendar, Barcode, Store
 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { WorkOrderServices, type WorkOrderListItem, type CompleteWorkOrderRequest } from "../../../services/workOrderServices";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasAnyRole } from "../../../lib/auth";
 
 interface RecordOutputModalProps {
     isOpen: boolean;
@@ -14,6 +17,7 @@ interface RecordOutputModalProps {
 }
 
 export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: RecordOutputModalProps): JSX.Element | null => {
+    const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [quantityProduced, setQuantityProduced] = useState<number | "">("");
     const [customBatchCode, setCustomBatchCode] = useState("");
     const [expiryDate, setExpiryDate] = useState("");
@@ -24,6 +28,10 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [successMessage, setSuccessMessage] = useState("");
+    const [warningMessage, setWarningMessage] = useState("");
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showWarning, setShowWarning] = useState(false);
 
     useEffect(() => {
         if (isOpen && workOrder) {
@@ -56,27 +64,65 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
         }
     }, [isOpen, workOrder]);
 
+    useEffect(() => {
+        return () => {
+            if (warningTimeoutRef.current) {
+                clearTimeout(warningTimeoutRef.current);
+            }
+        };
+    }, []);
+
     if (!isOpen) return null;
 
     const mrStatus = workOrder.materialRequest?.status;
     const isLocked = mrStatus !== 'ISSUED';
+    const isWorker = hasAnyRole(["PROD_WORKER"]);
+    const isLineLeader = hasAnyRole(["LINE_LEADER"]) || isWorker;
+
+    const showSuccessNotification = (message: string) => {
+        setSuccessMessage(message);
+        setShowSuccess(true);
+        setTimeout(() => {
+            setShowSuccess(false);
+            setSuccessMessage("");
+        }, 1200);
+    };
+
+    const showWarningNotification = (message: string) => {
+        if (warningTimeoutRef.current) {
+            clearTimeout(warningTimeoutRef.current);
+        }
+
+        setWarningMessage(message);
+        setShowWarning(true);
+        warningTimeoutRef.current = setTimeout(() => {
+            setShowWarning(false);
+            setWarningMessage("");
+            warningTimeoutRef.current = null;
+        }, 2000);
+    };
 
     const handleSubmit = async () => {
-        if (isLocked) return;
+        if (isLocked || isLineLeader) return;
         if (quantityProduced === "" || Number(quantityProduced) <= 0) {
-            return alert("Actual output must be greater than 0!");
+            showWarningNotification("Actual output must be greater than 0!");
+            return;
         }
         if (!customBatchCode.trim() || !expiryDate) {
-            return alert("Please enter both batch code and expiry date!");
+            showWarningNotification("Please enter both batch code and expiry date!");
+            return;
         }
         if (targetWarehouseIdOverride === "") {
-            return alert("Please select the Target Warehouse for finished products!");
+            showWarningNotification("Please select the Target Warehouse for finished products!");
+            return;
         }
         if (laborCost === "" || Number(laborCost) < 0) {
-            return alert("Labor cost must be 0 or greater!");
+            showWarningNotification("Labor cost must be 0 or greater!");
+            return;
         }
         if (overheadCost === "" || Number(overheadCost) < 0) {
-            return alert("Overhead cost must be 0 or greater!");
+            showWarningNotification("Overhead cost must be 0 or greater!");
+            return;
         }
 
         setIsSubmitting(true);
@@ -84,7 +130,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
             const payload: CompleteWorkOrderRequest = {
                 quantityProduced: Number(quantityProduced),
                 batchCode: customBatchCode,
-                expiryDate: new Date(expiryDate).toISOString(), // Parse to Backend standard ISO
+                expiryDate: new Date(expiryDate).toISOString(),
                 warehouseId: Number(targetWarehouseIdOverride),
                 laborCost: Number(laborCost),
                 overheadCost: Number(overheadCost)
@@ -92,12 +138,14 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
 
             await WorkOrderServices.completeWorkOrder(workOrder.workOrderId, payload);
 
-            alert("Production recorded and batch generated successfully!");
-            onSuccess();
-            onClose();
+            showSuccessNotification("Production recorded and batch generated successfully!");
+            setTimeout(() => {
+                onSuccess();
+                onClose();
+            }, 700);
         } catch (error: any) {
             console.error(error);
-            alert(error?.response?.data?.message || "Error completing work order. Please check the information again.");
+            showWarningNotification(error?.response?.data?.message || "Error completing work order. Please check the information again.");
         } finally {
             setIsSubmitting(false);
         }
@@ -121,6 +169,18 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                 </div>
 
                 <div className="p-8 overflow-y-auto space-y-6 flex-1 bg-white">
+
+                    {isLineLeader && (
+                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl animate-in slide-in-from-top-2">
+                            <AlertOctagon className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <h4 className="text-sm font-bold text-amber-800">Permission Restricted</h4>
+                                <p className="text-xs text-amber-700 mt-1">
+                                    {isWorker ? "Production Workers" : "Line Leaders"} are not allowed to record output or generate product instances. Please contact a Production Manager or System Administrator to finalize this work order.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* WO SUMMARY INFO */}
                     <div className="flex gap-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
@@ -166,7 +226,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                     </div>
 
                     {/* ZONE 2: NEW PRODUCT BATCH PARAMETERS (4 DATA VARIABLES) */}
-                    <div className={`space-y-4 transition-opacity duration-300 ${isLocked ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                    <div className={`space-y-4 transition-opacity duration-300 ${(isLocked || isLineLeader) ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                         <h3 className="text-sm font-bold text-gray-900 uppercase pt-2 border-t border-gray-100">2. Batch Generation Settings <span className="text-red-500">*</span></h3>
                         
                         <div className="grid grid-cols-2 gap-5">
@@ -181,7 +241,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                         id="quantity-produced"
                                         type="number" min="1"
                                         value={quantityProduced} onChange={(e) => setQuantityProduced(e.target.value === "" ? "" : Number(e.target.value))}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isLineLeader}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-blue-700 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                                     />
                                 </div>
@@ -198,7 +258,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                         id="expiry-date"
                                         type="date"
                                         value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isLineLeader}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 cursor-pointer"
                                     />
                                 </div>
@@ -215,7 +275,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                         id="batch-code"
                                         type="text"
                                         value={customBatchCode} onChange={(e) => setCustomBatchCode(e.target.value)}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isLineLeader}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-mono font-bold text-gray-600 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                                     />
                                 </div>
@@ -238,7 +298,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                             id="target-warehouse"
                                             value={targetWarehouseIdOverride}
                                             onChange={(e) => setTargetWarehouseIdOverride(e.target.value === "" ? "" : Number(e.target.value))}
-                                            disabled={isLocked}
+                                            disabled={isLocked || isLineLeader}
                                             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 cursor-pointer bg-white"
                                         >
                                             <option value="">-- Select Sales Warehouse --</option>
@@ -263,7 +323,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                         id="labor-cost"
                                         type="number" min="0" step="any"
                                         value={laborCost} onChange={(e) => setLaborCost(e.target.value === "" ? "" : Number(e.target.value))}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isLineLeader}
                                         placeholder="Labor Cost..."
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                                     />
@@ -281,7 +341,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                                         id="overhead-cost"
                                         type="number" min="0" step="any"
                                         value={overheadCost} onChange={(e) => setOverheadCost(e.target.value === "" ? "" : Number(e.target.value))}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isLineLeader}
                                         placeholder="Overhead Cost..."
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                                     />
@@ -291,7 +351,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                     </div>
 
                     {/* ZONE 3: OUTPUT DATA PREVIEW */}
-                    <div className={`space-y-4 transition-opacity duration-300 ${isLocked ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                    <div className={`space-y-4 transition-opacity duration-300 ${(isLocked || isLineLeader) ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                         <h3 className="text-sm font-bold text-gray-900 uppercase pt-2 border-t border-gray-100">3. Output Preview</h3>
                         <div className="p-4 border-2 border-dashed border-gray-200 bg-gray-50 rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-4">
@@ -325,7 +385,7 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || isLocked || quantityProduced === "" || !customBatchCode || !expiryDate || targetWarehouseIdOverride === "" || laborCost === "" || overheadCost === ""}
+                        disabled={isSubmitting || isLocked || isLineLeader || quantityProduced === "" || !customBatchCode || !expiryDate || targetWarehouseIdOverride === "" || laborCost === "" || overheadCost === ""}
                         className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95"
                     >
                         {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
@@ -333,6 +393,15 @@ export const RecordOutputModal = ({ isOpen, onClose, onSuccess, workOrder }: Rec
                     </button>
                 </div>
             </div>
+            <SuccessNotification isVisible={showSuccess} message={successMessage} />
+            <WarningNotification
+                isVisible={showWarning}
+                message={warningMessage}
+                onClose={() => {
+                    setShowWarning(false);
+                    setWarningMessage("");
+                }}
+            />
         </div>
     );
 };

@@ -87,7 +87,7 @@ export const ComponentReceipts = (): JSX.Element => {
         }
 
         const initialItems: Record<number, ReceiptItem> = {};
-        if (details.details?.forEach(item => {
+        details.details?.forEach(item => {
           const remaining = item.quantityOrdered - item.quantityReceived;
           if (remaining > 0) {
             initialItems[item.componentId] = {
@@ -96,8 +96,7 @@ export const ComponentReceipts = (): JSX.Element => {
               receivingQty: remaining,
             };
           }
-        })) {
-        }
+        });
         setReceiptItems(initialItems);
 
       } catch (error) {
@@ -441,7 +440,7 @@ export const ComponentReceipts = (): JSX.Element => {
                         {poDetails.details?.map(item => {
                             const remaining = item.quantityOrdered - item.quantityReceived;
                             if (remaining <= 0) return null;
-    const state = receiptItems[item.componentId];
+                            const state = receiptItems[item.componentId];
                             if (!state) return null;
 
                             return (

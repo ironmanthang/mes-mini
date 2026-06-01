@@ -1,6 +1,5 @@
 import { 
   Search, 
-  Plus, 
   Eye, 
   Edit, 
   Trash2,
@@ -11,21 +10,43 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { ProductServices, type Product } from "../../../services/productServices";
-import { CreateNewProductModal } from "./CreateNewProductModal";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { UpdateProductModal } from "./UpdateProductModal";
 import { DeleteProductModal } from "./DeleteProductModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasAnyRole } from "../../../lib/auth";
 
 export const Information = (): JSX.Element => {
+  const canEdit = hasAnyRole(["SYS_ADMIN", "PROD_MGR", "WH_STAFF"]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedViewId, setSelectedViewId] = useState<number | null>(null);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
   const [productToDelete, setProductToDelete] = useState<{id: number, name: string} | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
+
+  const triggerSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 3000);
+  };
+
+  const triggerWarning = (message: string) => {
+    setWarningMessage(message);
+    setShowWarning(true);
+    setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+    }, 3000);
+  };
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -54,10 +75,6 @@ export const Information = (): JSX.Element => {
       );
     });
   }, [products, searchQuery]);
-
-  const handleCreateNew = () => {
-    setIsNewModalOpen(true);
-  };
 
   const handleViewDetails = (id: number) => {
     setSelectedViewId(id);
@@ -90,12 +107,6 @@ export const Information = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage master data for all finished goods and products in the system.</p>
           </div>
-          <button 
-            onClick={handleCreateNew}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> New Product
-          </button>
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -156,20 +167,24 @@ export const Information = (): JSX.Element => {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={() => handleUpdate(product.productId)}
-                            className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
-                            title="Update Product"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(product.productId, product.productName)}
-                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
-                            title="Delete Product"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canEdit && (
+                            <button 
+                              onClick={() => handleUpdate(product.productId)}
+                              className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
+                              title="Update Product"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button 
+                              onClick={() => handleDelete(product.productId, product.productName)}
+                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
+                              title="Delete Product"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -190,12 +205,6 @@ export const Information = (): JSX.Element => {
         </div>
       </div>
 
-      <CreateNewProductModal 
-        isOpen={isNewModalOpen}
-        onClose={() => setIsNewModalOpen(false)}
-        onSuccess={() => fetchProducts()} 
-      />
-
       <ProductDetailModal
         isOpen={selectedViewId !== null}
         onClose={() => setSelectedViewId(null)}
@@ -206,7 +215,10 @@ export const Information = (): JSX.Element => {
         isOpen={selectedUpdateId !== null}
         onClose={() => setSelectedUpdateId(null)}
         productId={selectedUpdateId}
-        onSuccess={() => fetchProducts()} 
+        onSuccess={() => {
+          triggerSuccess("Product updated successfully!");
+          fetchProducts();
+        }} 
       />
 
       <DeleteProductModal
@@ -215,14 +227,25 @@ export const Information = (): JSX.Element => {
         productId={productToDelete?.id || null}
         productName={productToDelete?.name || ""}
         onSuccess={() => {
-            setShowSuccess(true);
+            triggerSuccess("Product deleted successfully!");
             fetchProducts();
             setProductToDelete(null);
-            setTimeout(() => setShowSuccess(false), 3000);
+        }}
+        onFailure={(msg) => {
+            triggerWarning(msg);
         }}
       />
 
-      <SuccessNotification isVisible={showSuccess}/>
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
     </div>
   );
 };

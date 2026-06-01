@@ -2,6 +2,7 @@ import { type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Package, Calendar, User, ClipboardList, Box, AlertCircle, Printer } from "lucide-react";
 import type { WorkOrderDetail } from "../../../services/workOrderServices";
+import { hasAnyRole } from "../../../lib/auth";
 
 interface WorkOrderDetailModalProps {
   isOpen: boolean;
@@ -303,7 +304,7 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                         <span className="font-mono font-bold text-gray-900">{batch.batchCode}</span>
                         <span className="text-xs text-gray-500">Expiry: {batch.expiryDate || 'N/A'}</span>
                       </div>
-                      {batch.productInstances && batch.productInstances.length > 0 && (
+                      {batch.productInstances && batch.productInstances.length > 0 && hasAnyRole(["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]) && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -317,8 +318,10 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {batch.productInstances?.map((inst) => {
-                        const isPendingQC = inst.status === 'PENDING_QC';
-                        const isReadyForInduction = inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC';
+                        const hasQCAccess = hasAnyRole(["SYS_ADMIN", "WH_STAFF"]);
+                        const hasInductionAccess = hasAnyRole(["SYS_ADMIN", "WH_STAFF", "PROD_MGR"]);
+                        const isPendingQC = inst.status === 'PENDING_QC' && hasQCAccess;
+                        const isReadyForInduction = (inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC') && hasInductionAccess;
                         const isClickable = isPendingQC || isReadyForInduction;
 
                         return (
@@ -335,16 +338,18 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                           >
                             <div className="flex justify-between items-center gap-1">
                               <span className="font-mono font-bold text-gray-700">{inst.serialNumber}</span>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePrintInstance(inst.serialNumber);
-                                }}
-                                className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-                                title="Print QR Label"
-                              >
-                                <Printer className="w-3 h-3" />
-                              </button>
+                              {hasAnyRole(["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]) && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePrintInstance(inst.serialNumber);
+                                  }}
+                                  className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                  title="Print QR Label"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                             <span className={`font-bold ${
                               inst.status === 'PASSED_QC' ? 'text-green-600' : 

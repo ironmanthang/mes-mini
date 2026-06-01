@@ -1,8 +1,9 @@
 import { X, Save, Package, Loader2 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { ProductServices, type UpdateProduct } from "../../../services/productServices";
 import { QualityChecklistServices, type QualityChecklist } from "../../../services/qualityChecklistServices";
 import { ProductCategoryServices, type ProductCategory } from "../../../services/productCategoryServices";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface UpdateProductModalProps {
   isOpen: boolean;
@@ -22,6 +23,31 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showWarningNotification = (message: string) => {
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    setWarningMessage(message);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+      warningTimeoutRef.current = null;
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,7 +81,8 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
   const handleSubmit = async () => {
     if (!productId) return;
     if (!code.trim() || !productName.trim() || !unit.trim()) {
-      return alert("Vui lòng điền đầy đủ các thông tin bắt buộc.");
+      showWarningNotification("Please fill in all required fields.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -69,13 +96,11 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
       };
 
       await ProductServices.updateProduct(productId, payload);
-      
-      alert("✅ Cập nhật sản phẩm thành công!");
       onSuccess();
-      onClose(); 
+      onClose();
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Lỗi khi cập nhật sản phẩm.";
-      alert(msg);
+      const msg = error.response?.data?.message || "Failed to update product.";
+      showWarningNotification(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -199,6 +224,14 @@ export const UpdateProductModal = ({ isOpen, onClose, productId, onSuccess }: Up
         </div>
 
       </div>
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
     </div>
   );
 };

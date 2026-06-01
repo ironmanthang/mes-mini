@@ -1,17 +1,15 @@
 import { type JSX } from "react";
 import { 
   Info, 
-  ScanBarcode, 
   ClipboardCheck, 
   ShoppingCart,
-  PackagePlus,
   ClipboardList,
-  Tag,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
+import { hasAnyRole } from "../../lib/auth";
 
 export const FinishedProduct = (): JSX.Element => {
-  const tabs = [
+  const allTabs = [
     { 
       id: "information", 
       label: "Information", 
@@ -20,18 +18,12 @@ export const FinishedProduct = (): JSX.Element => {
       description: "Batch details & serial numbers" 
     },
     { 
-      id: "barcodes", 
-      label: "Barcodes", 
-      icon: ScanBarcode, 
-      to: "/finished-products/barcodes",
-      description: "Print & manage item labels" 
-    },
-    { 
       id: "quality", 
       label: "Quality Checks", 
       icon: ClipboardCheck, 
       to: "/finished-products/quality",
-      description: "QA/QC inspections & logs" 
+      description: "QA/QC inspections & logs",
+      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
     },
     { 
       id: "checklists", 
@@ -41,27 +33,17 @@ export const FinishedProduct = (): JSX.Element => {
       description: "Manage QC templates & parameters" 
     },
     { 
-      id: "categories", 
-      label: "Categories", 
-      icon: Tag, 
-      to: "/finished-products/categories",
-      description: "Manage product categories" 
-    },
-    { 
-      id: "inbound", 
-      label: "Inbound Requests", 
-      icon: PackagePlus, 
-      to: "/finished-products/inbound",
-      description: "Create warehouse entry requests" 
-    },
-    { 
       id: "orders", 
       label: "Orders", 
       icon: ShoppingCart, 
       to: "/finished-products/orders",
-      description: "Manage sales & shipping" 
+      description: "Manage sales & shipping",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
     },
   ];
+
+  // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
+  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">
@@ -73,7 +55,7 @@ export const FinishedProduct = (): JSX.Element => {
       </div>
 
       <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}

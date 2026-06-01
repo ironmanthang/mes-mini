@@ -219,6 +219,7 @@ async function seedRolePermissions(): Promise<void> {
             PERM.LINE_READ, PERM.QC_READ,
             PERM.MR_READ, PERM.MR_CREATE,
             PERM.PRODUCT_READ, PERM.COMP_READ,
+            PERM.DASH_READ,
         ],
         PROD_WORKER: [
             PERM.WO_READ, PERM.QC_READ,

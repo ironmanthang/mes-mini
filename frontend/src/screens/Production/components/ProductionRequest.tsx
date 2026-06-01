@@ -20,6 +20,9 @@ import { CreateNewProductionRequestModal } from "./CreateNewProductionRequestMod
 import { UpdateProductionRequestModal } from "./UpdateProductionRequestModal";
 import { ProductionRequestDetailModal } from "./ProductionRequestDetailModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasAnyRole } from "../../../lib/auth";
 
 export const CreateProductionRequest = (): JSX.Element => {
   const [requests, setRequests] = useState<ProductionRequest[]>([]);
@@ -31,30 +34,70 @@ export const CreateProductionRequest = (): JSX.Element => {
   const [selectedViewId, setSelectedViewId] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
 
-  const handleSubmitDraft = async (id: number) => {
-    if (!window.confirm("Submit this draft for review?")) return;
-    try {
-      await ProductionRequestServices.submitProductionRequest(id);
-      fetchRequests();
-      setMessage("Production Request submitted successfully!");
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to submit request.");
-    }
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    type: "submit" | "approve" | null;
+    id: number | null;
+    title: string;
+    message: string;
+    variant: "primary" | "success" | "danger";
+  }>({
+    isOpen: false,
+    type: null,
+    id: null,
+    title: "",
+    message: "",
+    variant: "primary",
+  });
+  const [isProcessingConfirm, setIsProcessingConfirm] = useState(false);
+
+  const handleSubmitDraft = (id: number) => {
+    setConfirmState({
+      isOpen: true,
+      type: "submit",
+      id,
+      title: "Submit Draft",
+      message: "Are you sure you want to submit this draft for review?",
+      variant: "primary",
+    });
   };
 
-  const handleApprove = async (id: number) => {
-    if (!window.confirm("Approve this production request?")) return;
+  const handleApprove = (id: number) => {
+    setConfirmState({
+      isOpen: true,
+      type: "approve",
+      id,
+      title: "Approve Request",
+      message: "Are you sure you want to approve this production request?",
+      variant: "success",
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (confirmState.id === null || !confirmState.type) return;
+    setIsProcessingConfirm(true);
     try {
-      await ProductionRequestServices.approveProductionRequest(id);
+      if (confirmState.type === "submit") {
+        await ProductionRequestServices.submitProductionRequest(confirmState.id);
+        setMessage("Production Request submitted successfully!");
+      } else if (confirmState.type === "approve") {
+        await ProductionRequestServices.approveProductionRequest(confirmState.id);
+        setMessage("Production Request approved!");
+      }
       fetchRequests();
-      setMessage("Production Request approved!");
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
+      setConfirmState({ isOpen: false, type: null, id: null, title: "", message: "", variant: "primary" });
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to approve request.");
+      setWarningMessage(error.response?.data?.message || "An error occurred while processing your request.");
+      setShowWarning(true);
+      setTimeout(() => setShowWarning(false), 3000);
+      setConfirmState({ isOpen: false, type: null, id: null, title: "", message: "", variant: "primary" });
+    } finally {
+      setIsProcessingConfirm(false);
     }
   };
 
@@ -136,12 +179,14 @@ export const CreateProductionRequest = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage MRP checks, material reservations, and manufacturing queues.</p>
           </div>
-          <button 
-            onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> New Request
-          </button>
+          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && (
+            <button 
+              onClick={() => setIsNewModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> New Request
+            </button>
+          )}
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -232,7 +277,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                             <Eye className="w-4 h-4" />
                           </button>
                           
-                          {req.status === 'DRAFT' && (
+                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status === 'DRAFT' && (
                             <>
                               <button 
                                 onClick={() => setSelectedUpdateId(req.productionRequestId)}
@@ -251,7 +296,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                             </>
                           )}
 
-                          {req.status === 'PENDING' && (
+                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status === 'PENDING' && (
                             <button 
                               onClick={() => handleApprove(req.productionRequestId)}
                               className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
@@ -261,7 +306,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                             </button>
                           )}
 
-                          {req.status !== 'DRAFT' && (
+                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status !== 'DRAFT' && (
                             <button 
                               onClick={() => setSelectedUpdateId(req.productionRequestId)}
                               className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
@@ -318,6 +363,25 @@ export const CreateProductionRequest = (): JSX.Element => {
       />
 
       <SuccessNotification isVisible={showSuccess} message={message}/>
+
+      <ConfirmNotification
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        variant={confirmState.variant}
+        isProcessing={isProcessingConfirm}
+        onConfirm={handleConfirmAction}
+        onClose={() => setConfirmState({ isOpen: false, type: null, id: null, title: "", message: "", variant: "primary" })}
+      />
+
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
     </div>
   );
 };

@@ -8,9 +8,13 @@ import {
   Trash2,
   Loader2
 } from "lucide-react";
-import { useState, useEffect, useCallback, type JSX } from "react";
+import { useState, useEffect, useCallback, useRef, type JSX } from "react";
 import { AddWarehouseModal } from "./AddWarehouseModel";
 import { WarehouseServices, type Warehouse, type TYPE } from "../../../services/warehouseServices";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { hasAnyRole } from "../../../lib/auth";
 
 export const WarehouseInformation = (): JSX.Element => {
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -19,6 +23,67 @@ export const WarehouseInformation = (): JSX.Element => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState("All");
   const [selectedWarehouse, setSelectedWarehouse] = useState<any>(null);
+
+  const canEdit = !hasAnyRole(["PROD_MGR"]);
+
+  // Notification States
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    dbId: number | null;
+    name: string;
+  }>({
+    isOpen: false,
+    dbId: null,
+    name: "",
+  });
+  const [isProcessingDelete, setIsProcessingDelete] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showWarningNotification = (msg: string) => {
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    setWarningMessage(msg);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+      warningTimeoutRef.current = null;
+    }, 3000);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!canEdit) return;
+    if (confirmDelete.dbId === null) return;
+    setIsProcessingDelete(true);
+    try {
+      await WarehouseServices.deleteWarehouse(confirmDelete.dbId);
+      setConfirmDelete({ isOpen: false, dbId: null, name: "" });
+      setSuccessMessage("Warehouse deleted successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+      fetchWarehouses();
+    } catch (error: any) {
+      setConfirmDelete({ isOpen: false, dbId: null, name: "" });
+      showWarningNotification(error.response?.data?.message || "Failed to delete warehouse");
+    } finally {
+      setIsProcessingDelete(false);
+    }
+  };
 
   const fetchWarehouses = useCallback(async () => {
     setIsLoading(true);
@@ -49,10 +114,12 @@ export const WarehouseInformation = (): JSX.Element => {
   }, [fetchWarehouses]);
 
   const handleOpenAdd = () => {
+    if (!canEdit) return;
     setSelectedWarehouse(null);
     setIsModalOpen(true);
   };
   const handleOpenEdit = (warehouse: any) => {
+    if (!canEdit) return;
     setSelectedWarehouse({
         warehouseId: warehouse.dbId,
         warehouseName: warehouse.name,
@@ -86,14 +153,16 @@ export const WarehouseInformation = (): JSX.Element => {
                 </select>
             </div>
 
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={handleOpenAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
-                >
-                    <Plus className="w-4 h-4" /> Add Warehouse
-                </button>
-            </div>
+            {canEdit && (
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handleOpenAdd}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
+                    >
+                        <Plus className="w-4 h-4" /> Add Warehouse
+                    </button>
+                </div>
+            )}
         </div>
 
         <div className="overflow-x-auto min-h-[300px]">
@@ -135,27 +204,28 @@ export const WarehouseInformation = (): JSX.Element => {
                                             <button className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="View Inventory">
                                                 <Eye className="w-4 h-4" />
                                             </button>
-                                            <button 
-                                                onClick={() => handleOpenEdit(item)} 
-                                                className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Info"
-                                            >
-                                                <Edit className="w-4 h-4" />
-                                            </button>
-                                            <button 
-                                                onClick={async () => {
-                                                    if (confirm(`Are you sure you want to delete warehouse ${item.name}?`)) {
-                                                        try {
-                                                            await WarehouseServices.deleteWarehouse(item.dbId);
-                                                            fetchWarehouses();
-                                                        } catch (error: any) {
-                                                            alert(error.response?.data?.message || "Failed to delete warehouse");
-                                                        }
-                                                    }
-                                                }}
-                                                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Delete Warehouse"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {canEdit && (
+                                                <>
+                                                    <button 
+                                                        onClick={() => handleOpenEdit(item)} 
+                                                        className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Info"
+                                                    >
+                                                        <Edit className="w-4 h-4" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setConfirmDelete({
+                                                                isOpen: true,
+                                                                dbId: item.dbId,
+                                                                name: item.name,
+                                                            });
+                                                        }}
+                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Delete Warehouse"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -182,14 +252,41 @@ export const WarehouseInformation = (): JSX.Element => {
             try {
                 if (selectedWarehouse) {
                     await WarehouseServices.updateWarehouse(selectedWarehouse.warehouseId, data);
+                    setSuccessMessage("Warehouse updated successfully!");
                 } else {
                     await WarehouseServices.createWarehouse(data);
+                    setSuccessMessage("Warehouse created successfully!");
                 }
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 2000);
                 fetchWarehouses();
             } catch (error: any) {
-                alert(error.response?.data?.message || "An error occurred while saving the warehouse");
+                showWarningNotification(error.response?.data?.message || "An error occurred while saving the warehouse");
             }
         }} 
+      />
+
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+
+      <ConfirmNotification
+        isOpen={confirmDelete.isOpen}
+        title="Delete Warehouse"
+        message={`Are you sure you want to delete warehouse ${confirmDelete.name}?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isProcessing={isProcessingDelete}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setConfirmDelete({ isOpen: false, dbId: null, name: "" })}
+      />
+
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
       />
     </div>
   );

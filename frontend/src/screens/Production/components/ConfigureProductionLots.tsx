@@ -40,7 +40,7 @@ export const ConfigureProductionLots = (): JSX.Element => {
           ProductionLineServices.getAllProductionLines()
         ]);
         
-        const validWOs = (woRes.data || []).filter(w => w.status === 'IN_PROGRESS' || w.status === 'COMPLETED');
+        const validWOs = (woRes.data || []).filter(w => w.status === 'COMPLETED');
         setWorkOrders(validWOs);
         
         setProductionLines(Array.isArray(lineRes) ? lineRes : (lineRes as any).data || []);

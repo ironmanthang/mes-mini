@@ -1,44 +1,53 @@
-import { Cpu, ShoppingCart, ScanBarcode , PackagePlus, ClipboardCheck } from "lucide-react";
+import { Cpu, ShoppingCart, PackagePlus, ClipboardCheck, QrCode } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
+import { hasAnyRole } from "../../lib/auth";
 
 export const Components = () => {
-  const tabs = [
+  const allTabs = [
     { 
       id: "info", 
       label: "Component Information", 
       icon: Cpu,
       to: "/components/info",
-      description: "Manage items, stock & specs"
+      description: "Manage items, stock & specs",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
     },
     { 
       id: "create-order", 
       label: "Create Component Orders", 
       icon: PackagePlus,
       to: "/components/create-order",
-      description: "Import materials & components"
+      description: "Import materials & components",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR"]
     },
     { 
       id: "orders",
       label: "Component Orders", 
       icon: ShoppingCart,
       to: "/components/orders",
-      description: "Purchase Orders & Tracking"
+      description: "Purchase Orders & Tracking",
+      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
     },
     { 
       id: "receipts", 
       label: "Component Receipts", 
       icon: ClipboardCheck,
       to: "/components/receipts",
-      description: "Verify and store incoming goods" 
+      description: "Verify and store incoming goods",
+      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
     },
     { 
-      id: "barcodes",
+      id: "barcodes", 
       label: "Component Barcodes", 
-      icon: ScanBarcode,
+      icon: QrCode,
       to: "/components/barcodes",
-      description: "Generate & Print Labels"
+      description: "Print component tray barcodes",
+      allowedRoles: ["SYS_ADMIN", "LINE_LEADER"]
     },
   ];
+
+  // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
+  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">
@@ -50,7 +59,7 @@ export const Components = () => {
       </div>
 
       <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}

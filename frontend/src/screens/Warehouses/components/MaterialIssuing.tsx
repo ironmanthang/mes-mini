@@ -6,6 +6,9 @@ import {
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { MaterialRequestServices, type MaterialRequest, type ValidationLine } from "../../../services/materialRequestServices";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 export const MaterialIssuing = (): JSX.Element => {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -17,6 +20,11 @@ export const MaterialIssuing = (): JSX.Element => {
   const [isValidating, setIsValidating] = useState(false);
   const [hasValidated, setHasValidated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isIssueConfirmOpen, setIsIssueConfirmOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
   
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | "">("");
@@ -56,6 +64,20 @@ export const MaterialIssuing = (): JSX.Element => {
     fetchRequests();
   }, []);
 
+  const showSuccessNotification = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 1200);
+  };
+
+  const showWarningNotification = (message: string) => {
+    setWarningMessage(message);
+    setShowWarning(true);
+  };
+
   const handleValidate = async () => {
     if (!selectedRequest || !selectedWarehouseId) return;
     
@@ -69,7 +91,7 @@ export const MaterialIssuing = (): JSX.Element => {
       setHasValidated(true);
     } catch (err) {
       console.error("Validation failed", err);
-      alert("Error checking inventory.");
+      showWarningNotification("Error checking inventory.");
     } finally {
       setIsValidating(false);
     }
@@ -79,7 +101,12 @@ export const MaterialIssuing = (): JSX.Element => {
     return hasValidated && validationLines.length > 0 && validationLines.every(line => line.isSufficient);
   }, [hasValidated, validationLines]);
 
-  const handleConfirmIssue = async () => {
+  const handleConfirmIssue = () => {
+    if (!isAllAvailable || !selectedRequest || !selectedWarehouseId) return;
+    setIsIssueConfirmOpen(true);
+  };
+
+  const handleCompleteIssue = async () => {
     if (!isAllAvailable || !selectedRequest || !selectedWarehouseId) return;
 
     setIsSubmitting(true);
@@ -111,13 +138,14 @@ export const MaterialIssuing = (): JSX.Element => {
         consumedLots: consumedLotsPayload 
       });
       
-      alert("Material components issued successfully!");
+      showSuccessNotification("Material components issued successfully!");
       fetchRequests(); 
       setSelectedRequest(null);
       setHasValidated(false);
       setValidationLines([]);
+      setIsIssueConfirmOpen(false);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Error during material issuing.");
+      showWarningNotification(e?.response?.data?.message || "Error during material issuing.");
     } finally {
       setIsSubmitting(false);
     }
@@ -130,6 +158,32 @@ export const MaterialIssuing = (): JSX.Element => {
              req.workOrder?.code?.toLowerCase().includes(searchStr);
     });
   }, [requests, searchQuery]);
+
+  const notifications = (
+    <>
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
+      <ConfirmNotification
+        isOpen={isIssueConfirmOpen}
+        title="Complete Material Issue"
+        message="Are you sure you want to issue these material components from the selected warehouse?"
+        confirmLabel="Complete & Issue"
+        variant="primary"
+        isProcessing={isSubmitting}
+        onConfirm={handleCompleteIssue}
+        onClose={() => {
+          if (!isSubmitting) setIsIssueConfirmOpen(false);
+        }}
+      />
+    </>
+  );
 
   if (!selectedRequest) {
     return (
@@ -200,6 +254,7 @@ export const MaterialIssuing = (): JSX.Element => {
             )}
           </div>
         </div>
+        {notifications}
       </div>
     );
   }
@@ -384,6 +439,7 @@ export const MaterialIssuing = (): JSX.Element => {
         </div>
 
       </div>
+      {notifications}
     </div>
   );
 };

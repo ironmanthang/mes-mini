@@ -36,7 +36,7 @@ export interface UpdateSupplierRequest {
 
 export const supplierService = {
   getAllSuppliers: async () => {
-    const response = await api.get<Supplier[]>("/suppliers");
+    const response = await api.get<{ data: Supplier[]; total?: number; page?: number; limit?: number }>("/suppliers");
     return response.data;
   },
 

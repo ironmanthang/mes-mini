@@ -1,5 +1,5 @@
 import { X, Save } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { JSX } from "react";
 
 interface AddWarehouseModalProps {
@@ -9,30 +9,14 @@ interface AddWarehouseModalProps {
   initialData?: any;
 }
 
-export const AddWarehouseModal = ({ isOpen, onClose, onConfirm, initialData }: AddWarehouseModalProps): JSX.Element | null => {
-  const [formData, setFormData] = useState({
-    warehouseName: "",
-    location: "",
-    warehouseType: "COMPONENT"
-  });
+const getInitialFormData = (initialData?: any) => ({
+  warehouseName: initialData?.warehouseName || "",
+  location: initialData?.location || "",
+  warehouseType: initialData?.warehouseType || "COMPONENT"
+});
 
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        warehouseName: initialData.warehouseName || "",
-        location: initialData.location || "",
-        warehouseType: initialData.warehouseType || "COMPONENT"
-      });
-    } else {
-      setFormData({
-        warehouseName: "",
-        location: "",
-        warehouseType: "COMPONENT"
-      });
-    }
-  }, [initialData, isOpen]);
-
-  if (!isOpen) return null;
+const WarehouseForm = ({ onClose, onConfirm, initialData }: Omit<AddWarehouseModalProps, "isOpen">): JSX.Element => {
+  const [formData, setFormData] = useState(() => getInitialFormData(initialData));
 
   const isEditMode = !!initialData;
   const title = isEditMode ? "EDIT WAREHOUSE INFORMATION" : "ADD NEW WAREHOUSE";
@@ -49,12 +33,12 @@ export const AddWarehouseModal = ({ isOpen, onClose, onConfirm, initialData }: A
       return;
     }
     onConfirm(formData);
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
       <div 
-        key={initialData ? initialData.warehouseId : 'new'} 
         className="bg-white w-[500px] rounded-lg shadow-xl animate-in fade-in zoom-in duration-200"
       >
         <div className="relative p-6 text-center border-b border-gray-100">
@@ -130,5 +114,18 @@ export const AddWarehouseModal = ({ isOpen, onClose, onConfirm, initialData }: A
         </div>
       </div>
     </div>
+  );
+};
+
+export const AddWarehouseModal = ({ isOpen, onClose, onConfirm, initialData }: AddWarehouseModalProps): JSX.Element | null => {
+  if (!isOpen) return null;
+
+  return (
+    <WarehouseForm
+      key={initialData ? initialData.warehouseId : "new"}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      initialData={initialData}
+    />
   );
 };

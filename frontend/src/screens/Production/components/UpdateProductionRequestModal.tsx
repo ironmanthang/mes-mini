@@ -2,11 +2,15 @@ import {
     X, RefreshCcw, Ban, AlertTriangle, CheckCircle2, 
     ShoppingCart, Loader2, Send, CheckCircle, Save, Search
 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { ProductionRequestServices, type ProductionRequest, type DraftPurchaseOrderResponse, type PRPriority } from "../../../services/productionRequestServices";
 import { ProductServices } from "../../../services/productServices";
 import { InventoryServices } from "../../../services/inventoryServices";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { ReasonConfirmNotification } from "../../Notification/ReasonConfirmNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface UpdateProductionRequestModalProps {
   isOpen: boolean;
@@ -17,6 +21,7 @@ interface UpdateProductionRequestModalProps {
 
 export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuccess }: UpdateProductionRequestModalProps): JSX.Element | null => {
   const navigate = useNavigate();
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [requestData, setRequestData] = useState<ProductionRequest | null>(null);
   const [draftPO, setDraftPO] = useState<DraftPurchaseOrderResponse | null>(null);
   
@@ -28,6 +33,13 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
 
   const [isLoading, setIsLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [showShortageConfirm, setShowShortageConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
 
   // --- Live BOM Check ---
   const [isCheckingBom, setIsCheckingBom] = useState(false);
@@ -91,6 +103,14 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
     return () => clearTimeout(timeoutId);
 }, [requestData?.productId, editQty, requestData?.status]);
 
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const fetchRequestDetails = async (id: number) => {
     setIsLoading(true);
     try {
@@ -114,10 +134,41 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
     }
   };
 
+  const showSuccessNotification = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 1200);
+  };
+
+  const showWarningNotification = (message: string) => {
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+
+    setWarningMessage(message);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+      warningTimeoutRef.current = null;
+    }, 2000);
+  };
+
+  const closeAfterSuccess = (message: string) => {
+    showSuccessNotification(message);
+    setTimeout(() => {
+      onSuccess();
+      onClose();
+    }, 700);
+  };
+
   const handleUpdateDraft = async () => {
     if (!requestId || !requestData) return;
     if (!editQty || Number(editQty) <= 0) {
-        alert("Quantity must be greater than 0");
+        showWarningNotification("Quantity must be greater than 0");
         return;
     }
 
@@ -129,11 +180,11 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
             dueDate: editDueDate || undefined,
             note: editNote
         });
-        alert("✅ Draft updated successfully!");
+        showSuccessNotification("Draft updated successfully!");
         fetchRequestDetails(requestId); // Refresh data
         onSuccess(); // Refresh parent list
     } catch (error: any) {
-        alert(error.response?.data?.message || "Failed to update draft.");
+        showWarningNotification(error.response?.data?.message || "Failed to update draft.");
     } finally {
         setIsActionLoading(false);
     }
@@ -146,15 +197,13 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
       const response = await ProductionRequestServices.recheckFeasibility(requestId);
       
       if (response.status === 'APPROVED') {
-        alert("✅ Re-check successful! Materials are now reserved. Status changed to APPROVED.");
-        onSuccess();
-        onClose();
+        closeAfterSuccess("Re-check successful! Materials are now reserved. Status changed to APPROVED.");
       } else {
-        alert("⚠️ Still missing materials. Check the shortage list.");
+        showWarningNotification("Still missing materials. Check the shortage list.");
         fetchRequestDetails(requestId);
       }
     } catch (error: any) {
-      alert(error.response?.data?.message || "Lỗi khi kiểm tra lại vật tư.");
+      showWarningNotification(error.response?.data?.message || "Error while re-checking materials.");
     } finally {
       setIsActionLoading(false);
     }
@@ -162,60 +211,78 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
 
   const handleCancel = async () => {
     if (!requestId) return;
-    const reason = window.prompt("Vui lòng nhập lý do hủy yêu cầu sản xuất này:");
-    if (reason === null) return;
+    const canCancel =
+      requestData?.status === 'PENDING' ||
+      requestData?.status === 'WAITING_MATERIAL' ||
+      requestData?.status === 'APPROVED';
+
+    if (!canCancel) {
+      showWarningNotification("Cannot cancel. Only PENDING, WAITING_MATERIAL, and APPROVED production requests can be cancelled.");
+      return;
+    }
+
+    setCancelReason("");
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!requestId || !cancelReason.trim()) return;
 
     setIsActionLoading(true);
     try {
-      await ProductionRequestServices.cancelProductionRequest(requestId, reason);
-      alert("Đã hủy yêu cầu sản xuất thành công.");
-      onSuccess();
-      onClose();
+      await ProductionRequestServices.cancelProductionRequest(requestId, cancelReason.trim());
+      setShowCancelConfirm(false);
+      closeAfterSuccess("Production request cancelled successfully.");
     } catch (error: any) {
-      alert(error.response?.data?.message || "Lỗi khi hủy yêu cầu.");
+      setShowCancelConfirm(false);
+      showWarningNotification(error.response?.data?.message || "Error while cancelling request.");
     } finally {
       setIsActionLoading(false);
     }
   };
-
   const handleSubmitRequest = async () => {
     if (!requestId) return;
 
-    // Check shortage for DRAFTs before submission
     const hasShortage = bomResult.some(item => item.status === 'Shortage');
     if (hasShortage) {
-        if (!window.confirm("Shortages detected! Your inventory does not have enough components. The request will move to WAITING_MATERIAL status. Do you want to proceed?")) {
-            return;
-        }
+        setShowShortageConfirm(true);
+        return;
     }
+
+    submitProductionRequest();
+  };
+
+  const submitProductionRequest = async () => {
+    if (!requestId) return;
 
     setIsActionLoading(true);
     try {
       await ProductionRequestServices.submitProductionRequest(requestId);
-      alert("✅ Production Request submitted successfully!");
-      onSuccess();
-      onClose();
+      setShowShortageConfirm(false);
+      closeAfterSuccess("Production Request submitted successfully!");
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to submit request.");
+      showWarningNotification(error.response?.data?.message || "Failed to submit request.");
     } finally {
       setIsActionLoading(false);
     }
   };
-
   const handleApproveRequest = async () => {
     if (!requestId) return;
     setIsActionLoading(true);
     try {
       await ProductionRequestServices.approveProductionRequest(requestId);
-      alert("✅ Production Request approved!");
-      onSuccess();
-      onClose();
+      closeAfterSuccess("Production Request approved!");
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to approve request.");
+      showWarningNotification(error.response?.data?.message || "Failed to approve request.");
     } finally {
       setIsActionLoading(false);
     }
   };
+
+  const canCancelRequest =
+    requestData?.status === 'PENDING' ||
+    requestData?.status === 'WAITING_MATERIAL' ||
+    requestData?.status === 'APPROVED';
 
   if (!isOpen || !requestId) return null;
 
@@ -494,7 +561,8 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
         <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-between">
             <button 
               onClick={handleCancel} 
-              disabled={isActionLoading || requestData?.status === 'FULFILLED' || requestData?.status === 'CANCELLED'} 
+              disabled={isActionLoading || !canCancelRequest}
+              title={canCancelRequest ? "Cancel Request" : "Only PENDING, WAITING_MATERIAL, and APPROVED requests can be cancelled"}
               className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Ban className="w-4 h-4" /> Cancel Request
@@ -541,6 +609,41 @@ export const UpdateProductionRequestModal = ({ isOpen, onClose, requestId, onSuc
         </div>
 
       </div>
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
+      <ConfirmNotification
+        isOpen={showShortageConfirm}
+        title="Submit With Material Shortage"
+        message="Shortages detected. Inventory does not have enough components, so this request will move to WAITING_MATERIAL status. Do you want to proceed?"
+        confirmLabel="Submit Anyway"
+        variant="danger"
+        isProcessing={isActionLoading}
+        onConfirm={submitProductionRequest}
+        onClose={() => {
+          if (!isActionLoading) setShowShortageConfirm(false);
+        }}
+      />
+      <ReasonConfirmNotification
+        isOpen={showCancelConfirm}
+        title="Cancel Production Request"
+        message="Please enter a reason before cancelling this production request."
+        reason={cancelReason}
+        reasonPlaceholder="Enter cancellation reason..."
+        confirmLabel="Cancel Request"
+        isProcessing={isActionLoading}
+        onReasonChange={setCancelReason}
+        onConfirm={handleConfirmCancel}
+        onClose={() => {
+          if (!isActionLoading) setShowCancelConfirm(false);
+        }}
+      />
     </div>
   );
 };

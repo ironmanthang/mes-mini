@@ -5,6 +5,8 @@ import {
 import { useState, useEffect, useRef, useMemo, type JSX, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ProductInstanceServices } from "../../../services/productInstanceServices";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface StagedProduct {
     productInstanceId: number;
@@ -26,12 +28,48 @@ export const ProductInduction = (): JSX.Element => {
   
   const [scanStatus, setScanStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showSuccessNotification = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 1200);
+  };
+
+  const showWarningNotification = (message: string) => {
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+
+    setWarningMessage(message);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+      warningTimeoutRef.current = null;
+    }, 2000);
+  };
 
   // ==========================================
   // CORE LOGIC: SCAN PROCESSING
@@ -148,7 +186,6 @@ export const ProductInduction = (): JSX.Element => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Confirm Induction action. This calls the backend to induct products.
   const handleConfirmInduction = async () => {
       if (stagingList.length === 0 || isSubmitting) return;
 
@@ -156,14 +193,14 @@ export const ProductInduction = (): JSX.Element => {
       try {
           const serialNumbers = stagingList.map(item => item.serialNumber);
           await ProductInstanceServices.inductProducts(serialNumbers);
-          alert(`Warehouse induction request for ${stagingList.length} item(s) completed successfully.`);
+          showSuccessNotification(`Warehouse induction request for ${stagingList.length} item(s) completed successfully.`);
           setStagingList([]);
           setScanStatus('SUCCESS');
           setFeedbackMessage(`Induction completed for: ${serialNumbers.join(", ")}`);
           setTimeout(() => inputRef.current?.focus(), 50);
       } catch (error: any) {
           console.error(error);
-          alert(error?.response?.data?.message || "Error during warehouse induction.");
+          showWarningNotification(error?.response?.data?.message || "Error during warehouse induction.");
           setScanStatus('ERROR');
           setFeedbackMessage(error?.response?.data?.message || "Induction failed.");
       } finally {
@@ -330,6 +367,16 @@ export const ProductInduction = (): JSX.Element => {
           </button>
         </div>
       </div>
+
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
 
     </div>
   );

@@ -20,7 +20,7 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
   const [expectedShipDate, setExpectedShipDate] = useState("");
   const [priority, setPriority] = useState<string>("MEDIUM");
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
-  const [deliveryTerms, setDeliveryTerms] = useState("FOB");
+  const [deliveryTerms, setDeliveryTerms] = useState("FOB - Free On Board");
   const [note, setNote] = useState("");
 
   const [discount, setDiscount] = useState<number>(0);
@@ -46,6 +46,8 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
         setRows([{ productId: 0, quantity: 1, salePrice: 0 }]);
         setDiscount(0); setTax(0); setAgentShippingPrice(0); setNote("");
         setPriority("MEDIUM");
+        setDeliveryTerms("FOB - Free On Board");
+        setPaymentTerms("Net 30");
     }
   }, [isOpen]);
 
@@ -74,7 +76,7 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
   const subtotal = rows.reduce((sum, row) => sum + (row.quantity * row.salePrice), 0);
   const grandTotal = subtotal - discount + tax + agentShippingPrice;
 
-  const handleSubmit = async (statusTarget: "DRAFT" | "PENDING_APPROVAL") => {
+  const handleSubmit = async (statusTarget: "DRAFT" | "PENDING") => {
     if (!agentId) return alert("Please select an Agent/Customer.");
     if (!expectedShipDate) return alert("Please set an Expected Delivery Date.");
     if (rows.length === 0 || rows.some(r => r.productId === 0)) return alert("Please select valid products for all rows.");
@@ -89,7 +91,7 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
         tax,
         agentShippingPrice: agentShippingPrice,
         paymentTerms,
-        deliveryTerms,
+        deliveryTerms: deliveryTerms === "" || deliveryTerms === "null" || !deliveryTerms ? undefined : deliveryTerms,
         note,
         status: statusTarget,
         priority,
@@ -226,12 +228,12 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-600 uppercase">Delivery Terms</label>
-                        <select value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none cursor-pointer">
+                        <select value={deliveryTerms || ""} onChange={(e) => setDeliveryTerms(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md text-sm outline-none cursor-pointer">
                             <option value="FOB - Free On Board">FOB - Free On Board</option>
                             <option value="CIF - Cost, Insurance and Freight">CIF - Cost, Insurance and Freight</option>
                             <option value="EXW - Ex Works">EXW - Ex Works</option>
                             <option value="DDP - Delivered Duty Paid">DDP - Delivered Duty Paid</option>
-                            <option value="null">null</option>
+                            <option value="">None (N/A)</option>
                         </select>
                     </div>
                     <div className="space-y-2">
@@ -277,7 +279,7 @@ export const NewSalesOrderModal = ({ isOpen, onClose, onConfirm }: NewSalesOrder
             <button onClick={() => handleSubmit("DRAFT")} disabled={isSubmitting} className="px-6 py-2 bg-white border border-blue-600 text-blue-600 rounded-lg font-bold hover:bg-blue-50 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors">
                 <Save className="w-4 h-4" /> Save Draft
             </button>
-            <button onClick={() => handleSubmit("PENDING_APPROVAL")} disabled={isSubmitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm">
+            <button onClick={() => handleSubmit("PENDING")} disabled={isSubmitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm">
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />} 
                 {isSubmitting ? "Submitting..." : "Submit for Approval"}
             </button>

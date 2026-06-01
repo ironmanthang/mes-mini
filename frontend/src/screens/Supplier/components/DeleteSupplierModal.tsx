@@ -1,36 +1,35 @@
 import { X, AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { useState, type JSX } from "react";
-import { ProductServices } from "../../../services/productServices";
+import { supplierService } from "../../../services/supplierServices";
 
-interface DeleteProductModalProps {
+interface DeleteSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productId: number | null;
-  productName: string;
+  supplierId: number | null;
+  supplierName: string;
   onSuccess: () => void;
-  onFailure: (message: string) => void;
 }
 
-export const DeleteProductModal = ({ isOpen, onClose, productId, productName, onSuccess, onFailure }: DeleteProductModalProps): JSX.Element | null => {
+export const DeleteSupplierModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }: DeleteSupplierModalProps): JSX.Element | null => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!productId) return;
+    if (!supplierId) return;
 
     setIsDeleting(true);
     try {
-      await ProductServices.deleteProduct(productId);
+      await supplierService.deleteSupplier(supplierId);
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Error deleting product:", error);
-      onFailure(error?.response?.data?.message || "Cannot delete this product. It might be used in an existing Bill of Materials or Sales Order.");
+      console.error("Error deleting:", error);
+      alert(error?.response?.data?.message || "Cannot delete this supplier. It might have active component mappings or pending purchase orders.");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (!isOpen || !productId) return null;
+  if (!isOpen || !supplierId) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px] p-4">
@@ -42,7 +41,7 @@ export const DeleteProductModal = ({ isOpen, onClose, productId, productName, on
                 <div className="p-2 bg-red-50 rounded-full">
                     <AlertTriangle className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Delete Product</h2>
+                <h2 className="text-xl font-bold text-gray-900">Delete Supplier</h2>
             </div>
             <button 
                 onClick={onClose} 
@@ -56,14 +55,14 @@ export const DeleteProductModal = ({ isOpen, onClose, productId, productName, on
         {/* Body */}
         <div className="p-6">
             <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to delete this product? This action cannot be undone.
+                Are you sure you want to delete this supplier? This action cannot be undone.
             </p>
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
-                <span className="font-bold text-gray-900 text-base">{productName}</span>
-                <span className="block text-xs text-gray-500 mt-1 font-mono">ID: {productId}</span>
+                <span className="font-bold text-gray-900 text-base">{supplierName}</span>
+                <span className="block text-xs text-gray-500 mt-1 font-mono">ID: {supplierId}</span>
             </div>
             <p className="text-xs text-red-500 mt-4 flex items-center gap-1.5 font-medium">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" /> Note: The system will block deletion if this product is linked to existing transactions or inventory.
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" /> Note: The system will block deletion if this supplier has associated components or purchase orders.
             </p>
         </div>
 
@@ -72,17 +71,19 @@ export const DeleteProductModal = ({ isOpen, onClose, productId, productName, on
             <button 
                 onClick={onClose} 
                 disabled={isDeleting}
-                className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 
+                font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
             >
                 Cancel
             </button>
             <button 
                 onClick={handleDelete} 
                 disabled={isDeleting}
-                className="px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                className="px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 
+                transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
             >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                {isDeleting ? "Deleting..." : "Delete Product"}
+                {isDeleting ? "Deleting..." : "Delete Supplier"}
             </button>
         </div>
       </div>

@@ -313,7 +313,7 @@ export const Performance = (): JSX.Element => {
               No line data available for the selected parameters.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="lineName" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#64748b' }} />
@@ -417,7 +417,7 @@ export const Performance = (): JSX.Element => {
               ) : productPieData.length === 0 ? (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs font-bold text-center">No product data.</div>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={productPieData}

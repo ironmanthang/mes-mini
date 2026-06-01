@@ -9,13 +9,12 @@ import { ProductServices } from "../../../services/productServices";
 import { InventoryServices } from "../../../services/inventoryServices";
 import { WorkOrderServices } from "../../../services/workOrderServices";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
-import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface CreateWorkOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (msg?: string) => void;
 }
 
 export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkOrderModalProps): JSX.Element | null => {
@@ -40,7 +39,6 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
   const [isCheckingBom, setIsCheckingBom] = useState(false);
   const [bomAllocation, setBomAllocation] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
@@ -171,11 +169,8 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
             await WorkOrderServices.releaseWorkOrder(newWO.workOrderId);
         }
 
-        setShowSuccess(true);
-        setTimeout(() => {
-            onSuccess();
-            onClose();
-        }, 2000);
+        onSuccess(actionStatus === 'RELEASED' ? "Work Order released successfully!" : "Work Order draft created successfully!");
+        onClose();
     } catch (e: any) {
         alert(e.response?.data?.message || "Lỗi khi xử lý lệnh sản xuất.");
     } finally { setIsSubmitting(false); }
@@ -400,7 +395,6 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
         )}
       </div>
 
-      <SuccessNotification isVisible={showSuccess} message="Work Order processed successfully!"/>
       <WarningNotification isVisible={showWarning} message="Please review the information, quantity constraints, and ensure QC Warehouses are selected." onClose={() => setShowWarning(false)}/>
     </div>
   );

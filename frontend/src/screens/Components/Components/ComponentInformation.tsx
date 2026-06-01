@@ -8,7 +8,6 @@ import {
   History, 
   Loader2,
   Trash2,
-  Barcode,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -98,15 +97,6 @@ export const ComponentInformation = (): JSX.Element => {
         setMessage("");
         setShowSuccess(false);
     }, 1000);
-  };
-
-  const handleViewBarcode = async (id: number, name: string) => {
-    try {
-        const data = await componentService.getComponentBarcode(id);
-        alert(`Mã vạch của ${name} là:\n\n[ ${data.barcode} ]`);
-    } catch (error: any) {
-        alert(error?.response?.data?.message || "Không thể lấy mã vạch");
-    }
   };
 
   const lowStockCount = components.filter(c => (c.currentStock || 0) < c.minStockLevel).length;
@@ -252,13 +242,6 @@ export const ComponentInformation = (): JSX.Element => {
                                         </span>
                                     </td>
                                     <td className="p-4 flex items-center justify-center gap-1">
-                                        <button 
-                                            onClick={() => handleViewBarcode(item.componentId, item.componentName)}
-                                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer transition-colors" 
-                                            title="View Barcode"
-                                        >
-                                            <Barcode className="w-4 h-4" />
-                                        </button>
                                         <button 
                                             onClick={() => handleOpenEdit(item)}
                                             className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded cursor-pointer transition-colors" 

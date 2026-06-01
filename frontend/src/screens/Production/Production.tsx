@@ -1,37 +1,45 @@
 import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
+import { hasAnyRole } from "../../lib/auth";
 
 export const Production = () => {
-  const tabs = [
+  const allTabs = [
     { 
       id: "production-requests",
       label: "Production Requests", 
       icon: Factory,
       to: "/production/requests",
-      description: "Create new manufacturing requests"
+      description: "Create new manufacturing requests",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]
     },
     { 
       id: "work-orders",
       label: "Work Orders", 
       icon: ClipboardList,
       to: "/production/work-orders",
-      description: "Schedule and track manufacturing orders"
+      description: "Schedule and track manufacturing orders",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER", "PROD_WORKER"]
     },
     { 
       id: "material-requests",
       label: "Material Requests",
       icon: PackageSearch,
       to: "/production/material-requests",
-      description: "Request components for work orders"
+      description: "Request components for work orders",
+      allowedRoles: ["SYS_ADMIN", "LINE_LEADER"]
     },
     { 
       id: "configure-lots",
       label: "Configure Lots", 
       icon: Settings,
       to: "/production/configure-lots",
-      description: "Setup batches & instances"
+      description: "Setup batches & instances",
+      allowedRoles: ["SYS_ADMIN", "PROD_MGR"]
     },
   ];
+
+  // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
+  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
 
   return (
     <div className="p-8 pb-24">
@@ -43,7 +51,7 @@ export const Production = () => {
       </div>
 
       <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}

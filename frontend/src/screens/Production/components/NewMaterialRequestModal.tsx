@@ -1,10 +1,12 @@
 import { 
     X, Send, Loader2, Search, PackageSearch
 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { WorkOrderServices, type WorkOrderListItem } from "../../../services/workOrderServices";
 import { MaterialRequestServices } from "../../../services/materialRequestServices";
 import { ProductServices } from "../../../services/productServices"; 
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface NewMaterialRequestModalProps {
     isOpen: boolean;
@@ -30,6 +32,41 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
     const [isFetchingBom, setIsFetchingBom] = useState(false);
     
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [successMessage, setSuccessMessage] = useState("");
+    const [warningMessage, setWarningMessage] = useState("");
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showWarning, setShowWarning] = useState(false);
+
+    const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showSuccessNotification = (message: string) => {
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        setSuccessMessage(message);
+        setShowSuccess(true);
+        successTimeoutRef.current = setTimeout(() => {
+            setShowSuccess(false);
+            setSuccessMessage("");
+        }, 2000);
+    };
+
+    const showWarningNotification = (message: string) => {
+        if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        setWarningMessage(message);
+        setShowWarning(true);
+        warningTimeoutRef.current = setTimeout(() => {
+            setShowWarning(false);
+            setWarningMessage("");
+        }, 2000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+            if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         if (isOpen) {
@@ -88,19 +125,22 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
     };
 
     const handleSubmit = async () => {
-        if (!selectedWoId) return alert("Please select a Work Order.");
+        if (!selectedWoId) {
+            showWarningNotification("Please select a Work Order.");
+            return;
+        }
 
         setIsSubmitting(true);
         try {
             // BE automatically extracts data by workOrderId
             await MaterialRequestServices.createFromWorkOrder(Number(selectedWoId));
 
-            alert("Material request submitted successfully!");
+            showSuccessNotification("Material request submitted successfully!");
             onSuccess();
             onClose();
         } catch (error) {
             console.error(error);
-            alert("Error submitting request. Please try again!");
+            showWarningNotification("Error submitting request. Please try again!");
         } finally {
             setIsSubmitting(false);
         }
@@ -225,6 +265,15 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
                     </button>
                 </div>
             </div>
+            <SuccessNotification isVisible={showSuccess} message={successMessage} />
+            <WarningNotification 
+                isVisible={showWarning} 
+                message={warningMessage} 
+                onClose={() => {
+                    setShowWarning(false);
+                    setWarningMessage("");
+                }} 
+            />
         </div>
     );
 };

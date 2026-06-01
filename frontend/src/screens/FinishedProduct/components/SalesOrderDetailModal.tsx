@@ -1,4 +1,4 @@
-import { X, Printer, FileText, CheckCircle, Truck, AlertTriangle, User, Calendar } from "lucide-react";
+import { X, Printer, Truck, AlertTriangle, User, Calendar } from "lucide-react";
 import { type JSX } from "react";
 import type { SalesOrderDetail } from "../../../services/salesOrdersServices";
 
@@ -233,15 +233,6 @@ export const SalesOrderDetailModal = ({ isOpen, onClose, order }: SalesOrderDeta
             onClick={handlePrint}>
                 <Printer className="w-4 h-4" /> Print Order
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 cursor-pointer transition-colors shadow-sm">
-                <FileText className="w-4 h-4" /> Generate Invoice
-            </button>
-            
-            {(order.status === 'APPROVED' || order.status === 'IN_PROGRESS') && fulfillmentPercent < 100 && (
-                <button className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-500 shadow-md cursor-pointer transition-colors">
-                    <CheckCircle className="w-4 h-4" /> Process Fulfillment
-                </button>
-            )}
         </div>
       </div>
     </div>

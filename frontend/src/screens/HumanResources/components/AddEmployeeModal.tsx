@@ -36,7 +36,7 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
   useEffect(() => {
     if (isOpen) {
       // Giả sử có API fetch tỉnh thành
-      fetch("https://provinces.open-api.vn/api/p/")
+      fetch("https://provinces.open-api.vn/api/v2/p/")
         .then(res => res.json())
         .then(data => setProvinces(data));
       
@@ -49,9 +49,9 @@ export const AddEmployeeModal = ({ isOpen, onClose, onConfirm }: AddEmployeeModa
     setFormData(prev => ({ ...prev, province: province?.name || "", ward: "" }));
     
     if (provinceCode) {
-      const res = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
+      const res = await fetch(`https://provinces.open-api.vn/api/v2/p/${provinceCode}?depth=2`);
       const data = await res.json();
-      setDistricts(data.districts || []);
+      setDistricts(data.wards || []);
     } else {
       setDistricts([]);
     }

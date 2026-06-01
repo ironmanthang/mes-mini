@@ -124,7 +124,7 @@ export const Header = (): JSX.Element => {
 
       <div
         className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded-lg transition-colors"
-        onClick={() => navigate("/user-system/settings")}
+        onClick={() => navigate("/settings")}
       >
         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
           <span className="text-blue-600 text-xs font-bold">L</span>

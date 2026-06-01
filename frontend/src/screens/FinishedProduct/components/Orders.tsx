@@ -7,18 +7,21 @@ import {
   ChevronRight,
   Loader2,
   AlertTriangle,
-  Edit,
   Send,
   Trash2,
   CheckCircle,
   XCircle,
   Play,
-  PackagePlus
 } from "lucide-react";
 import { useState, useMemo, type JSX, useEffect, useCallback } from "react";
 import { NewSalesOrderModal } from "./NewSalesOrderModal";
 import { SalesOrderDetailModal } from "./SalesOrderDetailModal";
 import { SalesOrdersServices, type SalesOrderListItem, type SalesOrderDetail } from "../../../services/salesOrdersServices";
+import { hasAnyRole } from "../../../lib/auth";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { ReasonConfirmNotification } from "../../Notification/ReasonConfirmNotification";
 
 export const Orders = (): JSX.Element => {
   const [orders, setOrders] = useState<SalesOrderListItem[]>([]);
@@ -32,6 +35,53 @@ export const Orders = (): JSX.Element => {
   
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrderDetail | null>(null);
+
+  // Notification States
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
+
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // Submit Confirm
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [orderToSubmit, setOrderToSubmit] = useState<number | null>(null);
+
+  // Delete Confirm
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<number | null>(null);
+
+  // Approve Confirm
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [orderToApprove, setOrderToApprove] = useState<number | null>(null);
+
+  // Reject Reason Confirm
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [orderToReject, setOrderToReject] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  // Start Processing Confirm
+  const [showStartProcessingConfirm, setShowStartProcessingConfirm] = useState(false);
+  const [orderToStartProcessing, setOrderToStartProcessing] = useState<number | null>(null);
+
+  const triggerSuccess = (msg: string) => {
+    setSuccessMessage(msg);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 3000);
+  };
+
+  const triggerWarning = (msg: string) => {
+    setWarningMessage(msg);
+    setShowWarning(true);
+    setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+    }, 4000);
+  };
 
   useEffect(() => {
     setPage(1);
@@ -83,78 +133,132 @@ export const Orders = (): JSX.Element => {
         setSelectedOrder(response);
     } catch (error) {
         console.error("Failed to get sales order detail: ", error);
-        alert("Failed to load order details.");
+        triggerWarning("Failed to load order details.");
     }
   };
 
-  const handleEditOrder = (id: number) => {
-    alert(`Mở form Edit cho Order ID: ${id}. Vui lòng tạo UpdateSalesOrderModal.`);
+  const handleSubmitOrder = (id: number) => {
+    if (hasAnyRole(["PROD_MGR"])) {
+      triggerWarning("You do not have permission to submit orders.");
+      return;
+    }
+    setOrderToSubmit(id);
+    setShowSubmitConfirm(true);
   };
 
-  const handleSubmitOrder = async (id: number) => {
-    if (window.confirm("Submit this draft order for approval?")) {
-        try {
-            await SalesOrdersServices.submitSalesOrder(id);
-            fetchSalesOrders();
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Failed to submit order.");
+  const handleConfirmSubmit = async () => {
+    if (orderToSubmit === null) return;
+    setIsActionLoading(true);
+    try {
+        await SalesOrdersServices.submitSalesOrder(orderToSubmit);
+        fetchSalesOrders();
+        triggerSuccess("Sales order submitted for approval successfully!");
+    } catch (error: any) {
+        triggerWarning(error?.response?.data?.message || "Failed to submit order.");
+    } finally {
+        setIsActionLoading(false);
+        setShowSubmitConfirm(false);
+        setOrderToSubmit(null);
+    }
+  };
+
+  const handleDeleteDraft = (id: number) => {
+    if (hasAnyRole(["PROD_MGR"])) {
+      triggerWarning("You do not have permission to delete draft orders.");
+      return;
+    }
+    setOrderToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (orderToDelete === null) return;
+    setIsActionLoading(true);
+    try {
+        await SalesOrdersServices.deleteSalesOrder(orderToDelete);
+        fetchSalesOrders();
+        triggerSuccess("Draft order deleted successfully!");
+    } catch (error: any) {
+        triggerWarning(error?.response?.data?.message || "Failed to delete order.");
+    } finally {
+        setIsActionLoading(false);
+        setShowDeleteConfirm(false);
+        setOrderToDelete(null);
+    }
+  };
+
+  const handleApproveOrder = (id: number) => {
+    setOrderToApprove(id);
+    setShowApproveConfirm(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    if (orderToApprove === null) return;
+    setIsActionLoading(true);
+    try {
+        const res = await SalesOrdersServices.approveSalesOrder(orderToApprove);
+        const msg = `Order Approved Successfully! Reserved: ${res.reservedCount} units.`;
+        if (res.shortage > 0) {
+            triggerWarning(`${msg} ALERT: Shortage of ${res.shortage} units detected!`);
+        } else {
+            triggerSuccess(msg);
         }
+        fetchSalesOrders();
+    } catch (error: any) {
+        triggerWarning(error?.response?.data?.message || "Approval failed.");
+    } finally {
+        setIsActionLoading(false);
+        setShowApproveConfirm(false);
+        setOrderToApprove(null);
     }
   };
 
-  const handleDeleteDraft = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this draft?")) {
-        try {
-            await SalesOrdersServices.deleteSalesOrder(id);
-            fetchSalesOrders();
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Failed to delete order.");
-        }
+  const handleRejectOrder = (id: number) => {
+    setOrderToReject(id);
+    setRejectReason("");
+    setShowRejectConfirm(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (orderToReject === null || !rejectReason.trim()) return;
+    setIsActionLoading(true);
+    try {
+        await SalesOrdersServices.rejectSalesOrder(orderToReject, rejectReason.trim());
+        fetchSalesOrders();
+        triggerSuccess("Sales order rejected successfully.");
+    } catch (error: any) {
+        triggerWarning(error?.response?.data?.message || "Reject failed.");
+    } finally {
+        setIsActionLoading(false);
+        setShowRejectConfirm(false);
+        setOrderToReject(null);
+        setRejectReason("");
     }
   };
 
-  const handleApproveOrder = async (id: number) => {
-    if (window.confirm("Approve this sales order?")) {
-        try {
-            const res = await SalesOrdersServices.approveSalesOrder(id);
-            const msg = `Order Approved Successfully!\nReserved: ${res.reservedCount} units.`;
-            if (res.shortage > 0) {
-                alert(`${msg}\nALERT: Shortage of ${res.shortage} units detected!`);
-            } else {
-                alert(msg);
-            }
-            fetchSalesOrders();
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Approval failed.");
-        }
+  const handleStartProcessing = (id: number) => {
+    if (hasAnyRole(["PROD_MGR"])) {
+      triggerWarning("You do not have permission to start processing orders.");
+      return;
     }
+    setOrderToStartProcessing(id);
+    setShowStartProcessingConfirm(true);
   };
 
-  const handleRejectOrder = async (id: number) => {
-    const reason = window.prompt("Please enter a reason for rejecting this order:");
-    if (reason) {
-        try {
-            await SalesOrdersServices.rejectSalesOrder(id, reason);
-            fetchSalesOrders();
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Reject failed.");
-        }
+  const handleConfirmStartProcessing = async () => {
+    if (orderToStartProcessing === null) return;
+    setIsActionLoading(true);
+    try {
+        await SalesOrdersServices.startProcessing(orderToStartProcessing);
+        fetchSalesOrders();
+        triggerSuccess("Sales order start processing successfully!");
+    } catch (error: any) {
+        triggerWarning(error?.response?.data?.message || "Failed to start processing.");
+    } finally {
+        setIsActionLoading(false);
+        setShowStartProcessingConfirm(false);
+        setOrderToStartProcessing(null);
     }
-  };
-
-  const handleStartProcessing = async (id: number) => {
-    if (window.confirm("Start processing/packing this order?")) {
-        try {
-            await SalesOrdersServices.startProcessing(id);
-            fetchSalesOrders();
-        } catch (error: any) {
-            alert(error?.response?.data?.message || "Failed to start processing.");
-        }
-    }
-  };
-
-  const handleShipOrder = (id: number) => {
-    alert(`Mở form Ship cho Order ID: ${id}. Yêu cầu quét mã Serial. Vui lòng tạo ShipOrderModal.`);
   };
 
   const getStatusColor = (status: string) => {
@@ -207,13 +311,15 @@ export const Orders = (): JSX.Element => {
                 </div>
             </div>
 
-            <button 
-                onClick={() => setIsNewOrderOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium 
-                rounded-lg hover:bg-blue-500 transition-colors shadow-sm text-sm cursor-pointer"
-            >
-                <Plus className="w-4 h-4" /> New Sales Order
-            </button>
+            {!hasAnyRole(["PROD_MGR"]) && (
+                <button 
+                    onClick={() => setIsNewOrderOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium 
+                    rounded-lg hover:bg-blue-500 transition-colors shadow-sm text-sm cursor-pointer"
+                >
+                    <Plus className="w-4 h-4" /> New Sales Order
+                </button>
+            )}
         </div>
 
         <div className="flex-1 overflow-x-auto min-h-[400px]">
@@ -263,11 +369,8 @@ export const Orders = (): JSX.Element => {
                                             <Eye className="w-4 h-4" />
                                         </button>
 
-                                        {order.status === 'DRAFT' && (
+                                        {order.status === 'DRAFT' && !hasAnyRole(["PROD_MGR"]) && (
                                             <>
-                                                <button onClick={() => handleEditOrder(order.salesOrderId)} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Draft">
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
                                                 <button onClick={() => handleSubmitOrder(order.salesOrderId)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit Order">
                                                     <Send className="w-4 h-4" />
                                                 </button>
@@ -288,23 +391,13 @@ export const Orders = (): JSX.Element => {
                                             </>
                                         )}
 
-                                        {order.status === 'APPROVED' && (
+                                        {order.status === 'APPROVED' && !hasAnyRole(["PROD_MGR"]) && (
                                             <>
                                                 <button onClick={() => handleStartProcessing(order.salesOrderId)} className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors cursor-pointer" title="Start Processing">
                                                     <Play className="w-4 h-4" />
                                                 </button>
-                                                <button onClick={() => handleShipOrder(order.salesOrderId)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Ship Order">
-                                                    <PackagePlus className="w-4 h-4" />
-                                                </button>
                                             </>
                                         )}
-
-                                        {order.status === 'IN_PROGRESS' && (
-                                            <button onClick={() => handleShipOrder(order.salesOrderId)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Ship Order">
-                                                <PackagePlus className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                        
                                     </td>
                                 </tr>
                             ))
@@ -349,7 +442,7 @@ export const Orders = (): JSX.Element => {
       </div>
 
       <NewSalesOrderModal 
-        isOpen={isNewOrderOpen} 
+        isOpen={isNewOrderOpen && !hasAnyRole(["PROD_MGR"])} 
         onClose={() => setIsNewOrderOpen(false)} 
         onConfirm={handleCreateOrder} 
       />
@@ -358,6 +451,100 @@ export const Orders = (): JSX.Element => {
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
         order={selectedOrder}
+      />
+
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+
+      <WarningNotification 
+        isVisible={showWarning} 
+        message={warningMessage} 
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showSubmitConfirm}
+        title="Submit Sales Order"
+        message="Submit this draft order for approval?"
+        confirmLabel="Submit"
+        variant="primary"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmSubmit}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowSubmitConfirm(false);
+            setOrderToSubmit(null);
+          }
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showDeleteConfirm}
+        title="Delete Draft Order"
+        message="Are you sure you want to delete this draft?"
+        confirmLabel="Delete"
+        variant="danger"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowDeleteConfirm(false);
+            setOrderToDelete(null);
+          }
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showApproveConfirm}
+        title="Approve Sales Order"
+        message="Approve this sales order?"
+        confirmLabel="Approve"
+        variant="success"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmApprove}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowApproveConfirm(false);
+            setOrderToApprove(null);
+          }
+        }}
+      />
+
+      <ReasonConfirmNotification
+        isOpen={showRejectConfirm}
+        title="Reject Sales Order"
+        message="Please enter a reason for rejecting this order:"
+        reason={rejectReason}
+        reasonPlaceholder="Enter rejection reason..."
+        confirmLabel="Reject"
+        isProcessing={isActionLoading}
+        onReasonChange={setRejectReason}
+        onConfirm={handleConfirmReject}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowRejectConfirm(false);
+            setOrderToReject(null);
+            setRejectReason("");
+          }
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showStartProcessingConfirm}
+        title="Start Processing"
+        message="Start processing/packing this order?"
+        confirmLabel="Start"
+        variant="primary"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmStartProcessing}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowStartProcessingConfirm(false);
+            setOrderToStartProcessing(null);
+          }
+        }}
       />
 
     </div>

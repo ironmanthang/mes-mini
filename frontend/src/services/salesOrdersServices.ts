@@ -135,11 +135,50 @@ export interface UpdateSalesOrder {
 
 export interface ShipOrderRequest {
     warehouseId: number;
-    shipmentItems: { 
+    shipments: { 
         productId: number; 
         serialNumbers: string[] 
     }[];
     courierShippingCost?: number;
+}
+
+export interface ComponentFeasibility {
+    componentId: number;
+    componentName: string;
+    requiredQty: number;
+    availableQty: number;
+    shortageQty: number;
+    status: 'YELLOW' | 'RED';
+}
+
+export interface LineItemFeasibility {
+    soDetailId: number;
+    productId: number;
+    productName: string;
+    orderedQty: number;
+    finishedGoodsAvailable: number;
+    status: 'GREEN' | 'YELLOW' | 'RED';
+    existingPrId?: number;
+    existingPrStatus?: string;
+    components?: ComponentFeasibility[];
+}
+
+export interface FeasibilityResult {
+    salesOrderId: number;
+    salesOrderCode: string;
+    overallStatus: 'GREEN' | 'YELLOW' | 'RED' | 'MIXED';
+    lineItems: LineItemFeasibility[];
+}
+
+export interface PickListItem {
+    productId: number;
+    productName: string;
+    productCode: string;
+    serialNumber: string;
+    warehouseId: number;
+    warehouseName?: string;
+    location?: string;
+    receivedAt: string;
 }
 
 
@@ -170,34 +209,42 @@ export const SalesOrdersServices = {
     },
 
     submitSalesOrder: async (id: number) => {
-        const response = await api.put<SalesOrderDetail>(`/sales-orders/${id}/submit`);
-        return response.data;
+        const response = await api.put<{ message: string; result: SalesOrderDetail }>(`/sales-orders/${id}/submit`);
+        return response.data.result;
     },
 
     approveSalesOrder: async (id: number) => {
-        const response = await api.put<SalesOrderDetail & { reservedCount: number; shortage: number }>(`/sales-orders/${id}/approve`);
-        return response.data;
+        const response = await api.put<{ message: string; result: SalesOrderDetail & { reservedCount: number; shortage: number } }>(`/sales-orders/${id}/approve`);
+        return response.data.result;
     },
 
     rejectSalesOrder: async (id: number, reason: string) => {
-        const response = await api.put<SalesOrderDetail>(`/sales-orders/${id}/reject`, { reason });
-        return response.data;
+        const response = await api.put<{ message: string; result: SalesOrderDetail }>(`/sales-orders/${id}/reject`, { reason });
+        return response.data.result;
     },
 
     startProcessing: async (id: number) => {
-        const response = await api.put<SalesOrderDetail>(`/sales-orders/${id}/start-processing`);
-        return response.data;
+        const response = await api.put<{ message: string; result: SalesOrderDetail }>(`/sales-orders/${id}/process`);
+        return response.data.result;
     },
 
     shipOrder: async (id: number, data: ShipOrderRequest) => {
-        const response = await api.post<SalesOrderDetail>(`/sales-orders/${id}/ship`, data);
-        return response.data;
+        const response = await api.post<{ message: string; result: SalesOrderDetail }>(`/sales-orders/${id}/ship`, data);
+        return response.data.result;
     },
 
     cancelSalesOrder: async (id: number, reason: string) => {
-        const response = await api.put<SalesOrderDetail>(`/sales-orders/${id}/cancel`, { reason });
+        const response = await api.put<{ message: string; result: SalesOrderDetail }>(`/sales-orders/${id}/cancel`, { reason });
+        return response.data.result;
+    },
+
+    checkFeasibility: async (id: number) => {
+        const response = await api.get<FeasibilityResult>(`/sales-orders/${id}/feasibility`);
         return response.data;
     },
 
-    
+    getPickList: async (id: number) => {
+        const response = await api.get<PickListItem[]>(`/sales-orders/${id}/pick-list`);
+        return response.data;
+    },
 };

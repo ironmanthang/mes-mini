@@ -9,7 +9,11 @@ import { CreateWorkOrderModal } from "./CreateWorkOrderModal";
 import { RecordOutputModal } from "./RecordOutputModal";
 import { WorkOrderDetailModal } from "./WorkOrderDetailModal";
 import { ConfigureWorkOrderModal } from "./ConfigureWorkOrderModal";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { ReasonConfirmNotification } from "../../Notification/ReasonConfirmNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { hasAnyRole } from "../../../lib/auth";
 
 export const WorkOrders = (): JSX.Element => {
   const [workOrders, setWorkOrders] = useState<WorkOrderListItem[]>([]);
@@ -26,6 +30,104 @@ export const WorkOrders = (): JSX.Element => {
   
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
+
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
+
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+  const [woToRelease, setWoToRelease] = useState<WorkOrderListItem | null>(null);
+
+  const [showStartConfirm, setShowStartConfirm] = useState(false);
+  const [woToStart, setWoToStart] = useState<WorkOrderListItem | null>(null);
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showCancelReasonConfirm, setShowCancelReasonConfirm] = useState(false);
+  const [woToCancel, setWoToCancel] = useState<WorkOrderListItem | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const triggerWarning = (msg: string) => {
+    setWarningMessage(msg);
+    setShowWarning(true);
+    setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+    }, 3000);
+  };
+
+  const handleConfirmRelease = async () => {
+    if (!woToRelease) return;
+    setIsActionLoading(true);
+    try {
+      await WorkOrderServices.releaseWorkOrder(woToRelease.workOrderId);
+      fetchWorkOrders();
+      setMessage("Work Order released successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (e: any) {
+      triggerWarning(e.response?.data?.message || "Failed to release Work Order");
+    } finally {
+      setIsActionLoading(false);
+      setShowReleaseConfirm(false);
+      setWoToRelease(null);
+    }
+  };
+
+  const handleConfirmStart = async () => {
+    if (!woToStart) return;
+    setIsActionLoading(true);
+    try {
+      await WorkOrderServices.startWorkOrder(woToStart.workOrderId);
+      fetchWorkOrders();
+      setMessage("Production started successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (e: any) {
+      triggerWarning(e.response?.data?.message || "Failed to start Work Order");
+    } finally {
+      setIsActionLoading(false);
+      setShowStartConfirm(false);
+      setWoToStart(null);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!woToCancel) return;
+    setIsActionLoading(true);
+    try {
+      await WorkOrderServices.cancelWorkOrder(woToCancel.workOrderId, "");
+      fetchWorkOrders();
+      setMessage("Work Order cancelled successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (e: any) {
+      triggerWarning(e.response?.data?.message || "Failed to cancel Work Order");
+    } finally {
+      setIsActionLoading(false);
+      setShowCancelConfirm(false);
+      setWoToCancel(null);
+    }
+  };
+
+  const handleConfirmCancelWithReason = async () => {
+    if (!woToCancel || !cancelReason.trim()) return;
+    setIsActionLoading(true);
+    try {
+      await WorkOrderServices.cancelWorkOrder(woToCancel.workOrderId, cancelReason.trim());
+      fetchWorkOrders();
+      setMessage("Work Order cancelled successfully!");
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (e: any) {
+      triggerWarning(e.response?.data?.message || "Failed to cancel Work Order");
+    } finally {
+      setIsActionLoading(false);
+      setShowCancelReasonConfirm(false);
+      setWoToCancel(null);
+      setCancelReason("");
+    }
+  };
 
   const fetchWorkOrders = async () => {
     setIsLoading(true);
@@ -95,9 +197,10 @@ export const WorkOrders = (): JSX.Element => {
 
   const renderActions = (wo: WorkOrderListItem) => {
     const actions = [];
+    const isProductionMgrOrAdmin = hasAnyRole(["SYS_ADMIN", "PROD_MGR"]);
 
     // 0. Edit/Configure: DRAFT only
-    if (wo.status === 'DRAFT') {
+    if (wo.status === 'DRAFT' && isProductionMgrOrAdmin) {
       actions.push(
         <button 
           key="edit"
@@ -114,22 +217,13 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 1. Release: DRAFT -> RELEASED
-    if (wo.status === 'DRAFT') {
+    if (wo.status === 'DRAFT' && isProductionMgrOrAdmin) {
       actions.push(
         <button 
           key="release"
-          onClick={async () => {
-            if (confirm(`Release Work Order ${wo.code}?`)) {
-              try {
-                await WorkOrderServices.releaseWorkOrder(wo.workOrderId);
-                fetchWorkOrders();
-                setMessage("Work Order released successfully!");
-                setShowSuccess(true);
-                setTimeout(() => setShowSuccess(false), 3000);
-              } catch (e: any) {
-                alert(e.response?.data?.message || "Failed to release Work Order");
-              }
-            }
+          onClick={() => {
+            setWoToRelease(wo);
+            setShowReleaseConfirm(true);
           }}
           className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
           title="Release Work Order"
@@ -140,22 +234,13 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 2. Start: RELEASED -> IN_PROGRESS
-    if (wo.status === 'RELEASED') {
+    if (wo.status === 'RELEASED' && isProductionMgrOrAdmin) {
       actions.push(
         <button 
           key="start"
-          onClick={async () => {
-            if (confirm(`Start production for ${wo.code}?`)) {
-              try {
-                await WorkOrderServices.startWorkOrder(wo.workOrderId);
-                fetchWorkOrders();
-                setMessage("Production started successfully!");
-                setShowSuccess(true);
-                setTimeout(() => setShowSuccess(false), 3000);
-              } catch (e: any) {
-                alert(e.response?.data?.message || "Failed to start Work Order");
-              }
-            }
+          onClick={() => {
+            setWoToStart(wo);
+            setShowStartConfirm(true);
           }}
           className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
           title="Start Production"
@@ -165,8 +250,8 @@ export const WorkOrders = (): JSX.Element => {
       );
     }
 
-    // 3. Record Output: IN_PROGRESS -> COMPLETED
-    if (wo.status === 'IN_PROGRESS') {
+    // 3. Record Output: IN_PROGRESS -> COMPLETED (only SYS_ADMIN and PROD_MGR)
+    if (wo.status === 'IN_PROGRESS' && isProductionMgrOrAdmin) {
       actions.push(
         <button 
           key="output"
@@ -180,32 +265,17 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 4. Cancel: DRAFT, RELEASED, IN_PROGRESS -> CANCELLED
-    if (['DRAFT', 'RELEASED', 'IN_PROGRESS'].includes(wo.status)) {
+    if (['DRAFT', 'RELEASED', 'IN_PROGRESS'].includes(wo.status) && isProductionMgrOrAdmin) {
       actions.push(
         <button 
           key="cancel"
-          onClick={async () => {
-            let reason = "";
+          onClick={() => {
+            setWoToCancel(wo);
             if (wo.status === 'IN_PROGRESS') {
-              const res = prompt("Please provide a reason for cancelling an IN_PROGRESS Work Order:");
-              if (res === null) return; // User cancelled prompt
-              if (!res.trim()) {
-                alert("Reason is required for cancelling an in-progress order.");
-                return;
-              }
-              reason = res;
-            }
-            
-            if (confirm(`Are you sure you want to cancel ${wo.code}?`)) {
-              try {
-                await WorkOrderServices.cancelWorkOrder(wo.workOrderId, reason);
-                fetchWorkOrders();
-                setMessage("Work Order cancelled successfully!");
-                setShowSuccess(true);
-                setTimeout(() => setShowSuccess(false), 3000);
-              } catch (e: any) {
-                alert(e.response?.data?.message || "Failed to cancel Work Order");
-              }
+              setCancelReason("");
+              setShowCancelReasonConfirm(true);
+            } else {
+              setShowCancelConfirm(true);
             }
           }}
           className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
@@ -226,7 +296,7 @@ export const WorkOrders = (): JSX.Element => {
             setSelectedWODetail(details); 
             setIsDetailModalOpen(true); 
           } catch (e: any) {
-            alert(e.response?.data?.message || "Failed to load Work Order details");
+            triggerWarning(e.response?.data?.message || "Failed to load Work Order details");
           }
         }} 
         className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
@@ -256,12 +326,14 @@ export const WorkOrders = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Schedule production and track active orders on the shop floor.</p>
           </div>
-          <button 
-            onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> New Work Order
-          </button>
+          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && (
+            <button 
+              onClick={() => setIsNewModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> New Work Order
+            </button>
+          )}
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -360,9 +432,9 @@ export const WorkOrders = (): JSX.Element => {
       <CreateWorkOrderModal 
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
-        onSuccess={() => {
+        onSuccess={(msg) => {
           fetchWorkOrders();
-          setMessage("Work Order created successfully!");
+          setMessage(msg || "Work Order created successfully!");
           setShowSuccess(true);
           setTimeout(() => setShowSuccess(false), 3000);
         }} 
@@ -405,6 +477,79 @@ export const WorkOrders = (): JSX.Element => {
       )}
 
       <SuccessNotification isVisible={showSuccess} message={message}/>
+
+      <WarningNotification 
+        isVisible={showWarning} 
+        message={warningMessage}
+        onClose={() => setShowWarning(false)}
+      />
+
+      <ConfirmNotification
+        isOpen={showReleaseConfirm}
+        title="Release Work Order"
+        message={`Are you sure you want to release Work Order ${woToRelease?.code}?`}
+        confirmLabel="Release"
+        variant="primary"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmRelease}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowReleaseConfirm(false);
+            setWoToRelease(null);
+          }
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showStartConfirm}
+        title="Start Production"
+        message={`Are you sure you want to start production for Work Order ${woToStart?.code}?`}
+        confirmLabel="Start"
+        variant="primary"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmStart}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowStartConfirm(false);
+            setWoToStart(null);
+          }
+        }}
+      />
+
+      <ConfirmNotification
+        isOpen={showCancelConfirm}
+        title="Cancel Work Order"
+        message={`Are you sure you want to cancel Work Order ${woToCancel?.code}?`}
+        confirmLabel="Cancel Work Order"
+        variant="danger"
+        isProcessing={isActionLoading}
+        onConfirm={handleConfirmCancel}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowCancelConfirm(false);
+            setWoToCancel(null);
+          }
+        }}
+      />
+
+      <ReasonConfirmNotification
+        isOpen={showCancelReasonConfirm}
+        title="Cancel Work Order"
+        message={`Please provide a reason for cancelling the IN_PROGRESS Work Order ${woToCancel?.code}:`}
+        reason={cancelReason}
+        reasonPlaceholder="Enter cancellation reason..."
+        confirmLabel="Cancel Work Order"
+        isProcessing={isActionLoading}
+        onReasonChange={setCancelReason}
+        onConfirm={handleConfirmCancelWithReason}
+        onClose={() => {
+          if (!isActionLoading) {
+            setShowCancelReasonConfirm(false);
+            setWoToCancel(null);
+            setCancelReason("");
+          }
+        }}
+      />
     </div>
   );
 };
