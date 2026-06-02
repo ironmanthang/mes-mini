@@ -53,7 +53,6 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
       setTargetSalesWarehouseId("");
       setTargetErrorWarehouseId("");
       setBomAllocation([]);
-      setShowSuccess(false);
       setShowWarning(false);
       setIsSubmitting(false);
       setIsLoadingInit(true);
