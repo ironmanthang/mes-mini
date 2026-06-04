@@ -57,12 +57,10 @@ export const CreateNewProductModal = ({ isOpen, onClose, onSuccess }: CreateNewP
 
       await ProductServices.createNewProduct(payload);
       
-      alert("✅ Tạo sản phẩm mới thành công!");
       onSuccess();
       onClose(); 
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Lỗi khi tạo sản phẩm.";
-      alert(msg);
+      console.error(error.response?.data?.message || "Lỗi khi tạo sản phẩm.");
     } finally {
       setIsSubmitting(false);
     }

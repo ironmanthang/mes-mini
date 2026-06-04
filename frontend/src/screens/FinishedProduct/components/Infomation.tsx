@@ -6,11 +6,13 @@ import {
   Package, 
   Loader2,
   Calendar,
-  Box
+  Box,
+  Plus,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { ProductServices, type Product } from "../../../services/productServices";
 import { ProductDetailModal } from "./ProductDetailModal";
+import { CreateNewProductModal } from "./CreateNewProductModal";
 import { UpdateProductModal } from "./UpdateProductModal";
 import { DeleteProductModal } from "./DeleteProductModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
@@ -88,11 +90,12 @@ export const Information = (): JSX.Element => {
     setProductToDelete({ id, name });
   };
 
-  // --- UI Helpers ---
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString('vi-VN');
   };
+
+  const [isCreateNewProduct, setIsCreateNewProduct] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 pb-12">
@@ -107,6 +110,13 @@ export const Information = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage master data for all finished goods and products in the system.</p>
           </div>
+
+          <button className="flex items-center bg-blue-500 p-3 text-sm font-semibold text-white rounded-lg
+          cursor-pointer hover:bg-blue-600 shadow-lg hover:shadow-md transition duration-200"
+          onClick={() => setIsCreateNewProduct(true)}
+          >
+            <Plus className="p-1"/><span>New Product</span>
+          </button>
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -204,6 +214,15 @@ export const Information = (): JSX.Element => {
           )}
         </div>
       </div>
+
+      <CreateNewProductModal
+        isOpen={isCreateNewProduct}
+        onClose={() => setIsCreateNewProduct(false)}
+        onSuccess={() => {
+          triggerSuccess("Create new product successfully!")
+          fetchProducts();
+        }}
+      />
 
       <ProductDetailModal
         isOpen={selectedViewId !== null}
