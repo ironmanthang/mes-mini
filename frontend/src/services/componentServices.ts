@@ -56,9 +56,19 @@ export interface UpdateComponentRequest {
   description?: string;
 }
 
+export interface ComponentResponse {
+  data: Component[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }
+}
+
 export const componentService = {
   getAllComponents: async (params?: { search?: string; page?: number; limit?: number }) => {
-    const response = await api.get("/components", { params });
+    const response = await api.get<ComponentResponse>("/components", { params });
     return response.data;
   },
 
