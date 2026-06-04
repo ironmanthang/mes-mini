@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
-import { purchaseOrderService, type PurchaseOrder } from "../../../services/purchaseOrderServices";
+import { purchaseOrderService, type PurchaseOrder, type PurchaseOrderDetail } from "../../../services/purchaseOrderServices";
 import { UpdateOrderModal } from "./UpdateOrderModal";
 
 export const ComponentOrders = (): JSX.Element => {
@@ -20,7 +20,7 @@ export const ComponentOrders = (): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderDetail | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState<number | null>(null);
 
@@ -202,7 +202,7 @@ export const ComponentOrders = (): JSX.Element => {
                         <Eye className="w-4 h-4" />
                       </button>
                       
-                      {(order.status === "DRAFT" || order.status === "PENDING_APPROVAL") && (
+                      {(order.status === "DRAFT" || order.status === "PENDING") && (
                         <button 
                           onClick={() => handleUpdate(order.purchaseOrderId)}
                           className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
@@ -212,7 +212,7 @@ export const ComponentOrders = (): JSX.Element => {
                         </button>
                       )}
                       
-                      {order.status === 'PENDING_APPROVAL' && (
+                      {order.status === 'PENDING' && (
                         <button 
                             onClick={() => checkApprove(order.purchaseOrderId)}
                             className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
@@ -222,7 +222,7 @@ export const ComponentOrders = (): JSX.Element => {
                         </button>
                       )}
 
-                      {order.status === 'APPROVED' && (
+                      {order.status === 'COMPLETED' && (
                         <button 
                             onClick={() => handleUpdateStatus(order.purchaseOrderId, "RECEIVED")}
                             className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 

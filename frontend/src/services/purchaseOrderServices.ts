@@ -2,61 +2,82 @@ import api from "./api";
 
 export interface PurchaseOrderDetail {
   purchaseOrderId: number;
-  componentId: number;
-  unitPrice: string;
-  poDetailId: number;
-  quantityOrdered: number;
-  quantityReceived: number;
-  productionRequestId: number | null;
-  component: {
-    componentId: number;
-    componentName: string;
-    description: string | null;
-    createdAt: string;
-    updatedAt: string;
-    code: string;
-    minStockLevel: number;
-    standardCost: string;
-    unit: string;
-  }
-}
-
-export interface PurchaseOrder {
-  purchaseOrderId: number;
   orderDate: string;
   employeeId: number;
-  supplierId: number;
+  suplierId: number;
   createdAt: string;
   updatedAt: string;
   deliveryTerms: string;
   expectedDeliveryDate: string;
   paymentTerms: string;
-  priority: string;
+  priority: "HIGH" | "MEDIUM" | "LOW";
   shippingCost: string;
   tax: string;
   code: string;
   totalAmount: string;
   discount: string;
-  approvedAt: string | null;
-  approverId: number | null;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'RECEIVED';
-
+  approvedAt: string;
+  approverId: number;
+  status: "ORDERED" | "RECEIVING" | "DRAFT" | "PENDING_APPROVAL" | "CANCELLED" | "COMPLETED";
   supplier: {
     supplierId: number;
     supplierName: string;
     phoneNumber: string;
     email: string;
     address: string;
-    code: string;
     createdAt: string;
     updatedAt: string;
+    code: string;
+  }
+  employee: {
+    fullName: string;
+  }
+  approver: {
+    fullName: string;
+  }
+  details: {
+    purchaseOrderDetailId: number;
+    componentId: number;
+    unitPrice: string;
+    poDetailId: number;
+    quantityOrdered: number;
+    quantityReceived: number;
+    productRequestId: number | null;
+    component: {
+      componentId: number;
+      componentName: string;
+      description: string | null;
+      createdAt: string;
+      updatedAt: string;
+      code: string;
+      minStockLevel: number;
+      standardCost: string;
+      unit: string;
+    };
+  } [];
+}
+
+export interface PurchaseOrder {
+  purchaseOrderId: number;
+  orderDate: string;
+  expectedDeliveryDate: string;
+  priority: string;
+  code: string;
+  totalAmount: string;
+  status: "ORDERED" | "RECEIVING" | "DRAFT" | "PENDING" | "COMPLETED" | "CANCELLED";
+
+  supplier: {
+    supplierName: string;
+    code: string;
   };
   
   employee: {
     fullName: string;
   };
-  
-  details: PurchaseOrderDetail[];
+
+  _count: {
+    details: number;
+  }
 }
 
 export interface CreatePORequest {
@@ -87,15 +108,25 @@ export interface UpdatePORequest {
   status?: 'DRAFT' | 'PENDING_APPROVAL' | 'CANCELLED';
 }
 
+export interface PurchaseOrderResponse {
+  data: PurchaseOrder[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }
+}
+
 
 export const purchaseOrderService = {
   getAllPOs: async () => {
-    const response = await api.get<PurchaseOrder[]>("/purchase-orders");
+    const response = await api.get<PurchaseOrderResponse>("/purchase-orders");
     return response.data;
   },
 
   getPOById: async (id: number) => {
-    const response = await api.get<PurchaseOrder>(`/purchase-orders/${id}`);
+    const response = await api.get<PurchaseOrderDetail>(`/purchase-orders/${id}`);
     return response.data;
   },
 
