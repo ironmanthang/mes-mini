@@ -12,24 +12,7 @@ import { PERM } from '../../common/constants/permissions.js';
 import RoleService from './roleService.js';
 
 const router = Router();
-
-router.use(protect, authorize(PERM.ROLE_MANAGE));
-router.get('/', getAllRoles);
-router.post('/', validate(roleCreateSchema), createRole);
-router.put('/:id', validate(roleUpdateSchema), updateRole);
-router.delete('/:id', deleteRole);
-router.get('/permissions', async (req, res) => {
-    try {
-        const { search, module } = req.query;
-        const permissions = await RoleService.getAllPermissions(
-            search as string, 
-            module as string
-        );
-        res.status(200).json(permissions);
-    } catch (error) {
-        res.status(500).json({ message: (error as Error).message });
-    }
-});
+router.use(protect);
 router.get('/:id/permissions', async (req, res) => {
     try {
         const permissions = await RoleService.getRolePermissions(req.params.id);
@@ -38,6 +21,24 @@ router.get('/:id/permissions', async (req, res) => {
         res.status(404).json({ message: (error as Error).message });
     }
 });
+router.use( authorize(PERM.ROLE_MANAGE));
+router.get('/', getAllRoles);
+router.post('/', validate(roleCreateSchema), createRole);
+router.put('/:id', validate(roleUpdateSchema), updateRole);
+router.delete('/:id', deleteRole);
+router.get('/permissions', async (req, res) => {
+    try {
+        const { search, module } = req.query;
+        const permissions = await RoleService.getAllPermissions(
+            search as string,
+            module as string
+        );
+        res.status(200).json(permissions);
+    } catch (error) {
+        res.status(500).json({ message: (error as Error).message });
+    }
+});
+
 router.put('/:id/permissions', async (req, res) => {
     try {
         const { permCodes } = req.body;
