@@ -164,10 +164,85 @@ This is enforced at the service level to ensure compliance across all API operat
 
 ### Flow Overview
 
-```
-Inventory Report -> Low Stock Alert
-    ├─ Low Component -> Purchase Order -> Goods Receipt -> Component Lots
-    └─ Low Product  -> Production Request -> Work Order -> Production -> QC -> Warehouse
+```mermaid
+flowchart TD
+    %% Define Styles
+    classDef reportStyle fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef prStyle fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef poStyle fill:#fdd,stroke:#333,stroke-width:2px;
+    classDef woStyle fill:#dfd,stroke:#333,stroke-width:2px;
+    classDef mrStyle fill:#ffd,stroke:#333,stroke-width:2px;
+    classDef qcStyle fill:#dff,stroke:#333,stroke-width:2px;
+    classDef whStyle fill:#fdb,stroke:#333,stroke-width:2px;
+
+    subgraph InventoryMonitoring ["Inventory Monitoring"]
+        Rep["Inventory Summary Report"]:::reportStyle
+        Alert{"Low Stock Alert?"}:::reportStyle
+    end
+
+    subgraph ProcurementPath ["Procurement Path (Low Components)"]
+        PO["Purchase Order<br/>(Draft -> Pending -> Approved -> Ordered -> Receiving -> Completed)"]:::poStyle
+        Receipt["Goods Receipt & Lot Generation<br/>(Create ComponentLots & IMPORT_PO txn)"]:::poStyle
+    end
+
+    subgraph ManufacturingPlanning ["Manufacturing Planning"]
+        PR["Production Request<br/>(Draft -> Pending/Waiting Material -> Approved)"]:::prStyle
+        CheckMRP{"MRP Check:<br/>Materials Available?"}:::prStyle
+        WO["Work Order Planning<br/>(Draft -> Released)"]:::woStyle
+    end
+
+    subgraph ShopFloorExecution ["Shop Floor Execution"]
+        WO_Progress["Work Order In Progress"]:::woStyle
+        MR["Material Request<br/>(BOM strict quantity -> Validate -> Complete/Issued)"]:::mrStyle
+        WO_Complete["Work Order Completion<br/>(ProductionBatch & ProductInstances in PENDING_QC)"]:::woStyle
+    end
+
+    subgraph QualityAndInduction ["Quality Control & Warehouse Induction"]
+        QC["Quality Check (SN Scan)<br/>(One Fail = Total Fail -> PASSED_QC/FAILED_QC)"]:::qcStyle
+        CostAbs["Cost Absorption Model<br/>(Calculate Unit Production Cost)"]:::qcStyle
+        Induction["Product Induction (Gate Scan)<br/>(IMPORT_PRODUCTION txn)"]:::whStyle
+        
+        WH_Sales[("Sales Warehouse<br/>(IN_STOCK_SALES)")]:::whStyle
+        WH_Error[("Error Warehouse<br/>(IN_STOCK_ERROR)")]:::whStyle
+        
+        PRAttrib["PR Attribution Loop<br/>(WO-PR Fulfillment -> FULFILLED status)"]:::prStyle
+    end
+
+    %% Connections
+    Rep --> Alert
+    
+    %% Procurement Path Branch
+    Alert -- "Low Component Stock" --> PO
+    PO --> Receipt
+    Receipt -->|"Update ComponentStock"| CheckMRP
+    
+    %% Manufacturing Path Branch
+    Alert -- "Low Product Stock" --> PR
+    PR --> CheckMRP
+    
+    %% MRP Check flows
+    CheckMRP -- "No (Material Shortage)" --> WAITING_MAT["WAITING_MATERIAL State"]:::prStyle
+    WAITING_MAT -.->|"Triggers procurement"| PO
+    CheckMRP -- "Yes" --> PR_Approve["Approved Production Request"]:::prStyle
+    
+    PR_Approve --> WO
+    WO --> WO_Progress
+    
+    %% Execution flows
+    WO_Progress --> MR
+    MR -->|"Issue ComponentLots (EXPORT_PRODUCTION txn)"| WO_Complete
+    WO_Complete --> QC
+    
+    %% Quality & Cost flows
+    QC --> CostAbs
+    CostAbs --> Induction
+    
+    %% Induction Routing
+    Induction -->|"Passed SNs"| WH_Sales
+    Induction -->|"Failed SNs"| WH_Error
+    
+    %% PR Fulfillment
+    WH_Sales --> PRAttrib
 ```
 
 ### Step-by-Step Flow

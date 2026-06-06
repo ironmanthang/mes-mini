@@ -1,5 +1,5 @@
 import { 
-  Search, Plus, Edit, Trash2, Shield, Loader2
+  Search, Plus, Edit, Trash2, Shield, Loader2, Key
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { roleService, type Role } from "../../../services/roleServices"; 
@@ -7,6 +7,7 @@ import { roleService, type Role } from "../../../services/roleServices";
 import { AddRoleModal } from "./AddRoleModal";
 import { UpdateRoleModal } from "./UpdateRoleModal";
 import { DeleteRoleModal } from "./DeleteRoleModal";
+import { ManageRolePermissionsModal } from "./ManageRolePermissionsModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 export const Roles = (): JSX.Element => {
@@ -17,7 +18,19 @@ export const Roles = (): JSX.Element => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [roleToEdit, setRoleToEdit] = useState<Role | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [roleForPermissions, setRoleForPermissions] = useState<Role | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleSuccess = (msg?: string) => {
+    setSuccessMsg(msg || "Action Completed Successfully");
+    setIsSuccess(true);
+    fetchRoles();
+    setTimeout(() => {
+      setIsSuccess(false);
+      setSuccessMsg("");
+    }, 3000);
+  };
 
   const fetchRoles = async () => {
     setIsLoading(true);
@@ -110,6 +123,13 @@ export const Roles = (): JSX.Element => {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
                         <button 
+                          onClick={() => setRoleForPermissions(role)}
+                          className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" 
+                          title="Configure Permissions"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
+                        <button 
                           onClick={() => handleOpenEdit(role)}
                           className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
                           title="Edit Role"
@@ -145,11 +165,7 @@ export const Roles = (): JSX.Element => {
       <AddRoleModal 
         isOpen={isAddOpen} 
         onClose={() => setIsAddOpen(false)} 
-        onSuccess={() => {
-            setIsSuccess(true);
-            fetchRoles();
-            setTimeout(() => setIsSuccess(false), 3000);
-        }} 
+        onSuccess={() => handleSuccess("Role created successfully!")} 
       />
 
       <UpdateRoleModal 
@@ -157,11 +173,7 @@ export const Roles = (): JSX.Element => {
         onClose={() => setRoleToEdit(null)} 
         roleId={roleToEdit?.roleId || null}
         initialRoleName={roleToEdit?.roleName || ""}
-        onSuccess={() => {
-            setIsSuccess(true);
-            fetchRoles();
-            setTimeout(() => setIsSuccess(false), 3000);
-        }} 
+        onSuccess={() => handleSuccess("Role updated successfully!")} 
       />
 
       <DeleteRoleModal 
@@ -169,14 +181,17 @@ export const Roles = (): JSX.Element => {
         onClose={() => setRoleToDelete(null)} 
         roleId={roleToDelete?.roleId || null}
         roleName={roleToDelete?.roleName || ""}
-        onSuccess={() => {
-            setIsSuccess(true);
-            fetchRoles();
-            setTimeout(() => setIsSuccess(false), 3000);
-        }} 
+        onSuccess={() => handleSuccess("Role deleted successfully!")} 
       />
 
-      <SuccessNotification isVisible={isSuccess}/>
+      <ManageRolePermissionsModal
+        isOpen={roleForPermissions !== null}
+        onClose={() => setRoleForPermissions(null)}
+        role={roleForPermissions}
+        onSuccess={handleSuccess}
+      />
+
+      <SuccessNotification isVisible={isSuccess} message={successMsg || undefined}/>
     </div>
   );
 };

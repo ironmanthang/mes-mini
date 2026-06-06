@@ -14,6 +14,13 @@ export interface UpdateRoleRequest {
 }
 
 
+export interface Permission {
+  permissionId: number;
+  permCode: string;
+  module: string;
+  description: string;
+}
+
 export const roleService = {
   getAllRoles: async () => {
     const response = await api.get<Role[]>("/roles");
@@ -34,4 +41,21 @@ export const roleService = {
     const response = await api.delete<{ message: string }>(`/roles/${id}`);
     return response.data;
   },
-};
+
+  getAllPermissions: async (search?: string, module?: string) => {
+    const response = await api.get<Permission[]>("/roles/permissions", {
+      params: { search, module }
+    });
+    return response.data;
+  },
+
+  getRolePermissions: async (roleId: number) => {
+    const response = await api.get<Permission[]>(`/roles/${roleId}/permissions`);
+    return response.data;
+  },
+
+  setRolePermissions: async (roleId: number, permCodes: string[]) => {
+    const response = await api.put<{ message: string; role: Role }>(`/roles/${roleId}/permissions`, { permCodes });
+    return response.data;
+  },
+};
