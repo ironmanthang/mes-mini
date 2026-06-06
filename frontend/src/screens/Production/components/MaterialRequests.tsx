@@ -7,10 +7,13 @@ import {
   PackageSearch,
   Calendar
 } from "lucide-react";
-import { useState, useEffect, useMemo, type JSX } from "react";
+import { useState, useEffect, useMemo, useRef, type JSX } from "react";
 import { NewMaterialRequestModal } from "./NewMaterialRequestModal";
 import { ViewMaterialRequestModal } from "./ViewMaterialRequestModal";
 import { MaterialRequestServices, type MaterialRequest } from "../../../services/materialRequestServices";
+import { hasAllPermissions } from "../../../lib/auth";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 export const MaterialRequests = (): JSX.Element => {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -21,6 +24,42 @@ export const MaterialRequests = (): JSX.Element => {
   
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<number | null>(null);
+
+  // Notification state
+  const [successMessage, setSuccessMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSuccessNotification = (message: string) => {
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    successTimeoutRef.current = setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 3000);
+  };
+
+  const showWarningNotification = (message: string) => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    setWarningMessage(message);
+    setShowWarning(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(false);
+      setWarningMessage("");
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    };
+  }, []);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -34,6 +73,7 @@ export const MaterialRequests = (): JSX.Element => {
       setRequests(sortedData);
     } catch (error) {
       console.error("Failed to fetch material requests:", error);
+      showWarningNotification("Failed to load material requests. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -92,12 +132,14 @@ export const MaterialRequests = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage and create material request slips automatically based on BOM.</p>
           </div>
-          <button 
-            onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> New Request
-          </button>
+          {hasAllPermissions(["WO_READ", "MR_CREATE"]) && (
+            <button 
+              onClick={() => setIsNewModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4" /> New Request
+            </button>
+          )}
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -196,13 +238,26 @@ export const MaterialRequests = (): JSX.Element => {
       <NewMaterialRequestModal 
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
-        onSuccess={() => fetchRequests()} 
+        onSuccess={() => {
+          fetchRequests();
+          showSuccessNotification("New material request created successfully!");
+        }} 
       />
 
       <ViewMaterialRequestModal 
         isOpen={viewRequestId !== null}
         onClose={() => setViewRequestId(null)}
         requestId={viewRequestId}
+      />
+
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
       />
     </div>
   );

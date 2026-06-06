@@ -111,8 +111,29 @@ export const hasAnyRole = (allowedRoles: string[]): boolean => {
  */
 export const hasPermission = (permCode: string): boolean => {
   // SYS_ADMIN mặc định có tất cả quyền
-  if (hasAnyRole(["SYS_ADMIN"])) return true;
+  if (hasAnyRole(["SYS_ADMIN", "PUBLIC"])) return true;
   
   const permissions = getUserPermissions();
   return permissions.includes(permCode);
 };
+
+/**
+ * Kiểm tra xem người dùng có ít nhất 1 trong danh sách các mã quyền không.
+ * Dùng để quyết định có hiển thị tab/section hay không khi tab yêu cầu nhiều permissions khác nhau.
+ */
+export const hasAnyPermission = (permCodes: string | string[]): boolean => {
+  const codes = Array.isArray(permCodes) ? permCodes : [permCodes];
+  return codes.some(code => hasPermission(code));
+};
+
+/**
+ * Kiểm tra xem người dùng có TẤT CẢ các mã quyền trong danh sách không.
+ * Chỉ trả về true khi user sở hữu đủ mọi permission được yêu cầu.
+ * Dùng cho các action nhạy cảm cần đồng thời nhiều quyền.
+ */
+export const hasAllPermissions = (permCodes: string | string[]): boolean => {
+  const codes = Array.isArray(permCodes) ? permCodes : [permCodes];
+  if (codes.length === 0) return true;
+  return codes.every(code => hasPermission(code));
+};
+

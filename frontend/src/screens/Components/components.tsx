@@ -1,6 +1,6 @@
 import { Cpu, ShoppingCart, PackagePlus, ClipboardCheck, QrCode } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const Components = () => {
   const allTabs = [
@@ -10,7 +10,7 @@ export const Components = () => {
       icon: Cpu,
       to: "/components/info",
       description: "Manage items, stock & specs",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
+      allowedPermissions: ["COMP_READ", "COMP_UPDATE", "COMP_CREATE"]
     },
     { 
       id: "create-order", 
@@ -18,7 +18,7 @@ export const Components = () => {
       icon: PackagePlus,
       to: "/components/create-order",
       description: "Import materials & components",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR"]
+      allowedPermissions: ["PO_CREATE"]
     },
     { 
       id: "orders",
@@ -26,7 +26,7 @@ export const Components = () => {
       icon: ShoppingCart,
       to: "/components/orders",
       description: "Purchase Orders & Tracking",
-      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
+      allowedPermissions: ["PO_READ"]
     },
     { 
       id: "receipts", 
@@ -34,20 +34,22 @@ export const Components = () => {
       icon: ClipboardCheck,
       to: "/components/receipts",
       description: "Verify and store incoming goods",
-      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
+      allowedPermissions: ["PO_READ"]
     },
     { 
-      id: "barcodes", 
+      id: "barcodes",
       label: "Component Barcodes", 
       icon: QrCode,
       to: "/components/barcodes",
       description: "Print component tray barcodes",
-      allowedRoles: ["SYS_ADMIN", "LINE_LEADER"]
+      allowedPermissions: ["PUBLIC"]
     },
   ];
 
-  // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  // Lọc tab: chỉ hiển thị những tab người dùng có ít nhất 1 quyền phù hợp
+  const visibleTabs = allTabs.filter(tab =>
+    !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions)
+  );
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

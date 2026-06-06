@@ -2,11 +2,10 @@ import { type JSX } from "react";
 import { 
   Info, 
   ClipboardCheck, 
-  ShoppingCart,
   ClipboardList,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const FinishedProduct = (): JSX.Element => {
   const allTabs = [
@@ -15,7 +14,8 @@ export const FinishedProduct = (): JSX.Element => {
       label: "Information", 
       icon: Info, 
       to: "/finished-products/info",
-      description: "Batch details & serial numbers" 
+      description: "Batch details & serial numbers",
+      allowedPermissions: ["PRODUCT_READ", "PRODUCT_CREATE", "PRODUCT_UPDATE"],
     },
     { 
       id: "quality", 
@@ -23,27 +23,20 @@ export const FinishedProduct = (): JSX.Element => {
       icon: ClipboardCheck, 
       to: "/finished-products/quality",
       description: "QA/QC inspections & logs",
-      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
+      allowedPermissions: ["QC_READ"]
     },
     { 
       id: "checklists", 
       label: "QC Checklists", 
       icon: ClipboardList, 
       to: "/finished-products/checklists",
-      description: "Manage QC templates & parameters" 
-    },
-    { 
-      id: "orders", 
-      label: "Orders", 
-      icon: ShoppingCart, 
-      to: "/finished-products/orders",
-      description: "Manage sales & shipping",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
+      description: "Manage QC templates & parameters",
+      allowedPermissions: ["QC_CREATE", "QC_READ"],
     },
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

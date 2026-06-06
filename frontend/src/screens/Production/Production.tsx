@@ -1,6 +1,6 @@
 import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const Production = () => {
   const allTabs = [
@@ -10,7 +10,7 @@ export const Production = () => {
       icon: Factory,
       to: "/production/requests",
       description: "Create new manufacturing requests",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]
+      allowedPermissions: ["PR_READ"]
     },
     { 
       id: "work-orders",
@@ -18,15 +18,15 @@ export const Production = () => {
       icon: ClipboardList,
       to: "/production/work-orders",
       description: "Schedule and track manufacturing orders",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER", "PROD_WORKER"]
+      allowedPermisions: ["WO_READ"]
     },
-    { 
+    {
       id: "material-requests",
       label: "Material Requests",
       icon: PackageSearch,
       to: "/production/material-requests",
       description: "Request components for work orders",
-      allowedRoles: ["SYS_ADMIN", "LINE_LEADER"]
+      allowedPermissions: ["MR_READ"]
     },
     { 
       id: "configure-lots",
@@ -34,12 +34,12 @@ export const Production = () => {
       icon: Settings,
       to: "/production/configure-lots",
       description: "Setup batches & instances",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR"]
+      allowedPermissions: ["LINE_READ"]
     },
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24">

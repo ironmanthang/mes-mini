@@ -1,4 +1,5 @@
 import api from "./api";
+import { roleService } from "./roleServices";
 
 export interface LoginCredentials {
   username: string;
@@ -36,9 +37,30 @@ export const authService = {
     const response = await api.post<AuthResponse>("/auth/login", credentials);
     if (response.data.token) {
       localStorage.setItem("token", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-      const roleName = response.data.user.roles.map(r => r.roleName);
-      localStorage.setItem("userRole", JSON.stringify(roleName));
+
+      const user = response.data.user;
+
+      // Lấy tất cả permissions của tất cả roles user đang giữ
+      const permCodeSet = new Set<string>();
+      for (const role of user.roles) {
+        try {
+          const perms = await roleService.getRolePermissions(role.roleId);
+          perms.forEach(p => permCodeSet.add(p.permCode));
+        } catch (err) {
+          console.warn(`Không thể lấy permissions cho roleId=${role.roleId}`, err);
+        }
+      }
+
+      // Lưu user kèm permissions vào localStorage
+      const enrichedUser = {
+        ...user,
+        permissions: [...permCodeSet],
+      };
+      localStorage.setItem("user", JSON.stringify(enrichedUser));
+
+      // Lưu danh sách roleName (dùng cho hasAnyRole ở những nơi còn dùng)
+      const roleNames = user.roles.map(r => r.roleName);
+      localStorage.setItem("userRole", JSON.stringify(roleNames));
     }
     return response.data;
   },

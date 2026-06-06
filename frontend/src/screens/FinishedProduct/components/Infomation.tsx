@@ -17,10 +17,9 @@ import { UpdateProductModal } from "./UpdateProductModal";
 import { DeleteProductModal } from "./DeleteProductModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const Information = (): JSX.Element => {
-  const canEdit = hasAnyRole(["SYS_ADMIN", "PROD_MGR", "WH_STAFF"]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,12 +110,14 @@ export const Information = (): JSX.Element => {
             <p className="text-sm text-gray-500 mt-1">Manage master data for all finished goods and products in the system.</p>
           </div>
 
-          <button className="flex items-center bg-blue-500 p-3 text-sm font-semibold text-white rounded-lg
-          cursor-pointer hover:bg-blue-600 shadow-lg hover:shadow-md transition duration-200"
-          onClick={() => setIsCreateNewProduct(true)}
-          >
-            <Plus className="p-1"/><span>New Product</span>
-          </button>
+          {hasPermission("PRODUCT_CREATE") && (
+            <button className="flex items-center bg-blue-500 p-3 text-sm font-semibold text-white rounded-lg
+            cursor-pointer hover:bg-blue-600 shadow-lg hover:shadow-md transition duration-200"
+            onClick={() => setIsCreateNewProduct(true)}
+            >
+              <Plus className="p-1"/><span>New Product</span>
+            </button>
+          )}
         </div>
 
         <div className="p-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
@@ -177,7 +178,7 @@ export const Information = (): JSX.Element => {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {canEdit && (
+                          {hasPermission("PRODUCT_UPDATE") && (
                             <button 
                               onClick={() => handleUpdate(product.productId)}
                               className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
@@ -186,7 +187,6 @@ export const Information = (): JSX.Element => {
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
-                          {canEdit && (
                             <button 
                               onClick={() => handleDelete(product.productId, product.productName)}
                               className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
@@ -194,7 +194,7 @@ export const Information = (): JSX.Element => {
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          )}
+                          
                         </div>
                       </td>
                     </tr>

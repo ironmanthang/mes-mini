@@ -592,8 +592,9 @@ export const CreateComponentOrder = (): JSX.Element => {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs uppercase text-gray-500 font-semibold">
-                <th className="p-3 w-[300px]">Component Name*</th>
+              <tr className="bg-gray-50 border-b border-gray-200 
+              text-left text-xs uppercase text-gray-500 font-semibold">
+                <th className="p-3 w-[500px]">Component Name*</th>
                 <th className="p-3">ID</th>
                 <th className="p-3 text-right w-[100px]">Qty*</th>
                 <th className="p-3 text-right w-[120px]">Unit Price ($)*</th>
@@ -615,7 +616,7 @@ export const CreateComponentOrder = (): JSX.Element => {
                           <option value={row.componentId}>{row.componentName}</option>
                         )}
                       {componentsList.map(c => (
-                        <option key={c.componentId} value={c.componentId}>{c.code} - {c.name}</option>
+                        <option key={c.componentId} value={c.componentId}>{c.name}</option>
                       ))}
                     </select>
                   </td>

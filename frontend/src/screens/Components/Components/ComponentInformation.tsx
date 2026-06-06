@@ -17,6 +17,7 @@ import { componentService, type Component } from "../../../services/componentSer
 import { InventoryServices } from "../../../services/inventoryServices";
 import { DeleteComponentModal } from "./DeleteComponentModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { hasPermission } from "../../../lib/auth";
 
 export const ComponentInformation = (): JSX.Element => {
   const [components, setComponents] = useState<Component[]>([]);
@@ -172,12 +173,14 @@ export const ComponentInformation = (): JSX.Element => {
                 <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer">
                     <History className="w-4 h-4" /> Purchase History
                 </button>
-                <button 
-                    onClick={handleOpenAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
-                >
-                    <Plus className="w-4 h-4" /> Add Component
-                </button>
+                {hasPermission("COMP_CREATE") && (
+                  <button 
+                      onClick={handleOpenAdd}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
+                  >
+                      <Plus className="w-4 h-4" /> Add Component
+                  </button>
+                )}
             </div>
         </div>
 
@@ -196,7 +199,9 @@ export const ComponentInformation = (): JSX.Element => {
                             <th className="p-4 text-right">Standard Cost</th>
                             <th className="p-4 text-center">Available / Min</th>
                             <th className="p-4 text-center">Status</th>
-                            <th className="p-4 text-center">Actions</th>
+                            {hasPermission("COMP_UPDATE") && (
+                              <th className="p-4 text-center">Actions</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="text-sm">
@@ -241,28 +246,30 @@ export const ComponentInformation = (): JSX.Element => {
                                             {status}
                                         </span>
                                     </td>
-                                    <td className="p-4 flex items-center justify-center gap-1">
-                                        <button 
-                                            onClick={() => handleOpenEdit(item)}
-                                            className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded cursor-pointer transition-colors" 
-                                            title="Edit Component"
-                                        >
-                                            <Edit className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDelete(item.componentId, item.componentName)}
-                                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer transition-colors" 
-                                            title="Delete Component"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                                    {hasPermission("COMP_UPDATE") && (
+                                      <td className="p-4 flex items-center justify-center gap-1">
+                                          <button 
+                                              onClick={() => handleOpenEdit(item)}
+                                              className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded cursor-pointer transition-colors" 
+                                              title="Edit Component"
+                                          >
+                                              <Edit className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                              onClick={() => handleDelete(item.componentId, item.componentName)}
+                                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer transition-colors" 
+                                              title="Delete Component"
+                                          >
+                                              <Trash2 className="w-4 h-4" />
+                                          </button>
+                                      </td>
+                                    )}
                                 </tr>
                             );
                         })}
                         {components.length === 0 && !isLoading && (
                             <tr>
-                                <td colSpan={7} className="text-center py-12 text-gray-500">
+                                <td colSpan={hasPermission("COMP_UPDATE") ? 7 : 6} className="text-center py-12 text-gray-500">
                                     <Cpu className="w-12 h-12 mx-auto text-gray-300 mb-3" />
                                     No components found.
                                 </td>

@@ -1,5 +1,4 @@
 import {
-  LayoutDashboardIcon,
   TrendingUpIcon,
   UsersIcon,
   WrenchIcon,
@@ -11,54 +10,54 @@ import {
 } from "lucide-react";
 import type { JSX } from "react";
 import { NavLink } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasPermission } from "../../lib/auth";
 
 const menuItems = [
-  { icon: LayoutDashboardIcon, label: "Dashboard", to: "/dashboard" },
   {
     icon: TrendingUpIcon,
     label: "Reports",
     to: "/reports",
-    allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]
+    allowedPermissions: ["WO_READ", "WH_STOCK_READ"]
   },
   {
     icon: UsersIcon,
     label: "Human Resources",
     to: "/human-resources",
-    allowedRoles: ["SYS_ADMIN"]
+    allowedPermissions: ["EMP_READ", "ROLE_MANAGE"]
   },
   {
     icon: WrenchIcon,
     label: "Components",
     to: "/components",
-    allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
+    allowedPermissions: ["COMP_READ", "PO_READ", "PO_CREATE", "PO_RECEIVE"]
   },
   {
     icon: TruckIcon,
     label: "Suppliers",
     to: "/supplier",
-    allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF"]
+    allowedPermissions: ["SUPPLIER_READ"]
   },
   {
     icon: WarehouseIcon,
     label: "Warehouse",
     to: "/warehouse",
-    allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
+    allowedPermissions: ["WH_STOCK_READ", "WH_MANAGE", "WH_INDUCT", "MR_APPROVE"]
   },
   {
     icon: FactoryIcon,
     label: "Production",
     to: "/production",
-    allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER", "PROD_WORKER"]
+    allowedPermissions: ["PR_READ", "WO_READ", "MR_READ", "LINE_READ"]
   },
   { icon: PackageIcon, label: "Finished Products", to: "/finished-products" },
 ];
 
 export const Sidebar = (): JSX.Element => {
-  // Lọc danh sách menu: chỉ hiển thị các mục mà người dùng có quyền truy cập
+  // Lọc danh sách menu: chỉ hiển thị các mục mà người dùng có ít nhất 1 permission phù hợp
   const visibleMenuItems = menuItems.filter(
-    item => !item.allowedRoles || hasAnyRole(item.allowedRoles)
+    item => !item.allowedPermissions || item.allowedPermissions.some(p => hasPermission(p))
   );
+
 
   return (
     <aside className="w-[200px] bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0">

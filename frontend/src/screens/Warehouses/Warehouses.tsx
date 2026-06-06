@@ -1,6 +1,6 @@
 import { Warehouse as WarehouseIcon, PackageCheck, QrCode } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const Warehouse = () => {
   const allTabs = [
@@ -10,7 +10,7 @@ export const Warehouse = () => {
       icon: WarehouseIcon,
       to: "/warehouse/info",
       description: "Manage locations, capacity & status",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "WH_STAFF", "PURCH_STAFF", "QC_INSPECTOR", "SALES_STAFF"]
+      allowedPermissions: ["WH_STOCK_READ", "WH_STOCK_ADJUST", "WH_MANAGE"],
     },
     { 
       id: "induction",
@@ -18,7 +18,7 @@ export const Warehouse = () => {
       icon: QrCode,
       to: "/warehouse/induction",
       description: "Scan & receive finished goods from production",
-      allowedRoles: ["SYS_ADMIN", "WH_STAFF", "PROD_MGR"]
+      allowedPermissions: ["WH_INDUCT"]
     },
     { 
       id: "material-issuing",
@@ -26,12 +26,12 @@ export const Warehouse = () => {
       icon: PackageCheck,
       to: "/warehouse/material-issuing",
       description: "Approve & issue materials to production",
-      allowedRoles: ["SYS_ADMIN", "WH_STAFF"]
+      allowedPermissions: ["WH_STOCK_READ", "WO_COMPLETED"]
     }
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

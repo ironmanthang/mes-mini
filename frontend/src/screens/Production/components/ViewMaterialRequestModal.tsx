@@ -1,8 +1,9 @@
 import { 
     X, Loader2, PackageSearch, Layers, Calendar, FileText, CheckCircle2, Clock, AlertCircle
 } from "lucide-react";
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { MaterialRequestServices, type MaterialRequest } from "../../../services/materialRequestServices";
+import { WarningNotification } from "../../Notification/WarningNotification";
 
 interface ViewMaterialRequestModalProps {
     isOpen: boolean;
@@ -14,6 +15,26 @@ export const ViewMaterialRequestModal = ({ isOpen, onClose, requestId }: ViewMat
     const [requestDetail, setRequestDetail] = useState<MaterialRequest | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
+    const [warningMessage, setWarningMessage] = useState("");
+    const [showWarning, setShowWarning] = useState(false);
+    const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showWarningNotification = (message: string) => {
+        if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        setWarningMessage(message);
+        setShowWarning(true);
+        warningTimeoutRef.current = setTimeout(() => {
+            setShowWarning(false);
+            setWarningMessage("");
+        }, 3000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         if (isOpen && requestId) {
             setIsLoading(true);
@@ -23,7 +44,7 @@ export const ViewMaterialRequestModal = ({ isOpen, onClose, requestId }: ViewMat
                 })
                 .catch(err => {
                     console.error("Failed to fetch material request details:", err);
-                    alert("Error loading material request details.");
+                    showWarningNotification("Error loading material request details. Please try again.");
                 })
                 .finally(() => setIsLoading(false));
         } else {
@@ -153,6 +174,14 @@ export const ViewMaterialRequestModal = ({ isOpen, onClose, requestId }: ViewMat
                     </button>
                 </div>
             </div>
+            <WarningNotification
+                isVisible={showWarning}
+                message={warningMessage}
+                onClose={() => {
+                    setShowWarning(false);
+                    setWarningMessage("");
+                }}
+            />
         </div>
     );
 };
