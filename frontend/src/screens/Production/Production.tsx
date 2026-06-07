@@ -1,4 +1,4 @@
-import { ClipboardList, Settings, Factory, PackageSearch } from "lucide-react";
+import { ClipboardList, Factory, PackageSearch } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { hasAnyPermission } from "../../lib/auth";
 
@@ -27,14 +27,6 @@ export const Production = () => {
       to: "/production/material-requests",
       description: "Request components for work orders",
       allowedPermissions: ["MR_READ"]
-    },
-    { 
-      id: "configure-lots",
-      label: "Configure Lots", 
-      icon: Settings,
-      to: "/production/configure-lots",
-      description: "Setup batches & instances",
-      allowedPermissions: ["LINE_READ"]
     },
   ];
 

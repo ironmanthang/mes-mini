@@ -13,7 +13,6 @@ import { ComponentInformation } from "./screens/Components/Components/ComponentI
 import { CreateComponentOrder } from "./screens/Components/Components/CreateComponentOrder";
 import { ComponentOrders } from "./screens/Components/Components/ComponentOrders";
 import { ComponentReceipts } from "./screens/Components/Components/ComponentReceipts";
-import { ComponentBarcodes } from "./screens/Components/Components/ComponentBarcodes";
 
 import { SupplierInformation } from "./screens/Supplier/components/SupplierInformation";
 import { SupplierComponents } from "./screens/Supplier/components/SupplierComponents";
@@ -21,7 +20,6 @@ import { SupplierComponents } from "./screens/Supplier/components/SupplierCompon
 import { CreateProductionRequest } from "./screens/Production/components/ProductionRequest";
 import { WorkOrders } from "./screens/Production/components/WorkOrders";
 import { MaterialRequests } from "./screens/Production/components/MaterialRequests";
-import { ConfigureProductionLots } from "./screens/Production/components/ConfigureProductionLots";
 
 import { WarehouseInformation } from "./screens/Warehouses/components/WarehouseInformation";
 import { MaterialIssuing } from "./screens/Warehouses/components/MaterialIssuing";
@@ -68,8 +66,7 @@ const ComponentsIndexRedirect = () => {
     { to: "info", allowedPermissions: ["COMP_READ"] },
     { to: "create-order", allowedPermissions: ["PO_CREATE"] },
     { to: "orders", allowedPermissions: ["PO_READ"] },
-    { to: "receipts", allowedPermissions: ["PO_RECEIVE"] },
-    { to: "barcodes", allowedPermissions: ["COMP_READ"] }
+    { to: "receipts", allowedPermissions: ["PO_RECEIVE"] }
   ], "info");
   return <Navigate to={allowed} replace />;
 };
@@ -87,8 +84,7 @@ const ProductionIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
     { to: "requests", allowedPermissions: ["PR_READ"] },
     { to: "work-orders", allowedPermissions: ["WO_READ"] },
-    { to: "material-requests", allowedPermissions: ["MR_READ"] },
-    { to: "configure-lots", allowedPermissions: ["LINE_READ"] }
+    { to: "material-requests", allowedPermissions: ["MR_READ"] }
   ], "work-orders");
   return <Navigate to={allowed} replace />;
 };
@@ -180,11 +176,6 @@ export default function App() {
                       <ComponentReceipts />
                     </ProtectedRouteWithRole>
                   } />
-                  <Route path="barcodes" element={
-                    <ProtectedRouteWithRole allowedPermissions={["COMP_READ"]}>
-                      <ComponentBarcodes />
-                    </ProtectedRouteWithRole>
-                  } />
                 </Route>
 
                 {/* Suppliers */}
@@ -234,11 +225,6 @@ export default function App() {
                   <Route path="material-requests" element={
                     <ProtectedRouteWithRole allowedPermissions={["MR_READ"]}>
                       <MaterialRequests />
-                    </ProtectedRouteWithRole>
-                  } />
-                  <Route path="configure-lots" element={
-                    <ProtectedRouteWithRole allowedPermissions={["LINE_READ"]}>
-                      <ConfigureProductionLots />
                     </ProtectedRouteWithRole>
                   } />
                 </Route>

@@ -1,192 +1,123 @@
-# 2. Prisma Basics — The Database Layer
+# Common Prisma Queries (The Most Important Part)
 
-## What is Prisma?
-
-Prisma is a tool that lets you talk to the database using TypeScript instead of raw SQL.
-
-Without Prisma (raw SQL):
-```sql
-SELECT * FROM components WHERE component_id = 5;
-```
-
-With Prisma (TypeScript):
-```typescript
-prisma.component.findUnique({ where: { componentId: 5 } });
-```
-
-Both do the exact same thing. Prisma just translates TypeScript into SQL for you.
+These are all the Prisma query methods your backend uses. Every example below is sourced from real code in this project.
 
 ---
 
-## The Schema File — Your Database Blueprint
+## The Basic Pattern
 
-Open: `backend/prisma/schema.prisma`
-
-This file defines **every table** in your database. Each `model` = one database table.
-
-### Reading a Model (using Component as example)
-
-```prisma
-model Component {
-  componentId   Int      @id @default(autoincrement()) @map("component_id")
-  componentName String   @map("component_name")
-  description   String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  code          String   @unique
-  minStockLevel Int      @default(0) @map("min_stock_level")
-  standardCost  Decimal  @default(0) @map("standard_cost") @db.Decimal(10, 2)
-  unit          String
-
-  @@map("components")
-}
+Every Prisma query follows this shape:
+```typescript
+await prisma.<modelName>.<method>({ options });
 ```
 
-Let's break this down piece by piece:
-
-| Code | What it means |
-|---|---|
-| `componentId Int` | A field called "componentId" that stores a number |
-| `@id` | This is the PRIMARY KEY (unique identifier for each row) |
-| `@default(autoincrement())` | The database auto-generates this number (1, 2, 3, ...) |
-| `@map("component_id")` | In the actual database table, the column name is "component_id" (snake_case) but in TypeScript we use "componentId" (camelCase) |
-| `String?` | The `?` means this field is OPTIONAL (can be null/empty) |
-| `@unique` | No two components can have the same value for this field |
-| `@default(0)` | If you don't provide a value, it defaults to 0 |
-| `@updatedAt` | Prisma automatically updates this timestamp when you change the record |
-| `@@map("components")` | The actual table name in PostgreSQL is "components" |
-
-### Field Types You'll See
-
-| Prisma Type | What it stores | Example |
-|---|---|---|
-| `Int` | Whole number | 42 |
-| `String` | Text | "Steel Sheet" |
-| `Boolean` | True or False | true |
-| `DateTime` | Date and time | 2026-06-04T12:00:00Z |
-| `Decimal` | Precise number (for money) | 1234.56 |
-| `Float` | Decimal number (less precise) | 3.14 |
-
-### Optional vs Required
-
-```prisma
-componentName String    // REQUIRED — must provide a value
-description   String?   // OPTIONAL — can be null (the ? makes it optional)
-```
+- `<modelName>` = a table in your database (e.g., `component`, `product`, `supplier`)
+- `<method>` = what you want to do (e.g., `findMany`, `create`, `update`, `delete`)
 
 ---
 
-## How to Add a New Field — Step by Step
+## 1. `findMany` — Get a List of Records
 
-Let's say the reviewer asks: "Add a `weight` field to the Component model."
-
-### Step 1: Edit `schema.prisma`
-
-Add the new field inside the `model Component { }` block:
-
-```prisma
-model Component {
-  componentId   Int      @id @default(autoincrement()) @map("component_id")
-  componentName String   @map("component_name")
-  description   String?
-  // ... existing fields ...
-  unit          String
-  weight        Decimal? @map("weight") @db.Decimal(10, 2)   // ← NEW FIELD
-  
-  // ... relations below ...
-}
-```
-
-Why `Decimal?` (with the `?`)?
-- Because existing components don't have a weight value yet
-- Making it optional means old data won't break
-- The `@db.Decimal(10, 2)` means: up to 10 digits total, 2 after decimal point (e.g., 12345678.99)
-
-### Step 2: Run Migration
-
-After changing the schema, you need to tell the database:
-
-```bash
-# Inside the backend container (or your terminal):
-npx prisma migrate dev --name add_weight_to_component
-```
-
-This command:
-1. Compares your schema.prisma with the current database
-2. Generates a SQL file (the "migration") that adds the new column
-3. Runs that SQL against your database
-4. Regenerates the Prisma client (so TypeScript knows about the new field)
-
-**Important**: After migration, the new field is ALREADY available in your API responses! Prisma automatically includes all fields when querying.
-
-### Step 3: Update Validator (if you want users to SET the field)
-
-In `componentValidator.ts`, add the field to both create and update schemas:
+The most used query. Returns an **array** of records.
 
 ```typescript
-// In createComponentSchema, add:
-weight: Joi.number().min(0).optional()
-
-// In updateComponentSchema, add:
-weight: Joi.number().min(0).optional()
-```
-
-### That's it!
-
-You don't need to change the Controller or Service files for simple field additions, because:
-- The service uses `prisma.component.create({ data: data as any })` — it passes ALL data through
-- The controller returns whatever the service returns
-- Prisma already includes all fields when reading
-
----
-
-## Common Prisma Queries (The Most Important Part)
-
-These are the Prisma commands your services use. You NEED to understand these.
-
-### 1. Find Many (Get a list)
-```typescript
-// Get ALL components
+// Get ALL components (no filter)
 const components = await prisma.component.findMany();
 
-// Get components with filter
+// Filter by exact match (unit = 'kg')
 const components = await prisma.component.findMany({
-    where: { unit: 'kg' }  // only components measured in kg
+    where: { unit: 'kg' }
 });
 
-// Get components with search (name contains "steel")
+// Search by text (name contains 'steel', case-insensitive)
 const components = await prisma.component.findMany({
     where: {
         componentName: { contains: 'steel', mode: 'insensitive' }
     }
 });
 
-// Get components with sorting
+// Sort results (newest first)
 const components = await prisma.component.findMany({
-    orderBy: { createdAt: 'desc' }  // newest first
+    orderBy: { createdAt: 'desc' }
 });
 
-// Get only specific fields
+// Pagination (skip first 20, take next 20)
+const components = await prisma.component.findMany({
+    skip: 20,
+    take: 20
+});
+
+// Return only specific fields (not the entire row)
 const components = await prisma.component.findMany({
     select: { componentId: true, componentName: true, code: true }
-    // Only returns these 3 fields, not everything
+    // Only returns these 3 fields
 });
 ```
 
-### 2. Find Unique (Get ONE record by unique field)
+**Real example from `inventoryService.ts`:**
 ```typescript
-// By primary key
+// Search by name only (no OR needed if filtering 1 field)
+const components = await prisma.component.findMany({
+    where: {
+        componentName: { contains: query.search, mode: 'insensitive' }
+    },
+    orderBy: { componentName: 'asc' }
+});
+```
+
+---
+
+## 2. `findUnique` — Get Exactly ONE Record by a Unique Field
+
+Use this when you know the exact ID or unique code. Returns one record or `null`.
+
+```typescript
+// By primary key (ID)
 const component = await prisma.component.findUnique({
     where: { componentId: 5 }
 });
 
-// By unique field
+// By unique field (code is marked @unique in schema.prisma)
 const component = await prisma.component.findUnique({
     where: { code: 'COM-001' }
 });
 ```
 
-### 3. Create (Insert new record)
+> **Rule**: You can only use `findUnique` on fields marked `@id` or `@unique` in `schema.prisma`. If the field is not unique, you'll get a TypeScript error.
+
+---
+
+## 3. `findFirst` — Get the First Record That Matches
+
+Like `findMany` but returns only the **first** result (or `null`). Useful for existence checks.
+
+```typescript
+// Check if a component is already used in a Purchase Order
+const inPO = await prisma.purchaseOrderDetail.findFirst({
+    where: { componentId: 5 }
+});
+if (inPO) throw new Error('Cannot delete: component is used in a PO.');
+```
+
+**Real example from `supplierService.ts`** (combining `NOT` and `OR`):
+```typescript
+// Find any supplier that has the same code, email, OR phone — but exclude self
+const conflict = await prisma.supplier.findFirst({
+    where: {
+        NOT: { supplierId: currentSupplierId },  // exclude yourself
+        OR: [
+            { code: data.code },
+            { email: data.email },
+            { phoneNumber: data.phoneNumber }
+        ]
+    }
+});
+```
+
+---
+
+## 4. `create` — Insert One New Record
+
 ```typescript
 const newComponent = await prisma.component.create({
     data: {
@@ -200,68 +131,293 @@ const newComponent = await prisma.component.create({
 // Returns the created component (including auto-generated id)
 ```
 
-### 4. Update (Change existing record)
+---
+
+## 5. `createMany` — Insert Multiple Records at Once
+
+More efficient than calling `create` in a loop.
+
+**Real example from `notificationService.ts`:**
 ```typescript
-const updated = await prisma.component.update({
-    where: { componentId: 5 },   // WHICH record to update
-    data: { componentName: 'Updated Name' }  // WHAT to change
+// Notify all managers at once (insert many notifications in one DB call)
+await prisma.notification.createMany({
+    data: employees.map(emp => ({
+        type: 'ALERT',
+        title: 'Low Stock',
+        message: 'Component X is below minimum level',
+        employeeId: emp.employeeId,
+    }))
 });
 ```
 
-### 5. Delete
+> `createMany` does NOT return the created records by default — it only returns `{ count: N }`.
+
+---
+
+## 6. `update` — Change ONE Existing Record
+
 ```typescript
-const deleted = await prisma.component.delete({
+const updated = await prisma.component.update({
+    where: { componentId: 5 },      // WHICH record to update (must be unique)
+    data: { componentName: 'Updated Name' }  // WHAT to change
+});
+// Only changes 'componentName'. All other fields are untouched.
+```
+
+**Real example from `notificationService.ts`:**
+```typescript
+// Mark a single notification as read
+await prisma.notification.update({
+    where: { notificationId: 12 },
+    data: { isRead: true }
+});
+```
+
+---
+
+## 7. `updateMany` — Change MULTIPLE Records at Once
+
+```typescript
+// Mark ALL of a user's unread notifications as read in one query
+await prisma.notification.updateMany({
+    where: { employeeId: 3, isRead: false },  // filter: which rows to change
+    data: { isRead: true }                    // what to change
+});
+// Returns: { count: 5 }  (how many rows were updated)
+```
+
+---
+
+## 8. `delete` — Remove ONE Record
+
+```typescript
+await prisma.component.delete({
     where: { componentId: 5 }
 });
 ```
 
-### 6. Count
-```typescript
-const total = await prisma.component.count();
-// Returns: 42  (just a number)
+---
 
-const filtered = await prisma.component.count({
+## 9. `deleteMany` — Remove MULTIPLE Records at Once
+
+**Real example from `supplierService.ts`:**
+```typescript
+// Remove all links between a supplier and a component
+const result = await prisma.supplierComponent.deleteMany({
+    where: {
+        supplierId: 2,
+        componentId: 7
+    }
+});
+// Returns: { count: 1 }
+```
+
+---
+
+## 10. `count` — Count How Many Records Match
+
+Returns a plain number, not an array.
+
+```typescript
+// Count all components
+const total = await prisma.component.count();
+// Returns: 42
+
+// Count only kg components
+const kgCount = await prisma.component.count({
     where: { unit: 'kg' }
 });
 ```
 
-### 7. Include Related Data
+---
+
+## 11. `upsert` — Insert if Not Exists, Otherwise Update
+
+"Update or Insert". Checks if a record exists — if yes, updates it; if no, creates it.
+
+**Real example from `supplierService.ts`:**
 ```typescript
-// Get a product WITH its category info
-const product = await prisma.product.findUnique({
-    where: { productId: 1 },
-    include: { category: true }  // joins the ProductCategory table
+// Link a supplier to a component — avoid duplicates
+await prisma.supplierComponent.upsert({
+    where: {
+        supplierId_componentId: { supplierId: 2, componentId: 7 }
+        // ↑ This is a composite unique key (two fields together must be unique)
+    },
+    update: {},           // If it already exists, do nothing (empty update)
+    create: {             // If it doesn't exist, create it
+        supplierId: 2,
+        componentId: 7
+    }
 });
-// Result includes: { productId: 1, productName: '...', category: { categoryId: 1, categoryName: '...' } }
 ```
 
 ---
 
-## Relations (How Tables Connect)
+## 12. `groupBy` — Aggregate Data Grouped by a Field
 
-In your schema, tables are connected via foreign keys:
+Like SQL's `GROUP BY`. Used for counting or summing data per group.
 
-```prisma
-model Product {
-  productId  Int              @id @default(autoincrement())
-  categoryId Int?             @map("category_id")
-  category   ProductCategory? @relation(fields: [categoryId], references: [categoryId])
-  //         ↑ relation name   ↑ which field in THIS table   ↑ which field in OTHER table
+**Real example from `inventoryService.ts`:**
+```typescript
+// Count how many product instances exist per product, for products in stock
+const stockCounts = await prisma.productInstance.groupBy({
+    by: ['productId'],          // Group rows by productId
+    where: {
+        productId: { in: [1, 2, 3] },
+        status: 'IN_STOCK_SALES'
+    },
+    _count: { productInstanceId: true }  // Count rows in each group
+});
+// Returns: [{ productId: 1, _count: { productInstanceId: 15 } }, ...]
+
+// Sum quantities per component across all warehouses
+const stockAgg = await prisma.componentStock.groupBy({
+    by: ['componentId'],
+    where: { componentId: { in: [1, 2, 3] } },
+    _sum: { quantity: true }  // Sum the quantity field in each group
+});
+// Returns: [{ componentId: 1, _sum: { quantity: 200 } }, ...]
+```
+
+---
+
+## The `where` Object — All Filter Options
+
+This is the heart of every query. Here is a full reference of what you can put inside `where`:
+
+### Direct Field Matching (AND logic by default)
+```typescript
+where: {
+    unit: 'kg',              // unit equals 'kg'
+    minStockLevel: 10,       // AND minStockLevel equals 10
+    isActive: true           // AND isActive equals true
+}
+// All conditions must be true (AND)
+```
+
+### String Operators
+```typescript
+where: {
+    componentName: { contains: 'steel' },              // contains substring
+    componentName: { contains: 'steel', mode: 'insensitive' }, // case-insensitive
+    code: { startsWith: 'COM-' },                      // starts with
+    code: { endsWith: '-001' },                        // ends with
 }
 ```
 
-This means:
-- Each Product can belong to a ProductCategory
-- `categoryId` in the Product table points to `categoryId` in the ProductCategory table
-- `category` is not a real column — it's a virtual field that Prisma uses for `include`
+### Number / Date Operators
+```typescript
+where: {
+    minStockLevel: { gt: 0 },    // greater than (>)
+    minStockLevel: { gte: 10 },  // greater than or equal (>=)
+    standardCost: { lt: 100 },   // less than (<)
+    standardCost: { lte: 100 },  // less than or equal (<=)
+}
+```
+
+### List Operators
+```typescript
+where: {
+    unit: { in: ['kg', 'pcs', 'l'] },       // unit must be one of these values
+    unit: { notIn: ['set'] },                // unit must NOT be any of these
+    productId: { in: [1, 2, 3, 4, 5] },     // productId must be in this list
+}
+```
+
+### `OR` — At Least One Condition Must Match
+```typescript
+where: {
+    OR: [
+        { componentName: { contains: 'steel', mode: 'insensitive' } },
+        { code: { contains: 'steel', mode: 'insensitive' } }
+    ]
+}
+// Returns components whose name OR code contains 'steel'
+```
+
+### `NOT` — Exclude Records That Match
+```typescript
+where: {
+    NOT: { supplierId: 5 }
+}
+// Returns all suppliers EXCEPT the one with supplierId = 5
+
+where: {
+    status: { not: 'SHIPPED' }
+}
+// Returns all records where status is NOT 'SHIPPED'
+```
+
+### Combining Everything Together
+```typescript
+// Real pattern from inventoryService.ts:
+where: {
+    productId: { in: productIds },   // must be in this list (AND)
+    status: { not: 'SHIPPED' }       // AND status is not SHIPPED
+}
+```
 
 ---
 
-## Prisma Studio — See Your Data Visually
+## `include` — Fetch Related Tables (JOIN)
 
-You already have it running! Open: `http://localhost:5555`
+```typescript
+// Get a component with its stock levels from all warehouses
+const component = await prisma.component.findUnique({
+    where: { componentId: 5 },
+    include: {
+        componentStocks: true  // joins the ComponentStock table
+    }
+});
+// Result: { componentId: 5, componentName: '...', componentStocks: [...] }
 
-This gives you a visual table view of all your data. Very useful to:
-- Check if your migration added the new column
-- See what data exists
-- Manually verify after testing with Postman
+// Deep include: nested relations
+const component = await prisma.component.findUnique({
+    where: { componentId: 5 },
+    include: {
+        componentStocks: {
+            include: { warehouse: true }  // also include the Warehouse for each stock entry
+        }
+    }
+});
+```
+
+---
+
+## `select` — Return Only Specific Fields
+
+Use this to avoid fetching unnecessary data (better performance).
+
+```typescript
+const products = await prisma.product.findMany({
+    select: {
+        productId: true,
+        code: true,
+        productName: true,
+        unit: true,
+        minStockLevel: true
+        // createdAt, updatedAt, description, etc. are NOT returned
+    }
+});
+```
+
+> **`include` vs `select`**: You can't use both at the same level. Use `select` when you want only specific own fields. Use `include` when you want to pull in related tables.
+
+---
+
+## Quick Cheat Sheet
+
+| Method | Returns | Use Case |
+|---|---|---|
+| `findMany` | Array of records | Get a list |
+| `findUnique` | One record or `null` | Get by ID or unique code |
+| `findFirst` | One record or `null` | Existence check, get first match |
+| `create` | The created record | Insert one new row |
+| `createMany` | `{ count: N }` | Insert many rows at once |
+| `update` | The updated record | Change fields of one row |
+| `updateMany` | `{ count: N }` | Change fields of many rows |
+| `delete` | The deleted record | Remove one row |
+| `deleteMany` | `{ count: N }` | Remove many rows |
+| `upsert` | The record | Create or update if exists |
+| `count` | A number | Count matching rows |
+| `groupBy` | Array of groups | Aggregate (sum, count) by field |

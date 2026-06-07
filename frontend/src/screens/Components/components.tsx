@@ -1,4 +1,4 @@
-import { Cpu, ShoppingCart, PackagePlus, ClipboardCheck, QrCode } from "lucide-react";
+import { Cpu, ShoppingCart, PackagePlus, ClipboardCheck } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { hasAnyPermission } from "../../lib/auth";
 
@@ -35,14 +35,6 @@ export const Components = () => {
       to: "/components/receipts",
       description: "Verify and store incoming goods",
       allowedPermissions: ["PO_READ"]
-    },
-    { 
-      id: "barcodes",
-      label: "Component Barcodes", 
-      icon: QrCode,
-      to: "/components/barcodes",
-      description: "Print component tray barcodes",
-      allowedPermissions: ["PUBLIC"]
     },
   ];
 

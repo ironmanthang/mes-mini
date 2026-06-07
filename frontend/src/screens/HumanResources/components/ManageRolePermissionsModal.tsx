@@ -47,11 +47,47 @@ export const ManageRolePermissionsModal = ({
   
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedPerms, setExpandedPerms] = useState<Record<string, boolean>>({});
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   
   const [warningMessage, setWarningMessage] = useState("");
   const [showWarning, setShowWarning] = useState(false);
 
   const isSysAdmin = role?.roleName === "System Admin" || (role as any)?.roleCode === "SYS_ADMIN";
+
+  const visiblePermissions = useMemo(() => {
+    return allPermissions.filter(p => !!PERMISSIONS_META[p.permCode]);
+  }, [allPermissions]);
+
+  const allModuleCodes = useMemo(() => {
+    const modules = new Set<string>();
+    for (const p of visiblePermissions) {
+      modules.add(p.module);
+    }
+    return Array.from(modules);
+  }, [visiblePermissions]);
+
+  const isAllCollapsed = useMemo(() => {
+    return allModuleCodes.length > 0 && allModuleCodes.every(code => collapsedModules[code]);
+  }, [allModuleCodes, collapsedModules]);
+
+  const toggleAllModules = () => {
+    if (isAllCollapsed) {
+      setCollapsedModules({});
+    } else {
+      const next: Record<string, boolean> = {};
+      for (const code of allModuleCodes) {
+        next[code] = true;
+      }
+      setCollapsedModules(next);
+    }
+  };
+
+  const toggleModuleCollapse = (moduleCode: string) => {
+    setCollapsedModules(prev => ({
+      ...prev,
+      [moduleCode]: !prev[moduleCode]
+    }));
+  };
 
   // Load permissions when modal opens and role changes
   useEffect(() => {
@@ -78,6 +114,7 @@ export const ManageRolePermissionsModal = ({
       fetchData();
       setSearchQuery("");
       setExpandedPerms({});
+      setCollapsedModules({});
     }
   }, [isOpen, role]);
 
@@ -129,9 +166,9 @@ export const ManageRolePermissionsModal = ({
 
   // Filter permissions based on search query
   const filteredPermissions = useMemo(() => {
-    if (!searchQuery.trim()) return allPermissions;
+    if (!searchQuery.trim()) return visiblePermissions;
     const q = searchQuery.toLowerCase().trim();
-    return allPermissions.filter(p => {
+    return visiblePermissions.filter(p => {
       const meta = PERMISSIONS_META[p.permCode];
       return (
         p.permCode.toLowerCase().includes(q) ||
@@ -143,7 +180,7 @@ export const ManageRolePermissionsModal = ({
         ))
       );
     });
-  }, [allPermissions, searchQuery]);
+  }, [visiblePermissions, searchQuery]);
 
   // Group filtered permissions by module
   const groupedPermissions = useMemo(() => {
@@ -216,9 +253,30 @@ export const ManageRolePermissionsModal = ({
                 className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+
+            {/* Global Collapse/Expand Toggle */}
+            {allPermissions.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAllModules}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-xs font-bold text-gray-700 rounded-lg transition-all cursor-pointer select-none"
+              >
+                {isAllCollapsed ? (
+                  <>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Expand All Modules</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Collapse All Modules</span>
+                  </>
+                )}
+              </button>
+            )}
             
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 flex-shrink-0 text-center sm:text-right">
-              Assigned: <span className="text-indigo-600 font-mono font-extrabold">{assignedCodes.length}</span> / {allPermissions.length} Permissions
+              Assigned: <span className="text-indigo-600 font-mono font-extrabold">{assignedCodes.filter(code => !!PERMISSIONS_META[code]).length}</span> / {visiblePermissions.length} Permissions
             </div>
           </div>
         )}
@@ -229,7 +287,7 @@ export const ManageRolePermissionsModal = ({
             <div className="flex h-full items-center justify-center py-24">
               <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
             </div>
-          ) : allPermissions.length === 0 ? (
+          ) : visiblePermissions.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500 bg-white border border-gray-200 rounded-xl">
               <HelpCircle className="w-12 h-12 text-gray-300 mb-3" />
               <p className="font-bold text-sm">No permissions found in the database.</p>
@@ -246,13 +304,22 @@ export const ManageRolePermissionsModal = ({
               const moduleLabel = MODULE_LABELS[moduleCode] || `Module: ${moduleCode}`;
               const modulePermCodes = perms.map(p => p.permCode);
               const checkedInModule = perms.filter(p => assignedCodes.includes(p.permCode));
+              const isCollapsed = !!collapsedModules[moduleCode];
 
               return (
                 <div key={moduleCode} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                   
                   {/* Module Header */}
-                  <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-4">
+                  <div 
+                    onClick={() => toggleModuleCollapse(moduleCode)}
+                    className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-gray-100/70 transition-colors select-none"
+                  >
                     <div className="flex items-center gap-2.5">
+                      {isCollapsed ? (
+                        <ChevronDown className="w-4 h-4 text-gray-400 transition-transform" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4 text-gray-400 transition-transform" />
+                      )}
                       <h4 className="text-sm font-extrabold text-gray-900 uppercase tracking-wide">
                         {moduleLabel}
                       </h4>
@@ -265,7 +332,10 @@ export const ManageRolePermissionsModal = ({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => handleSelectAllInModule(moduleCode, modulePermCodes)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectAllInModule(moduleCode, modulePermCodes);
+                          }}
                           className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 border border-transparent rounded cursor-pointer transition-colors"
                         >
                           Select All
@@ -273,7 +343,10 @@ export const ManageRolePermissionsModal = ({
                         <span className="text-gray-300 text-xs">|</span>
                         <button
                           type="button"
-                          onClick={() => handleDeselectAllInModule(moduleCode, modulePermCodes)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeselectAllInModule(moduleCode, modulePermCodes);
+                          }}
                           className="px-2.5 py-1 text-xs font-bold text-gray-500 hover:bg-gray-100 border border-transparent rounded cursor-pointer transition-colors"
                         >
                           Clear All
@@ -283,103 +356,105 @@ export const ManageRolePermissionsModal = ({
                   </div>
 
                   {/* Module Permissions Checklist */}
-                  <div className="divide-y divide-gray-100">
-                    {perms.map((perm) => {
-                      const isChecked = assignedCodes.includes(perm.permCode);
-                      const meta = PERMISSIONS_META[perm.permCode];
-                      const title = meta?.title || perm.permCode;
-                      const description = meta?.description || perm.description;
-                      const endpoints = meta?.endpoints || [];
-                      const isExpanded = !!expandedPerms[perm.permCode];
+                  {!isCollapsed && (
+                    <div className="divide-y divide-gray-100">
+                      {perms.map((perm) => {
+                        const isChecked = assignedCodes.includes(perm.permCode);
+                        const meta = PERMISSIONS_META[perm.permCode];
+                        const title = meta?.title || perm.permCode;
+                        const description = meta?.description || perm.description;
+                        const endpoints = meta?.endpoints || [];
+                        const isExpanded = !!expandedPerms[perm.permCode];
 
-                      return (
-                        <div 
-                          key={perm.permCode}
-                          onClick={() => togglePermission(perm.permCode)}
-                          className={`p-5 transition-colors flex flex-col gap-3 ${
-                            isSysAdmin 
-                              ? "cursor-default opacity-85" 
-                              : "cursor-pointer hover:bg-gray-50/60"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3.5">
-                              {/* Custom Styled Checkbox */}
-                              <div className="flex items-center h-5 mt-0.5">
-                                <input
-                                  type="checkbox"
-                                  checked={isSysAdmin || isChecked}
-                                  onChange={() => {}} // Controlled by row onClick
-                                  disabled={isSysAdmin || isSaving}
-                                  className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer ${
-                                    isSysAdmin ? "opacity-50 cursor-default" : ""
-                                  }`}
-                                />
+                        return (
+                          <div 
+                            key={perm.permCode}
+                            onClick={() => togglePermission(perm.permCode)}
+                            className={`p-5 transition-colors flex flex-col gap-3 ${
+                              isSysAdmin 
+                                ? "cursor-default opacity-85" 
+                                : "cursor-pointer hover:bg-gray-50/60"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3.5">
+                                {/* Custom Styled Checkbox */}
+                                <div className="flex items-center h-5 mt-0.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSysAdmin || isChecked}
+                                    onChange={() => {}} // Controlled by row onClick
+                                    disabled={isSysAdmin || isSaving}
+                                    className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer ${
+                                      isSysAdmin ? "opacity-50 cursor-default" : ""
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-gray-900">{title}</p>
+                                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm font-bold text-gray-900">{title}</p>
-                                <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
-                              </div>
+
+                              {/* Collapse Toggle for technical info */}
+                              <button
+                                type="button"
+                                onClick={(e) => toggleExpand(perm.permCode, e)}
+                                className="flex items-center gap-1 text-[11px] font-bold text-gray-400 hover:text-indigo-600 bg-transparent py-1 px-2 border border-transparent hover:border-gray-200 rounded cursor-pointer transition-all"
+                                title="Show Technical Details"
+                              >
+                                <span>Details</span>
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                              </button>
                             </div>
 
-                            {/* Collapse Toggle for technical info */}
-                            <button
-                              type="button"
-                              onClick={(e) => toggleExpand(perm.permCode, e)}
-                              className="flex items-center gap-1 text-[11px] font-bold text-gray-400 hover:text-indigo-600 bg-transparent py-1 px-2 border border-transparent hover:border-gray-200 rounded cursor-pointer transition-all"
-                              title="Show Technical Details"
-                            >
-                              <span>Details</span>
-                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-
-                          {/* Collapsible Advanced Info panel */}
-                          {isExpanded && (
-                            <div className="ml-7 p-3.5 bg-gray-50 rounded-lg border border-gray-100 space-y-2.5 animate-in slide-in-from-top-1 duration-150">
-                              <div>
-                                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">
-                                  Permission Code
-                                </span>
-                                <code className="text-xs text-gray-700 bg-white border border-gray-200 px-2 py-1 rounded font-mono font-semibold">
-                                  {perm.permCode}
-                                </code>
-                              </div>
-
-                              {endpoints.length > 0 && (
+                            {/* Collapsible Advanced Info panel */}
+                            {isExpanded && (
+                              <div className="ml-7 p-3.5 bg-gray-50 rounded-lg border border-gray-100 space-y-2.5 animate-in slide-in-from-top-1 duration-150">
                                 <div>
                                   <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">
-                                    Affected API Routes
+                                    Permission Code
                                   </span>
-                                  <div className="flex flex-wrap gap-1.5 mt-1">
-                                    {endpoints.map((route) => {
-                                      const isPost = route.startsWith("POST");
-                                      const isPut = route.startsWith("PUT");
-                                      const isDelete = route.startsWith("DELETE");
-                                      
-                                      let methodColor = "bg-blue-50 text-blue-700 border-blue-100";
-                                      if (isPost) methodColor = "bg-green-50 text-green-700 border-green-100";
-                                      if (isPut) methodColor = "bg-amber-50 text-amber-700 border-amber-100";
-                                      if (isDelete) methodColor = "bg-red-50 text-red-700 border-red-100";
-
-                                      return (
-                                        <span 
-                                          key={route} 
-                                          className={`text-[10px] font-mono px-2 py-0.5 rounded border ${methodColor}`}
-                                        >
-                                          {route}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
+                                  <code className="text-xs text-gray-700 bg-white border border-gray-200 px-2 py-1 rounded font-mono font-semibold">
+                                    {perm.permCode}
+                                  </code>
                                 </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+
+                                {endpoints.length > 0 && (
+                                  <div>
+                                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">
+                                      Affected API Routes
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                      {endpoints.map((route) => {
+                                        const isPost = route.startsWith("POST");
+                                        const isPut = route.startsWith("PUT");
+                                        const isDelete = route.startsWith("DELETE");
+                                        
+                                        let methodColor = "bg-blue-50 text-blue-700 border-blue-100";
+                                        if (isPost) methodColor = "bg-green-50 text-green-700 border-green-100";
+                                        if (isPut) methodColor = "bg-amber-50 text-amber-700 border-amber-100";
+                                        if (isDelete) methodColor = "bg-red-50 text-red-700 border-red-100";
+
+                                        return (
+                                          <span 
+                                            key={route} 
+                                            className={`text-[10px] font-mono px-2 py-0.5 rounded border ${methodColor}`}
+                                          >
+                                            {route}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                 </div>
               );

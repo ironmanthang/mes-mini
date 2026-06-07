@@ -24,7 +24,7 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   EMP_STATUS: {
     title: "Manage Employee Status",
     description: "Activate/deactivate employee accounts and force terminate active sessions.",
-    endpoints: ["PUT /api/employees/:id/status"],
+    endpoints: ["PATCH /api/employees/:id/status", "PATCH /api/employees/:id/force-logout"],
   },
 
   // --- Role Management ---
@@ -46,12 +46,17 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   PO_READ: {
     title: "View Purchase Orders",
     description: "Browse component procurement requests, history, and status updates.",
-    endpoints: ["GET /api/purchase-orders", "GET /api/purchase-orders/:id"],
+    endpoints: [
+      "GET /api/purchase-orders",
+      "GET /api/purchase-orders/:id",
+      "GET /api/purchase-orders/:id/receive",
+      "GET /api/purchase-orders/:id/attachments"
+    ],
   },
   PO_CREATE: {
     title: "Create Draft POs",
     description: "Initialize and edit draft purchase orders for raw materials.",
-    endpoints: ["POST /api/purchase-orders", "PUT /api/purchase-orders/:id"],
+    endpoints: ["POST /api/purchase-orders", "PUT /api/purchase-orders/:id", "POST /api/purchase-orders/:id/items"],
   },
   PO_SUBMIT: {
     title: "Submit POs for Approval",
@@ -79,16 +84,17 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
     endpoints: ["PUT /api/purchase-orders/:id/cancel"],
   },
 
+  /*
   // --- Sales Orders ---
   SO_READ: {
     title: "View Sales Orders",
     description: "Browse client sales orders, order items, and shipping status.",
-    endpoints: ["GET /api/sales-orders", "GET /api/sales-orders/:id"],
+    endpoints: ["GET /api/sales-orders", "GET /api/sales-orders/:id", "GET /api/sales-orders/:id/feasibility"],
   },
   SO_CREATE: {
     title: "Create Draft SOs",
-    description: "Create new sales orders or modify existing drafts.",
-    endpoints: ["POST /api/sales-orders", "PUT /api/sales-orders/:id"],
+    description: "Create new sales orders, modify existing drafts, or delete drafts.",
+    endpoints: ["POST /api/sales-orders", "PUT /api/sales-orders/:id", "DELETE /api/sales-orders/:id"],
   },
   SO_SUBMIT: {
     title: "Submit SOs for Approval",
@@ -103,19 +109,28 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   SO_SHIP: {
     title: "Ship & Fulfill SOs",
     description: "Log shipments and deduct stock by matching serial numbers to client orders.",
-    endpoints: ["POST /api/sales-orders/:id/ship"],
+    endpoints: [
+      "POST /api/sales-orders/:id/ship",
+      "GET /api/sales-orders/:id/pick-list",
+      "PUT /api/sales-orders/:id/process"
+    ],
   },
   SO_CANCEL: {
     title: "Cancel Sales Orders",
     description: "Cancel active or draft sales orders with reason logging.",
     endpoints: ["PUT /api/sales-orders/:id/cancel"],
   },
+  */
 
   // --- Production Requests ---
   PR_READ: {
     title: "View Production Requests",
     description: "Examine product assembly requests and check shortage statuses.",
-    endpoints: ["GET /api/production-requests", "GET /api/production-requests/:id"],
+    endpoints: [
+      "GET /api/production-requests",
+      "GET /api/production-requests/:id",
+      "GET /api/production-requests/:id/requirements"
+    ],
   },
   PR_CREATE: {
     title: "Create Production Requests",
@@ -125,7 +140,11 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   PR_UPDATE: {
     title: "Edit Production Requests",
     description: "Modify quantities, notes, or priorities on pending requests.",
-    endpoints: ["PUT /api/production-requests/:id"],
+    endpoints: [
+      "PUT /api/production-requests/:id",
+      "PUT /api/production-requests/:id/recheck",
+      "PUT /api/production-requests/:id/submit"
+    ],
   },
   PR_CANCEL: {
     title: "Cancel Production Requests",
@@ -135,7 +154,7 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   PR_LINK_PO: {
     title: "Link Procurement to PR",
     description: "Associate a component purchase order with an active production request.",
-    endpoints: ["PUT /api/production-requests/:id/link-po"],
+    endpoints: ["GET /api/production-requests/:id/draft-purchase-order"],
   },
   PR_APPROVE: {
     title: "Approve Production Requests",
@@ -155,9 +174,14 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
     endpoints: ["POST /api/work-orders"],
   },
   WO_UPDATE: {
-    title: "Edit & Release Work Orders",
-    description: "Release draft orders to the shop floor or adjust target dates.",
-    endpoints: ["PUT /api/work-orders/:id", "PUT /api/work-orders/:id/release"],
+    title: "Edit, Release & Cancel Work Orders",
+    description: "Release draft orders, start execution, update details, or cancel Work Orders.",
+    endpoints: [
+      "PUT /api/work-orders/:id",
+      "PUT /api/work-orders/:id/release",
+      "PUT /api/work-orders/:id/start",
+      "PUT /api/work-orders/:id/cancel"
+    ],
   },
   WO_COMPLETE: {
     title: "Complete Work Orders",
@@ -165,6 +189,7 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
     endpoints: ["PUT /api/work-orders/:id/complete"],
   },
 
+  /*
   // --- Production Lines ---
   LINE_READ: {
     title: "View Production Lines",
@@ -186,6 +211,7 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
     description: "Permanently delete inactive production lines.",
     endpoints: ["DELETE /api/production-lines/:id"],
   },
+  */
 
   // --- Quality Control ---
   QC_READ: {
@@ -203,17 +229,22 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   WH_STOCK_READ: {
     title: "View Stock Levels",
     description: "Track real-time inventory balances, storage locations, and component lots.",
-    endpoints: ["GET /api/inventory", "GET /api/inventory/summary"],
+    endpoints: [
+      "GET /api/warehouse-ops/inventory/status",
+      "GET /api/warehouse-ops/inventory/low-stock-details",
+      "GET /api/warehouse-ops/inventory/stock-status",
+      "GET /api/warehouses"
+    ],
   },
-  WH_STOCK_ADJUST: {
-    title: "Adjust Stock Balances",
-    description: "Manually overwrite stock quantities with audit logs for corrections.",
-    endpoints: ["POST /api/inventory/adjust"],
-  },
+  // WH_STOCK_ADJUST: {
+  //   title: "Adjust Stock Balances",
+  //   description: "Manually overwrite stock quantities with audit logs (Not implemented on backend).",
+  //   endpoints: [],
+  // },
   WH_MANAGE: {
     title: "Manage Warehouses",
     description: "Register, modify, or delete warehouse locations (Sales, Component, Error).",
-    endpoints: ["GET /api/warehouses", "POST /api/warehouses", "PUT /api/warehouses/:id", "DELETE /api/warehouses/:id"],
+    endpoints: ["POST /api/warehouses", "PUT /api/warehouses/:id", "DELETE /api/warehouses/:id"],
   },
   WH_INDUCT: {
     title: "Induct Finished Products",
@@ -235,9 +266,13 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   MR_APPROVE: {
     title: "Approve & Issue Materials",
     description: "Complete requests and deduct component lots from stock for production.",
-    endpoints: ["PUT /api/material-requests/:id/issue"],
+    endpoints: [
+      "PUT /api/warehouse-ops/material-requests/:id/validate",
+      "PUT /api/warehouse-ops/material-requests/:id/complete"
+    ],
   },
 
+  /*
   // --- Transfer Requests ---
   TR_READ: {
     title: "View Stock Transfers",
@@ -249,31 +284,51 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
     description: "Initialize and complete warehouse-to-warehouse stock transfers.",
     endpoints: ["POST /api/transfers", "PUT /api/transfers/:id/complete"],
   },
+  */
 
+  /*
   // --- Attachments ---
   ATTACH_UPLOAD: {
     title: "Upload Attachments",
     description: "Add contractual docs, invoices, or inspection sheets to system records.",
-    endpoints: ["POST /api/attachments"],
+    endpoints: [
+      "POST /api/purchase-orders/:id/attachments/request-upload",
+      "POST /api/purchase-orders/:id/attachments/confirm"
+    ],
   },
   ATTACH_DELETE_ANY: {
     title: "Override Attachment Deletion",
     description: "Permanently delete any uploaded attachment (Administrator only).",
-    endpoints: ["DELETE /api/attachments/:id"],
+    endpoints: ["DELETE /api/purchase-orders/:id/attachments/:attachmentId"],
   },
+  */
 
+  /*
   // --- Notifications ---
   NOTIF_READ: {
     title: "Read Notifications",
-    description: "Access alerts and check critical supply warnings.",
-    endpoints: ["GET /api/notifications", "PUT /api/notifications/read"],
+    description: "Access alerts and check critical supply warnings. (Unchecked at route-level in backend).",
+    endpoints: [
+      "GET /api/notifications",
+      "GET /api/notifications/unread",
+      "PUT /api/notifications/:id/read",
+      "PUT /api/notifications/read-all"
+    ],
   },
+  */
 
   // --- Dashboard ---
   DASH_READ: {
     title: "View Analytics Dashboard",
     description: "Access executive charts, stock statistics, and performance stats.",
-    endpoints: ["GET /api/dashboard/metrics"],
+    endpoints: [
+      "GET /api/warehouse-ops/dashboard",
+      "GET /api/sales/dashboard",
+      "GET /api/production/dashboard",
+      "GET /api/production/reports/line-performance",
+      "GET /api/costs/materials",
+      "GET /api/costs/products"
+    ],
   },
 
   // --- Master Data: Products ---
@@ -289,8 +344,20 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   },
   PRODUCT_UPDATE: {
     title: "Edit Products & BOM",
-    description: "Update product properties and change mandatory BOM specifications.",
-    endpoints: ["PUT /api/products/:id"],
+    description: "Update product properties, change BOM, checklists, or delete products.",
+    endpoints: [
+      "PUT /api/products/:id",
+      "DELETE /api/products/:id",
+      "POST /api/products/:id/bom",
+      "PUT /api/products/:id/bom/:componentId",
+      "DELETE /api/products/:id/bom/:componentId",
+      "POST /api/checklists",
+      "PUT /api/checklists/:id",
+      "DELETE /api/checklists/:id",
+      "POST /api/checklists/:id/points",
+      "PUT /api/checklists/points/:pointId",
+      "DELETE /api/checklists/points/:pointId"
+    ],
   },
 
   // --- Master Data: Components ---
@@ -306,8 +373,8 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   },
   COMP_UPDATE: {
     title: "Edit Components",
-    description: "Modify component description details, units, or minimum stock alerts.",
-    endpoints: ["PUT /api/components/:id"],
+    description: "Modify component details, units, minimum stock alerts, or delete components.",
+    endpoints: ["PUT /api/components/:id", "DELETE /api/components/:id"],
   },
 
   // --- Master Data: Suppliers ---
@@ -323,10 +390,11 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   },
   SUPPLIER_UPDATE: {
     title: "Edit Supplier Details",
-    description: "Update contact details, vendor address, or mapping associations.",
-    endpoints: ["PUT /api/suppliers/:id"],
+    description: "Update contact details, vendor address, mapping associations, or delete suppliers.",
+    endpoints: ["PUT /api/suppliers/:id", "DELETE /api/suppliers/:id"],
   },
 
+  /*
   // --- Master Data: Agents ---
   AGENT_READ: {
     title: "View Agents Directory",
@@ -340,7 +408,8 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
   },
   AGENT_UPDATE: {
     title: "Edit Agent Details",
-    description: "Modify distributor contact details, code, and address.",
-    endpoints: ["PUT /api/agents/:id"],
+    description: "Modify agent contact details, address, or delete agents.",
+    endpoints: ["PUT /api/agents/:id", "DELETE /api/agents/:id"],
   },
+  */
 };
