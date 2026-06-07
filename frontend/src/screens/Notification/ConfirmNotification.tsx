@@ -9,6 +9,7 @@ interface ConfirmNotificationProps {
   cancelLabel?: string;
   variant?: "primary" | "success" | "danger";
   isProcessing?: boolean;
+  showCancel?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -21,6 +22,7 @@ export const ConfirmNotification = ({
   cancelLabel = "Cancel",
   variant = "primary",
   isProcessing = false,
+  showCancel = true,
   onConfirm,
   onClose,
 }: ConfirmNotificationProps): JSX.Element | null => {
@@ -63,13 +65,15 @@ export const ConfirmNotification = ({
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              disabled={isProcessing}
-              className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {cancelLabel}
-            </button>
+            {showCancel && (
+              <button
+                onClick={onClose}
+                disabled={isProcessing}
+                className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {cancelLabel}
+              </button>
+            )}
             <button
               onClick={onConfirm}
               disabled={isProcessing}

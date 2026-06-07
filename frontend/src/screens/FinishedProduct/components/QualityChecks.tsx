@@ -7,6 +7,8 @@ import { useSearchParams } from "react-router-dom";
 import { ProductInstanceServices, type ProductInstanceListItem } from "../../../services/productInstanceServices";
 import { QualityCheckServices, type CreateCheckData } from "../../../services/qualityCheckServices";
 import { QualityChecklistServices, type InspectionPoint } from "../../../services/qualityChecklistServices";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { hasPermission } from "../../../lib/auth";
 
 
 export const QualityChecks = (): JSX.Element => {
@@ -55,8 +57,31 @@ export const QualityChecks = (): JSX.Element => {
   const [inspectorNotes, setInspectorNotes] = useState("");
 
   // UI State
-  const [showToast, setShowToast] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalNotification, setModalNotification] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: "primary" | "success" | "danger";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "primary",
+  });
+
+  const showModalNotification = (
+    title: string,
+    message: string,
+    variant: "primary" | "success" | "danger" = "primary"
+  ) => {
+    setModalNotification({
+      isOpen: true,
+      title,
+      message,
+      variant,
+    });
+  };
 
   // ==========================================
   // 1. FETCH PENDING INSPECTION LIST (LEFT COLUMN)
@@ -91,7 +116,11 @@ export const QualityChecks = (): JSX.Element => {
       if (!targetChecklistId) {
         setInspectionPoints([]);
         setIsLoadingChecklist(false);
-        alert(`Product "${selectedInstance.product.productName}" has no QC checklist assigned. Assign a checklist before performing QC.`);
+        showModalNotification(
+          "Missing QC Checklist",
+          `Product "${selectedInstance.product.productName}" has no QC checklist assigned. Assign a checklist before performing QC.`,
+          "danger"
+        );
         setSelectedInstance(null);
         return;
       }
@@ -108,7 +137,7 @@ export const QualityChecks = (): JSX.Element => {
               const parsed = JSON.parse(savedDraft);
               setEvaluations(parsed.evaluations || {});
               setInspectorNotes(parsed.inspectorNotes || "");
-              triggerToast("Previous draft restored.");
+              showModalNotification("Draft Restored", "Previous draft restored.", "success");
             } catch (err) {
               console.error(err);
               resetForm();
@@ -136,10 +165,7 @@ export const QualityChecks = (): JSX.Element => {
     setInspectorNotes("");
   };
 
-  const triggerToast = (msg: string) => {
-    setShowToast(msg);
-    setTimeout(() => setShowToast(""), 3000);
-  };
+
 
   // --- EVALUATION LOGIC (ZONE B) ---
   const handleEvaluate = (pointId: number, result: 'PASS' | 'FAIL') => {
@@ -168,7 +194,7 @@ export const QualityChecks = (): JSX.Element => {
     const draftData = { evaluations, inspectorNotes };
 
     localStorage.setItem(draftKey, JSON.stringify(draftData));
-    triggerToast("Inspection progress saved (Draft).");
+    showModalNotification("Draft Saved", "Inspection progress saved (Draft).", "success");
   };
 
   // ==========================================
@@ -202,11 +228,15 @@ export const QualityChecks = (): JSX.Element => {
         prev.delete("search");
         return prev;
       }, { replace: true });
-      triggerToast(`QC result finalized as [${finalResult}].`);
+      showModalNotification("QC Completed", `QC result finalized as [${finalResult}].`, "success");
 
     } catch (error: any) {
       console.error(error);
-      alert(error?.response?.data?.message || "Error recording QC result on server.");
+      showModalNotification(
+        "QC Recording Failed",
+        error?.response?.data?.message || "Error recording QC result on server.",
+        "danger"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -243,20 +273,24 @@ export const QualityChecks = (): JSX.Element => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {filteredList.map(item => (
-            <div
-              key={item.productInstanceId}
-              onClick={() => setSelectedInstance(item)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedInstance?.productInstanceId === item.productInstanceId ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-400' : 'bg-white border-gray-200 hover:border-blue-200 hover:bg-gray-50 hover:shadow-sm'}`}
-            >
-              <div className="flex justify-between items-start mb-1.5">
-                <span className="font-mono font-black text-sm text-blue-800 tracking-wide">{item.serialNumber}</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 uppercase border border-yellow-200">Pending</span>
+          {filteredList.map(item => {
+            const canClick = hasPermission("PRODUCT_UPDATE") && hasPermission("QC_READ");
+
+            return (
+              <div
+                key={item.productInstanceId}
+                onClick={() => canClick ? setSelectedInstance(item) : undefined}
+                className={`p-4 rounded-xl border ${canClick ? "cursor-pointer" : ""} transition-all ${selectedInstance?.productInstanceId === item.productInstanceId ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-400' : 'bg-white border-gray-200 hover:border-blue-200 hover:bg-gray-50 hover:shadow-sm'}`}
+              >
+                <div className="flex justify-between items-start mb-1.5">
+                  <span className="font-mono font-black text-sm text-blue-800 tracking-wide">{item.serialNumber}</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 uppercase border border-yellow-200">Pending</span>
+                </div>
+                <p className="text-sm text-gray-800 font-bold">{item.product.productName}</p>
+                <p className="text-[10px] text-gray-500 font-mono mt-1 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span> Batch: {item.productionBatch.batchCode}</p>
               </div>
-              <p className="text-sm text-gray-800 font-bold">{item.product.productName}</p>
-              <p className="text-[10px] text-gray-500 font-mono mt-1 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span> Batch: {item.productionBatch.batchCode}</p>
-            </div>
-          ))}
+            )
+          })}
           {!isLoadingList && filteredList.length === 0 && <p className="text-center text-sm text-gray-400 py-10">No products pending inspection.</p>}
         </div>
       </div>
@@ -380,14 +414,14 @@ export const QualityChecks = (): JSX.Element => {
               <div className="flex gap-3">
                 <button
                   onClick={() => handleSubmit('FAIL')}
-                  disabled={!canFail || isSubmitting}
+                  disabled={!canFail || isSubmitting || !hasPermission("QC_CREATE")}
                   className="flex-1 py-3 flex items-center justify-center gap-2 bg-red-600 text-white font-bold text-sm rounded-lg hover:bg-red-700 transition-all active:scale-95 disabled:opacity-40 disabled:grayscale cursor-pointer shadow-sm"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />} FAIL
                 </button>
                 <button
                   onClick={() => handleSubmit('PASS')}
-                  disabled={!canPass || isSubmitting}
+                  disabled={!canPass || isSubmitting || !hasPermission("QC_CREATE")}
                   className="flex-1 py-3 flex items-center justify-center gap-2 bg-green-600 text-white font-bold text-sm rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-40 disabled:grayscale cursor-pointer shadow-sm"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} PASS
@@ -407,12 +441,16 @@ export const QualityChecks = (): JSX.Element => {
         </div>
       )}
 
-      {showToast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5">
-          <CheckCircle2 className="w-5 h-5 text-green-400" />
-          <span className="text-sm font-bold tracking-wide">{showToast}</span>
-        </div>
-      )}
+      <ConfirmNotification
+        isOpen={modalNotification.isOpen}
+        title={modalNotification.title}
+        message={modalNotification.message}
+        confirmLabel="OK"
+        variant={modalNotification.variant}
+        showCancel={false}
+        onConfirm={() => setModalNotification(prev => ({ ...prev, isOpen: false }))}
+        onClose={() => setModalNotification(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

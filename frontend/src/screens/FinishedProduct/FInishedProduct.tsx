@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { hasAnyPermission } from "../../lib/auth";
+import { hasAllPermissions } from "../../lib/auth";
 
 export const FinishedProduct = (): JSX.Element => {
   const allTabs = [
@@ -23,7 +24,8 @@ export const FinishedProduct = (): JSX.Element => {
       icon: ClipboardCheck, 
       to: "/finished-products/quality",
       description: "QA/QC inspections & logs",
-      allowedPermissions: ["QC_READ"]
+      allowedPermissions: ["PRODUCT_READ", "PRODUCT_UPDATE", "QC_READ", "QC_CREATE"],
+      requiresAllPermissions: true,
     },
     { 
       id: "checklists", 
@@ -36,7 +38,13 @@ export const FinishedProduct = (): JSX.Element => {
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
+  const visibleTabs = allTabs.filter(tab => {
+      if (!tab.allowedPermissions) return true;
+      if (tab.requiresAllPermissions) {
+        return hasAllPermissions(tab.allowedPermissions);
+      }
+      return hasAnyPermission(tab.allowedPermissions);
+    });
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

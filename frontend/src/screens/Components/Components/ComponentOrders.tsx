@@ -267,6 +267,10 @@ export const ComponentOrders = (): JSX.Element => {
     }
   })();
 
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+  }
+
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
       
@@ -335,7 +339,7 @@ export const ComponentOrders = (): JSX.Element => {
                         </span>
                       </td>
                       <td className="p-4 text-right font-mono font-medium text-gray-800">
-                        ${Number(order.totalAmount).toLocaleString()}
+                        {formatCurrency(Number(order.totalAmount))}
                       </td>
                       <td className="p-4 text-gray-700">{order.employee?.fullName || "System"}</td>
                       <td className="p-4 flex items-center justify-center gap-1.5">

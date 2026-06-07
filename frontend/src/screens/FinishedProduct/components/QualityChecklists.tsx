@@ -10,6 +10,10 @@ import {
   type InspectionType,
   type PointDataInput
 } from "../../../services/qualityChecklistServices";
+import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasPermission } from "../../../lib/auth";
 
 export const QualityChecklists = (): JSX.Element => {
   // --- STATE ---
@@ -38,6 +42,39 @@ export const QualityChecklists = (): JSX.Element => {
   const [maxValue, setMaxValue] = useState<number | "">("");
   const [unit, setUnit] = useState("");
   const [sortOrder, setSortOrder] = useState<number>(0);
+
+  // Notification & Confirm States
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: "primary" | "success" | "danger";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    variant: "primary",
+    onConfirm: () => {},
+  });
+
+  const triggerSuccess = (msg: string) => {
+    setSuccessMessage(msg);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSuccessMessage("");
+    }, 2000);
+  };
+
+  const triggerWarning = (msg: string) => {
+    setWarningMessage(msg);
+    setShowWarning(true);
+  };
 
   // ==========================================
   // 1. DATA FETCHING
@@ -79,20 +116,20 @@ export const QualityChecklists = (): JSX.Element => {
   };
 
   const handleCreateChecklist = async () => {
-    if (!checklistName.trim()) return alert("Checklist Name is required");
+    if (!checklistName.trim()) return triggerWarning("Checklist Name is required");
     setIsSubmitting(true);
     try {
       const response = await QualityChecklistServices.createChecklist({
         checklistName: checklistName.trim(),
         description: checklistDescription.trim() || undefined
       });
-      alert("✅ Checklist created successfully!");
+      triggerSuccess("Checklist created successfully!");
       setShowCreateModal(false);
       await fetchChecklists(response.checklistId);
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to create checklist";
-      alert(`❌ Error: ${errorMsg}`);
+      triggerWarning(`Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,42 +144,49 @@ export const QualityChecklists = (): JSX.Element => {
 
   const handleEditChecklist = async () => {
     if (!selectedChecklist) return;
-    if (!checklistName.trim()) return alert("Checklist Name is required");
+    if (!checklistName.trim()) return triggerWarning("Checklist Name is required");
     setIsSubmitting(true);
     try {
       await QualityChecklistServices.updateChecklist(selectedChecklist.checklistId, {
         checklistName: checklistName.trim(),
         description: checklistDescription.trim() || undefined
       });
-      alert("✅ Checklist updated successfully!");
+      triggerSuccess("Checklist updated successfully!");
       setShowEditModal(false);
       await fetchChecklists(selectedChecklist.checklistId);
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to update checklist";
-      alert(`❌ Error: ${errorMsg}`);
+      triggerWarning(`Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteChecklist = async () => {
+  const handleDeleteChecklist = () => {
     if (!selectedChecklist) return;
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete checklist "${selectedChecklist.checklistName}"?\nThis cannot be undone.`
-    );
-    if (!confirmDelete) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Checklist",
+      message: `Are you sure you want to delete checklist "${selectedChecklist.checklistName}"?\nThis cannot be undone.`,
+      variant: "danger",
+      onConfirm: executeDeleteChecklist,
+    });
+  };
 
+  const executeDeleteChecklist = async () => {
+    if (!selectedChecklist) return;
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsSubmitting(true);
     try {
       await QualityChecklistServices.deleteChecklist(selectedChecklist.checklistId);
-      alert("✅ Checklist deleted successfully!");
+      triggerSuccess("Checklist deleted successfully!");
       setSelectedChecklist(null);
       await fetchChecklists();
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to delete checklist";
-      alert(`❌ Deletion Guard Blocked:\n${errorMsg}`);
+      triggerWarning(`Deletion Guard Blocked:\n${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -175,7 +219,7 @@ export const QualityChecklists = (): JSX.Element => {
 
   const handleAddInspectionPoint = async () => {
     if (!selectedChecklist) return;
-    if (!pointName.trim()) return alert("Inspection Point Name is required");
+    if (!pointName.trim()) return triggerWarning("Inspection Point Name is required");
 
     setIsSubmitting(true);
     try {
@@ -193,14 +237,14 @@ export const QualityChecklists = (): JSX.Element => {
       }
 
       await QualityChecklistServices.addInspectionPoint(selectedChecklist.checklistId, payload);
-      alert("✅ Inspection point added successfully!");
+      triggerSuccess("Inspection point added successfully!");
       setShowAddPointModal(false);
       resetPointForm();
       await fetchChecklists(selectedChecklist.checklistId);
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to add inspection point";
-      alert(`❌ Error: ${errorMsg}`);
+      triggerWarning(`Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +264,7 @@ export const QualityChecklists = (): JSX.Element => {
 
   const handleEditInspectionPoint = async () => {
     if (!selectedChecklist || !selectedPoint) return;
-    if (!pointName.trim()) return alert("Inspection Point Name is required");
+    if (!pointName.trim()) return triggerWarning("Inspection Point Name is required");
 
     setIsSubmitting(true);
     try {
@@ -236,7 +280,7 @@ export const QualityChecklists = (): JSX.Element => {
       };
 
       await QualityChecklistServices.updateInspectionPoint(selectedPoint.inspectionPointId, payload);
-      alert("✅ Inspection point updated successfully!");
+      triggerSuccess("Inspection point updated successfully!");
       setShowEditPointModal(false);
       resetPointForm();
       setSelectedPoint(null);
@@ -244,26 +288,35 @@ export const QualityChecklists = (): JSX.Element => {
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to update inspection point";
-      alert(`❌ Error: ${errorMsg}`);
+      triggerWarning(`Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteInspectionPoint = async (point: InspectionPoint) => {
+  const handleDeleteInspectionPoint = (point: InspectionPoint) => {
     if (!selectedChecklist) return;
-    const confirmDelete = window.confirm(`Are you sure you want to delete point "${point.pointName}"?`);
-    if (!confirmDelete) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Inspection Criteria",
+      message: `Are you sure you want to delete point "${point.pointName}"?`,
+      variant: "danger",
+      onConfirm: () => executeDeleteInspectionPoint(point),
+    });
+  };
 
+  const executeDeleteInspectionPoint = async (point: InspectionPoint) => {
+    if (!selectedChecklist) return;
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsSubmitting(true);
     try {
       await QualityChecklistServices.deleteInspectionPoint(point.inspectionPointId);
-      alert("✅ Inspection point deleted successfully!");
+      triggerSuccess("Inspection point deleted successfully!");
       await fetchChecklists(selectedChecklist.checklistId);
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.response?.data?.message || error?.message || "Failed to delete inspection point";
-      alert(`❌ Deletion Guard Blocked:\n${errorMsg}`);
+      triggerWarning(`Deletion Guard Blocked:\n${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -336,23 +389,28 @@ export const QualityChecklists = (): JSX.Element => {
               className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white"
             />
           </div>
-          <button
-            onClick={handleOpenCreateModal}
-            className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm"
-            title="Create Checklist"
-          >
-            <Plus className="w-4 h-4" /> Add
-          </button>
+          {hasPermission("PRODUCT_UPDATE") && (
+            <button
+              onClick={handleOpenCreateModal}
+              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm"
+              title="Create Checklist"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filteredList.map(item => {
             const isSelected = selectedChecklist?.checklistId === item.checklistId;
+            const canClick = hasPermission("PRODUCT_UPDATE");
+
             return (
               <div
                 key={item.checklistId}
-                onClick={() => setSelectedChecklist(item)}
-                className={`p-4 rounded-xl border cursor-pointer transition-all duration-150 ${
+                onClick={() => canClick ? setSelectedChecklist(item) : undefined}
+                className={`p-4 rounded-xl border ${canClick ? "cursor-pointer" : "cursor-not-allowed"}
+                  transition-all duration-150 ${
                   isSelected
                     ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-400"
                     : "bg-white border-gray-200 hover:border-blue-200 hover:bg-gray-50 hover:shadow-sm"
@@ -395,20 +453,24 @@ export const QualityChecklists = (): JSX.Element => {
             </div>
             
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleOpenEditModal}
-                disabled={isSubmitting}
-                className="px-3.5 py-1.5 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-100 cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm bg-white"
-              >
-                <Edit className="w-3.5 h-3.5" /> Edit Info
-              </button>
-              <button
-                onClick={handleDeleteChecklist}
-                disabled={isSubmitting}
-                className="px-3.5 py-1.5 border border-red-200 text-red-700 text-xs font-bold rounded-lg hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm bg-white"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Delete
-              </button>
+              {hasPermission("PRODUCT_UPDATE") && (
+                <button
+                  onClick={handleOpenEditModal}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-1.5 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-100 cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm bg-white"
+                >
+                  <Edit className="w-3.5 h-3.5" /> Edit Info
+                </button>
+              )}
+              {hasPermission("PRODUCT_UPDATE") && (
+                <button
+                  onClick={handleDeleteChecklist}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-1.5 border border-red-200 text-red-700 text-xs font-bold rounded-lg hover:bg-red-50 cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm bg-white"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </button>
+              )}
             </div>
           </div>
 
@@ -432,13 +494,15 @@ export const QualityChecklists = (): JSX.Element => {
                 {selectedChecklist.inspectionPoints?.length || 0} Points Defined
               </span>
             </div>
-            <button
-              onClick={handleOpenAddPointModal}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-4 h-4" /> Add Criteria
-            </button>
+            {hasPermission("PRODUCT_UPDATE") && (
+              <button
+                onClick={handleOpenAddPointModal}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Add Criteria
+              </button>
+            )}
           </div>
 
           {/* Points List */}
@@ -523,22 +587,26 @@ export const QualityChecklists = (): JSX.Element => {
 
                       {/* Editing Actions */}
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEditPointModal(point)}
-                          disabled={isSubmitting}
-                          className="p-2 hover:bg-blue-50 hover:text-blue-600 text-gray-400 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Point"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteInspectionPoint(point)}
-                          disabled={isSubmitting}
-                          className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Point"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {hasPermission("PRODUCT_UPDATE") && (
+                          <button
+                            onClick={() => handleOpenEditPointModal(point)}
+                            disabled={isSubmitting}
+                            className="p-2 hover:bg-blue-50 hover:text-blue-600 text-gray-400 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Point"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission("PRODUCT_UPDATE") && (
+                          <button
+                            onClick={() => handleDeleteInspectionPoint(point)}
+                            disabled={isSubmitting}
+                            className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Point"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -841,6 +909,29 @@ export const QualityChecklists = (): JSX.Element => {
           </div>
         </div>
       )}
+
+      {/* Notifications and Confirm Modals */}
+      <SuccessNotification isVisible={showSuccess} message={successMessage} />
+      
+      <WarningNotification
+        isVisible={showWarning}
+        message={warningMessage}
+        onClose={() => {
+          setShowWarning(false);
+          setWarningMessage("");
+        }}
+      />
+      
+      <ConfirmNotification
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

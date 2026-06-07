@@ -111,8 +111,8 @@ export const Performance = (): JSX.Element => {
     if (!reportData) return [];
     return reportData.lines.map(line => ({
       lineName: line.lineName || "Unassigned",
-      passed: line.passedCount,
-      failed: line.failedCount
+      Passed: line.passedCount,
+      Failed: line.failedCount
     }));
   }, [reportData]);
 
@@ -322,8 +322,8 @@ export const Performance = (): JSX.Element => {
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                 />
-                <Bar dataKey="passed" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={40} />
-                <Bar dataKey="failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="Passed" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={40} />
+                <Bar dataKey="Failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -391,7 +391,7 @@ export const Performance = (): JSX.Element => {
                       <td className="p-4 text-center text-gray-500 font-bold">{line.qcCompleted.toLocaleString()}</td>
                       <td className="p-4 text-center font-bold text-green-600">{line.passedCount.toLocaleString()}</td>
                       <td className="p-4 text-center font-bold text-red-600">{line.failedCount.toLocaleString()}</td>
-                      <td className={`p-4 text-right font-black text-base ${line.passRate < 95 ? 'text-red-500' : 'text-blue-700'}`}>
+                      <td className={`p-4 text-right font-black text-base text-blue-700`}>
                         {line.passRate}%
                       </td>
                     </tr>

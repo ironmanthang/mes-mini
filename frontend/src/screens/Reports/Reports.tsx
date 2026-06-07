@@ -1,6 +1,6 @@
 import { BarChart3, Box, TrendingUp } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyPermission } from "../../lib/auth";
+import { hasAnyPermission, hasAllPermissions } from "../../lib/auth";
 
 export const Reports = () => {
   const allTabs = [
@@ -10,7 +10,8 @@ export const Reports = () => {
       icon: BarChart3,
       to: "/reports/performance",
       description: "Analyze production line efficiency, yield, and output",
-      allowedPermissions: ["ABC"]
+      allowedPermissions: ["DASH_READ", "LINE_READ", "PRODUCT_READ"],
+      requiresAllPermissions: true,
     },
     {
       id: "inventory",
@@ -18,7 +19,7 @@ export const Reports = () => {
       icon: Box,
       to: "/reports/inventory",
       description: "View real-time stock levels for components and finished products across warehouses",
-      allowedPermissions: ["ABC"]
+      allowedPermissions: ["WH_STOCK_READ"],
     },
     {
       id: "costs",
@@ -26,12 +27,18 @@ export const Reports = () => {
       icon: TrendingUp,
       to: "/reports/costs",
       description: "Track procurement spend, manufacturing costs, and labor/overhead distribution",
-      allowedPermissions: ["ABC"]
+      allowedPermissions: ["DASH_READ"]
     },
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
+  const visibleTabs = allTabs.filter(tab => {
+      if (!tab.allowedPermissions) return true;
+      if (tab.requiresAllPermissions) {
+        return hasAllPermissions(tab.allowedPermissions);
+      }
+      return hasAnyPermission(tab.allowedPermissions);
+    });
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

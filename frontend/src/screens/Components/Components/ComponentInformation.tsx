@@ -104,7 +104,7 @@ export const ComponentInformation = (): JSX.Element => {
   const formatNumberVN = (numberString: string | number) => {
     const number = Number(numberString);
     if (isNaN(number)) return numberString;
-    return number.toLocaleString('vi-VN');
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(number);
   }
 
   const totalPages = Math.ceil(total / limit) || 1;
@@ -220,7 +220,7 @@ export const ComponentInformation = (): JSX.Element => {
                                     </td>
                                     <td className="p-4 text-gray-700">{item.unit}</td>
                                     <td className="p-4 text-right font-mono text-gray-700">
-                                        ${formatNumberVN(item.standardCost)}
+                                        {formatNumberVN(item.standardCost)}
                                     </td>
                                     <td className="p-4 text-center">
                                         <div className="flex flex-col items-center">

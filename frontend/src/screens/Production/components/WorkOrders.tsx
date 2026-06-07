@@ -13,7 +13,7 @@ import { ConfirmNotification } from "../../Notification/ConfirmNotification";
 import { ReasonConfirmNotification } from "../../Notification/ReasonConfirmNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const WorkOrders = (): JSX.Element => {
   const [workOrders, setWorkOrders] = useState<WorkOrderListItem[]>([]);
@@ -197,10 +197,9 @@ export const WorkOrders = (): JSX.Element => {
 
   const renderActions = (wo: WorkOrderListItem) => {
     const actions = [];
-    const isProductionMgrOrAdmin = hasAnyRole(["SYS_ADMIN", "PROD_MGR"]);
 
     // 0. Edit/Configure: DRAFT only
-    if (wo.status === 'DRAFT' && isProductionMgrOrAdmin) {
+    if (wo.status === 'DRAFT' && hasPermission("WO_UPDATE")) {
       actions.push(
         <button 
           key="edit"
@@ -217,7 +216,7 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 1. Release: DRAFT -> RELEASED
-    if (wo.status === 'DRAFT' && isProductionMgrOrAdmin) {
+    if (wo.status === 'DRAFT' && hasPermission("WO_UPDATE")) {
       actions.push(
         <button 
           key="release"
@@ -234,7 +233,7 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 2. Start: RELEASED -> IN_PROGRESS
-    if (wo.status === 'RELEASED' && isProductionMgrOrAdmin) {
+    if (wo.status === 'RELEASED' && hasPermission("WO_UPDATE")) {
       actions.push(
         <button 
           key="start"
@@ -251,7 +250,7 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 3. Record Output: IN_PROGRESS -> COMPLETED (only SYS_ADMIN and PROD_MGR)
-    if (wo.status === 'IN_PROGRESS' && isProductionMgrOrAdmin) {
+    if (wo.status === 'IN_PROGRESS' && hasPermission("WO_COMPLETE")) {
       actions.push(
         <button 
           key="output"
@@ -265,7 +264,7 @@ export const WorkOrders = (): JSX.Element => {
     }
 
     // 4. Cancel: DRAFT, RELEASED, IN_PROGRESS -> CANCELLED
-    if (['DRAFT', 'RELEASED', 'IN_PROGRESS'].includes(wo.status) && isProductionMgrOrAdmin) {
+    if (['DRAFT', 'RELEASED', 'IN_PROGRESS'].includes(wo.status) && hasPermission("WO_UPDATE")) {
       actions.push(
         <button 
           key="cancel"
@@ -326,7 +325,7 @@ export const WorkOrders = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Schedule production and track active orders on the shop floor.</p>
           </div>
-          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && (
+          {hasPermission("WO_CREATE") && (
             <button 
               onClick={() => setIsNewModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"

@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { Sidebar } from "./components/ui/sidebar";
+import { Sidebar, getFirstAllowedMenuItem } from "./components/ui/sidebar";
 import { Header } from "./components/ui/header";
 
 import { HumanResources } from "./screens/HumanResources";
@@ -103,7 +103,10 @@ const ProductionIndexRedirect = () => {
 const FinishedProductIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
     { to: "info", allowedPermissions: ["PRODUCT_READ"]},
-    { to: "quality", allowedPermissions: ["QC_READ"] },
+    { to: "quality", 
+      allowedPermissions: ["PRODUCT_READ", "PRODUCT_UPDATE", "QC_READ", "QC_CREATE"],
+      requiresAllPermissions: true
+    },
     { to: "checklists", allowedPermissions: ["QC_READ"]},
   ], "info");
   return <Navigate to={allowed} replace />;
@@ -119,10 +122,18 @@ const SupplierIndexRedirect = () => {
 
 const ReportsIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
-    {to: "performance", allowedPermissions: ["ABC"]},
-    {to: "inventory", allowedPermissions: ["ABC"]},
-    {to: "cost", allowedPermissions: ["ABC"]},
+    {to: "performance", 
+     allowedPermissions: ["DASH_READ", "LINE_READ", "PRODUCT_READ"],
+     requiresAllPermissions: true,
+    },
+    {to: "inventory", allowedPermissions: ["WH_STOCK_READ"]},
+    {to: "costs", allowedPermissions: ["DASH_READ"]},
   ], "performance");
+  return <Navigate to={allowed} replace />;
+};
+
+const MainIndexRedirect = () => {
+  const allowed = getFirstAllowedMenuItem();
   return <Navigate to={allowed} replace />;
 };
 
@@ -144,7 +155,7 @@ export default function App() {
             <div className="flex-1 overflow-auto bg-white">
               <Routes>
                 {/* Default redirect */}
-                <Route index element={<Navigate to="/reports" replace />} />
+                <Route index element={<MainIndexRedirect />} />
 
                 <Route path="/settings" element={
                   <div className="p-8">
@@ -283,7 +294,8 @@ export default function App() {
                     </ProtectedRouteWithRole>
                   } />
                   <Route path="quality" element={
-                    <ProtectedRouteWithRole allowedPermissions={["QC_READ"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["PRODUCT_READ", "PRODUCT_UPDATE", "QC_READ", "QC_CREATE"]}
+                    requiresAllPermissions={true}>
                       <FinishedProductQuality />
                     </ProtectedRouteWithRole>
                   } />
@@ -296,30 +308,31 @@ export default function App() {
 
                 {/* Reports */}
                 <Route path="/reports" element={
-                  <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                  <ProtectedRouteWithRole allowedPermissions={["DASH_READ", "WH_STOCK_READ"]}>
                     <Reports />
                   </ProtectedRouteWithRole>
                 }>
                   <Route index element={<ReportsIndexRedirect />} />
                   <Route path="performance" element={
-                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["DASH_READ", "LINE_READ", "PRODUCT_READ"]}
+                    requiresAllPermissions={true}>
                       <Performance/>
                     </ProtectedRouteWithRole>
                   } />
                   <Route path="inventory" element={
-                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["WH_STOCK_READ"]}>
                       <InventoryReport/>
                     </ProtectedRouteWithRole>
                   } />
                   <Route path="costs" element={
-                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["DASH_READ"]}>
                       <CostReport/>
                     </ProtectedRouteWithRole>
                   } />
                 </Route>
 
                 {/* Catch-all */}
-                <Route path="*" element={<Navigate to="/reports" replace />} />
+                <Route path="*" element={<MainIndexRedirect />} />
               </Routes>
             </div>
           </main>

@@ -2,7 +2,7 @@ import { type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Package, Calendar, User, ClipboardList, Box, AlertCircle, Printer } from "lucide-react";
 import type { WorkOrderDetail } from "../../../services/workOrderServices";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 interface WorkOrderDetailModalProps {
   isOpen: boolean;
@@ -304,7 +304,7 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                         <span className="font-mono font-bold text-gray-900">{batch.batchCode}</span>
                         <span className="text-xs text-gray-500">Expiry: {batch.expiryDate || 'N/A'}</span>
                       </div>
-                      {batch.productInstances && batch.productInstances.length > 0 && hasAnyRole(["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]) && (
+                      {batch.productInstances && batch.productInstances.length > 0 && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -318,38 +318,36 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {batch.productInstances?.map((inst) => {
-                        const hasQCAccess = hasAnyRole(["SYS_ADMIN", "WH_STAFF"]);
-                        const hasInductionAccess = hasAnyRole(["SYS_ADMIN", "WH_STAFF", "PROD_MGR"]);
-                        const isPendingQC = inst.status === 'PENDING_QC' && hasQCAccess;
-                        const isReadyForInduction = (inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC') && hasInductionAccess;
+                        const isPendingQC = inst.status === 'PENDING_QC';
+                        const isReadyForInduction = inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC';
                         const isClickable = isPendingQC || isReadyForInduction;
+                        const hasInductPermission = hasPermission("WH_INDUCT");
+                        const canClick = isClickable && hasInductPermission;
 
                         return (
-                          <div 
+                          <div
                             key={inst.productInstanceId} 
-                            onClick={isClickable ? () => handleInstanceClick(inst.serialNumber, inst.status) : undefined}
+                            onClick={canClick ? () => handleInstanceClick(inst.serialNumber, inst.status) : undefined}
                             className={`p-2 border rounded-lg text-[10px] flex flex-col gap-1.5 transition-all ${
                               isPendingQC 
-                                ? 'bg-white border-yellow-200 hover:border-yellow-400 hover:shadow-sm cursor-pointer hover:bg-yellow-50/30' 
+                                ? `bg-white border-yellow-200 ${canClick ? 'hover:border-yellow-400 hover:shadow-sm cursor-pointer hover:bg-yellow-50/30' : 'opacity-75'}` 
                                 : isReadyForInduction
-                                  ? 'bg-white border-blue-200 hover:border-blue-400 hover:shadow-sm cursor-pointer hover:bg-blue-50/30'
-                                  : 'bg-white border-gray-200'
+                                  ? `bg-white border-blue-200 ${canClick ? 'hover:border-blue-400 hover:shadow-sm cursor-pointer hover:bg-blue-50/30' : 'opacity-75'}`
+                                  : 'bg-white border-gray-200 opacity-75'
                             }`}
                           >
                             <div className="flex justify-between items-center gap-1">
                               <span className="font-mono font-bold text-gray-700">{inst.serialNumber}</span>
-                              {hasAnyRole(["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]) && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePrintInstance(inst.serialNumber);
-                                  }}
-                                  className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-                                  title="Print QR Label"
-                                >
-                                  <Printer className="w-3 h-3" />
-                                </button>
-                              )}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrintInstance(inst.serialNumber);
+                                }}
+                                className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                title="Print QR Label"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                             <span className={`font-bold ${
                               inst.status === 'PASSED_QC' ? 'text-green-600' : 

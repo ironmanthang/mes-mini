@@ -11,9 +11,9 @@ import { useState, useEffect, useMemo, useRef, type JSX } from "react";
 import { NewMaterialRequestModal } from "./NewMaterialRequestModal";
 import { ViewMaterialRequestModal } from "./ViewMaterialRequestModal";
 import { MaterialRequestServices, type MaterialRequest } from "../../../services/materialRequestServices";
-import { hasAllPermissions } from "../../../lib/auth";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasPermission } from "../../../lib/auth";
 
 export const MaterialRequests = (): JSX.Element => {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -132,7 +132,7 @@ export const MaterialRequests = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage and create material request slips automatically based on BOM.</p>
           </div>
-          {hasAllPermissions(["WO_READ", "MR_CREATE"]) && (
+          {hasPermission("MR_CREATE") && (
             <button 
               onClick={() => setIsNewModalOpen(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer active:scale-95"

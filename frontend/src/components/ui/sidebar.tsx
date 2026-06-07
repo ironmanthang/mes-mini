@@ -17,7 +17,7 @@ const menuItems = [
     icon: TrendingUpIcon,
     label: "Reports",
     to: "/reports",
-    allowedPermissions: ["ABC"]
+    allowedPermissions: ["DASH_READ", "WH_STOCK_READ"]
   },
   {
     icon: UsersIcon,
@@ -49,8 +49,20 @@ const menuItems = [
     to: "/production",
     allowedPermissions: ["PR_READ", "WO_READ", "MR_READ", "LINE_READ"]
   },
-  { icon: PackageIcon, label: "Finished Products", to: "/finished-products" },
+  { 
+    icon: PackageIcon, 
+    label: "Finished Products", 
+    to: "/finished-products",
+    allowedPermissions: ["PRODUCT_READ", "QC_READ"]
+  },
 ];
+
+export const getFirstAllowedMenuItem = (): string => {
+  const allowed = menuItems.find(
+    item => !item.allowedPermissions || item.allowedPermissions.some(p => hasPermission(p))
+  );
+  return allowed ? allowed.to : "/reports";
+};
 
 export const Sidebar = (): JSX.Element => {
   // Lọc danh sách menu: chỉ hiển thị các mục mà người dùng có ít nhất 1 permission phù hợp
