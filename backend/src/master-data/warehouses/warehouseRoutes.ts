@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from './warehouseController.js';
+import { getAllWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, getWarehouseStock } from './warehouseController.js';
 import { protect, authorize } from '../../common/middleware/authMiddleware.js';
 import { PERM } from '../../common/constants/permissions.js';
 
@@ -7,22 +7,27 @@ const router = Router();
 
 router.use(protect);
 
-router.get('/', 
-    authorize(PERM.WH_STOCK_READ), 
+router.get('/',
+    authorize(PERM.WH_STOCK_READ),
     getAllWarehouses
 );
 
-router.post('/', 
+router.get('/:id/stock',
+    authorize(PERM.WH_STOCK_READ),
+    getWarehouseStock
+);
+
+router.post('/',
     authorize(PERM.WH_MANAGE),
     createWarehouse
 );
 
-router.put('/:id', 
+router.put('/:id',
     authorize(PERM.WH_MANAGE),
     updateWarehouse
 );
 
-router.delete('/:id', 
+router.delete('/:id',
     authorize(PERM.WH_MANAGE),
     deleteWarehouse
 );
@@ -73,6 +78,64 @@ router.delete('/:id',
  *                   updatedAt: { type: string, format: date-time }
  *       400:
  *         description: Invalid warehouse type
+ */
+
+/**
+ * @swagger
+ * /api/warehouses/{id}/stock:
+ *   get:
+ *     summary: Get stock detail for a specific warehouse
+ *     description: |
+ *       Returns a grouped, summarized view of what is currently inside a warehouse.
+ *       The response shape is polymorphic based on the warehouse type:
+ *       - **COMPONENT**: grouped by component, with nested lot detail (lotCode, quantities, PO traceability)
+ *       - **SALES**: grouped by product, with nested batch detail (batchCode, WO traceability, FIFO dates)
+ *       - **ERROR**: grouped by product, with nested batch + production line detail (for root-cause analysis)
+ *     tags: [Warehouses]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Warehouse ID
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by component/product name, code, or lot code
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Page number (pagination at the component/product level)
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Warehouse stock detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 warehouseId: { type: integer }
+ *                 warehouseName: { type: string }
+ *                 warehouseType: { type: string, enum: [COMPONENT, SALES, ERROR] }
+ *                 location: { type: string, nullable: true }
+ *                 summary: { type: object }
+ *                 data: { type: array, items: { type: object } }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page: { type: integer }
+ *                     limit: { type: integer }
+ *                     total: { type: integer }
+ *                     totalPages: { type: integer }
+ *       400:
+ *         description: Invalid warehouse ID
+ *       404:
+ *         description: Warehouse not found
  */
 
 /**

@@ -233,7 +233,8 @@ export const PERMISSIONS_META: Record<string, PermissionMeta> = {
       "GET /api/warehouse-ops/inventory/status",
       "GET /api/warehouse-ops/inventory/low-stock-details",
       "GET /api/warehouse-ops/inventory/stock-status",
-      "GET /api/warehouses"
+      "GET /api/warehouses",
+      "GET /api/warehouses/:id/stock"
     ],
   },
   // WH_STOCK_ADJUST: {

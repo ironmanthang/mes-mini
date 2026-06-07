@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import WarehouseService from './warehouseService.js';
+import WarehouseStockService from './warehouseStockService.js';
 
 export const getAllWarehouses = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -67,6 +68,28 @@ export const deleteWarehouse = async (req: Request, res: Response): Promise<void
             res.status(404).json({ message: msg });
         } else if (msg.includes('Cannot delete warehouse')) {
             res.status(400).json({ message: msg });
+        } else {
+            res.status(500).json({ message: msg });
+        }
+    }
+};
+
+export const getWarehouseStock = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const warehouseId = Number(id);
+
+        if (isNaN(warehouseId)) {
+            res.status(400).json({ message: 'Invalid warehouse ID' });
+            return;
+        }
+
+        const result = await WarehouseStockService.getWarehouseStock(warehouseId, req.query as any);
+        res.status(200).json(result);
+    } catch (error) {
+        const msg = (error as Error).message;
+        if (msg === 'Warehouse not found') {
+            res.status(404).json({ message: msg });
         } else {
             res.status(500).json({ message: msg });
         }
