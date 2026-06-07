@@ -19,6 +19,7 @@ import { UpdateOrderModal } from "./UpdateOrderModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
+import { hasPermission } from "../../../lib/auth";
 
 type ConfirmActionType = "SUBMIT" | "APPROVE" | "MARK_ORDERED";
 
@@ -349,37 +350,51 @@ export const ComponentOrders = (): JSX.Element => {
                         
                         {order.status === "DRAFT" && (
                           <>
-                            <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Order">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => openConfirmAction(order.purchaseOrderId, "SUBMIT")} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit for Approval">
-                              <Send className="w-4 h-4" />
-                            </button>
+                            {hasPermission("PO_CREATE") && (
+                              <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" title="Edit Order">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            {hasPermission("PO_SUBMIT") && (
+                              <button onClick={() => openConfirmAction(order.purchaseOrderId, "SUBMIT")} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Submit for Approval">
+                                <Send className="w-4 h-4" />
+                              </button>
+                            )}
                           </>
                         )}
                         
                         {order.status === 'PENDING' && (
                           <>
-                            <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors cursor-pointer" title="View/Edit Details">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => checkApprove(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" title="Approve Order">
-                                <CheckCircle className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => openActionModal(order.purchaseOrderId, 'REJECT')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Reject Order">
+                            {hasPermission("PO_CREATE") && (
+                              <button onClick={() => handleUpdate(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors cursor-pointer" title="View/Edit Details">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            {hasPermission("PO_APPROVE") && (
+                              <button onClick={() => checkApprove(order.purchaseOrderId)} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" title="Approve Order">
+                                  <CheckCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                            {hasPermission("PO_CANCEL") && (
+                              <button onClick={() => openActionModal(order.purchaseOrderId, 'REJECT')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Reject Order">
                                 <XCircle className="w-4 h-4" />
-                            </button>
+                              </button>
+                            )}
                           </>
                         )}
 
                         {order.status === 'APPROVED' && (
                           <>
-                            <button onClick={() => openConfirmAction(order.purchaseOrderId, "MARK_ORDERED")} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Mark as Ordered">
+                            {hasPermission("PO_RECEIVE") && (
+                              <button onClick={() => openConfirmAction(order.purchaseOrderId, "MARK_ORDERED")} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Mark as Ordered">
                                 <Send className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order">
+                              </button>
+                            )}
+                            {hasPermission("PO_CANCEL") && (
+                              <button onClick={() => openActionModal(order.purchaseOrderId, 'CANCEL')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Cancel Order">
                                 <XCircle className="w-4 h-4" />
-                            </button>
+                              </button>
+                            )}
                           </>
                         )}
                       </td>

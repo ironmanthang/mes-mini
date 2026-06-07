@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { useState, useEffect } from "react";
 import { employeeService, type Employee, type UpdateEmployeeRequest } from "../../../services/employeeServices";
 import { roleService, type Role } from "../../../services/roleServices";
+import { hasPermission } from "../../../lib/auth";
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -170,21 +171,23 @@ export const EditEmployeeModal = ({ isOpen, onClose, userData, onConfirm, curren
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                disabled={isEditingSelf}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="INACTIVE">INACTIVE</option>
-              </select>
-              {isEditingSelf && (
-                 <p className="text-[10px] text-red-500 font-bold tracking-tight">Security Guard: You cannot change your own status.</p>
-              )}
-            </div>
+            {hasPermission("EMP_STATUS") && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  disabled={isEditingSelf}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+                {isEditingSelf && (
+                  <p className="text-[10px] text-red-500 font-bold tracking-tight">Security Guard: You cannot change your own status.</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">Date of Birth</label>

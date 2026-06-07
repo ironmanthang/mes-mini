@@ -5,7 +5,6 @@ import {
   Filter, 
   Plus, 
   Edit, 
-  History, 
   Loader2,
   Trash2,
   ChevronLeft,
@@ -170,9 +169,6 @@ export const ComponentInformation = (): JSX.Element => {
             </div>
 
             <div className="flex items-center gap-2">
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer">
-                    <History className="w-4 h-4" /> Purchase History
-                </button>
                 {hasPermission("COMP_CREATE") && (
                   <button 
                       onClick={handleOpenAdd}

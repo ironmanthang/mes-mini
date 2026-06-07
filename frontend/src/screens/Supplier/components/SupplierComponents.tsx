@@ -15,10 +15,10 @@ import { componentService, type Component } from "../../../services/componentSer
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const SupplierComponents = (): JSX.Element => {
-  const canEdit = !hasAnyRole(["PROD_MGR"]);
+  const canEdit = hasPermission("SUPPLIER_UPDATE");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [assignedComponents, setAssignedComponents] = useState<SupplierComponent[]>([]);
@@ -318,7 +318,7 @@ export const SupplierComponents = (): JSX.Element => {
           </div>
 
           {/* Form to add a component association */}
-          {selectedSupplierId && canEdit && (
+          {(selectedSupplierId && canEdit) && (
             <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
               <h3 className="text-sm font-bold text-gray-800 uppercase mb-4 flex items-center gap-2">
                 <PackageCheck className="w-4 h-4 text-blue-600" /> Link Component to Supplier

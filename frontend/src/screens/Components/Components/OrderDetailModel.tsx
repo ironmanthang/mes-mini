@@ -3,6 +3,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { purchaseOrderService, type PurchaseOrder, type Attachment, type ComponentLot } from "../../../services/purchaseOrderServices";
+import { hasPermission } from "../../../lib/auth";
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -589,7 +590,7 @@ export const OrderDetailModal = ({
             <Printer className="w-4 h-4" /> Print
           </button>
           
-          {order.status === 'PENDING' && (
+          {(hasPermission("PO_APPROVE") && order.status === 'PENDING') && (
             <button 
               onClick={onApprove}
               className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-500 flex items-center gap-2 cursor-pointer transition-colors shadow-sm"

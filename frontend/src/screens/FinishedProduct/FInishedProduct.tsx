@@ -15,7 +15,7 @@ export const FinishedProduct = (): JSX.Element => {
       icon: Info, 
       to: "/finished-products/info",
       description: "Batch details & serial numbers",
-      allowedPermissions: ["PRODUCT_READ", "PRODUCT_CREATE", "PRODUCT_UPDATE"],
+      allowedPermissions: ["PRODUCT_READ"],
     },
     { 
       id: "quality", 
@@ -31,7 +31,7 @@ export const FinishedProduct = (): JSX.Element => {
       icon: ClipboardList, 
       to: "/finished-products/checklists",
       description: "Manage QC templates & parameters",
-      allowedPermissions: ["QC_CREATE", "QC_READ"],
+      allowedPermissions: ["QC_READ"],
     },
   ];
 

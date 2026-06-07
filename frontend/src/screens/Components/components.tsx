@@ -10,7 +10,7 @@ export const Components = () => {
       icon: Cpu,
       to: "/components/info",
       description: "Manage items, stock & specs",
-      allowedPermissions: ["COMP_READ", "COMP_UPDATE", "COMP_CREATE"]
+      allowedPermissions: ["COMP_READ"]
     },
     { 
       id: "create-order", 

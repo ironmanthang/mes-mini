@@ -1,6 +1,7 @@
 import { X, Save, Edit, Loader2, Paperclip, Plus, Trash2, FileText, Lock } from "lucide-react";
 import { useState, useEffect, type JSX, useRef } from "react";
 import { purchaseOrderService, type UpdatePORequest, type Attachment } from "../../../services/purchaseOrderServices";
+import { hasPermission } from "../../../lib/auth";
 
 interface UpdateOrderModalProps {
   isOpen: boolean;
@@ -297,7 +298,8 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                 />
               </div>
 
-              <div className="pt-4 border-t border-gray-100 space-y-3">
+              {hasPermission("ATTACH_UPLOAD") && (
+                <div className="pt-4 border-t border-gray-100 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                       <div>
                           <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
@@ -336,15 +338,17 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                                           <span className="text-xs text-gray-400">Uploaded {new Date(att.uploadedAt).toLocaleDateString('vi-VN')}</span>
                                       </div>
                                   </div>
-                                  <button 
+                                  {hasPermission("ATTACH_DELETE_ANY") && (
+                                    <button 
                                       type="button"
                                       onClick={() => handleDeleteExistingAttachment(att.attachmentId)}
                                       disabled={isSubmitting}
                                       className="p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer disabled:opacity-50"
                                       title="Delete from server"
-                                  >
-                                      <Trash2 className="w-4 h-4" />
-                                  </button>
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                               </div>
                           ))}
                       </div>
@@ -376,9 +380,9 @@ export const UpdateOrderModal = ({ isOpen, onClose, orderId, onSuccess }: Update
                               </div>
                           ))}
                       </div>
-                  )}
-              </div>
-
+                    )}
+                </div>
+              )}
             </>
           )}
         </div>

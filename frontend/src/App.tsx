@@ -41,15 +41,22 @@ import { CostReport } from "./screens/Reports/components/CostReport";
 import { ProductLookup } from "./screens/PublicPortal/ProductLookup";
 
 import { ProtectedRouteWithRole } from "./components/ProtectedRouteWithRole";
-import { hasPermission } from "./lib/auth";
+import { hasPermission, hasAllPermissions } from "./lib/auth";
 
 interface TabConfig {
   to: string;
   allowedPermissions?: string[];
+  requiresAllPermissions?: boolean;
 }
 
 const getFirstAllowedTab = (tabs: TabConfig[], defaultTab: string): string => {
-  const allowed = tabs.find(tab => !tab.allowedPermissions || tab.allowedPermissions.some(p => hasPermission(p)));
+  const allowed = tabs.find(tab => {
+    if (!tab.allowedPermissions) return true;
+    if (tab.requiresAllPermissions) {
+      return hasAllPermissions(tab.allowedPermissions);
+    }
+    return tab.allowedPermissions.some(p => hasPermission(p));
+  });
   return allowed ? allowed.to : defaultTab;
 };
 
@@ -66,16 +73,20 @@ const ComponentsIndexRedirect = () => {
     { to: "info", allowedPermissions: ["COMP_READ"] },
     { to: "create-order", allowedPermissions: ["PO_CREATE"] },
     { to: "orders", allowedPermissions: ["PO_READ"] },
-    { to: "receipts", allowedPermissions: ["PO_RECEIVE"] }
+    { to: "receipts", allowedPermissions: ["PO_READ"] }
   ], "info");
   return <Navigate to={allowed} replace />;
 };
 
 const WarehouseIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
-    { to: "info", allowedPermissions: ["WH_STOCK_READ", "WH_MANAGE"] },
+    { to: "info", allowedPermissions: ["WH_STOCK_READ"] },
     { to: "induction", allowedPermissions: ["WH_INDUCT"] },
-    { to: "material-issuing", allowedPermissions: ["MR_APPROVE"] }
+    { 
+      to: "material-issuing", 
+      allowedPermissions: ["MR_READ", "WH_STOCK_READ"],
+      requiresAllPermissions: true 
+    }
   ], "info");
   return <Navigate to={allowed} replace />;
 };
@@ -91,19 +102,26 @@ const ProductionIndexRedirect = () => {
 
 const FinishedProductIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
-    { to: "info" },
-    { to: "quality", allowedPermissions: ["QC_READ", "QC_CREATE"] },
-    { to: "checklists" },
-    { to: "orders", allowedPermissions: ["SO_READ"] }
+    { to: "info", allowedPermissions: ["PRODUCT_READ"]},
+    { to: "quality", allowedPermissions: ["QC_READ"] },
+    { to: "checklists", allowedPermissions: ["QC_READ"]},
   ], "info");
   return <Navigate to={allowed} replace />;
 };
 
+const SupplierIndexRedirect = () => {
+  const allowed = getFirstAllowedTab([
+    {to: "info", allowedPermissions: ["SUPPLIER_READ"]},
+    {to: "components", allowedPermissions: ["SUPPLIER_READ"]},
+  ], "info");
+  return <Navigate to={allowed} replace />
+}
+
 const ReportsIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
-    { to: "performance", allowedPermissions: ["WO_READ"] },
-    { to: "inventory", allowedPermissions: ["WH_STOCK_READ"] },
-    { to: "costs", allowedPermissions: ["WO_READ"] }
+    {to: "performance", allowedPermissions: ["ABC"]},
+    {to: "inventory", allowedPermissions: ["ABC"]},
+    {to: "cost", allowedPermissions: ["ABC"]},
   ], "performance");
   return <Navigate to={allowed} replace />;
 };
@@ -154,7 +172,11 @@ export default function App() {
                 </Route>
 
                 {/* Components */}
-                <Route path="/components" element={<Components />}>
+                <Route path="/components" element={
+                  <ProtectedRouteWithRole allowedPermissions={["COMP_READ", "PO_CREATE", "PO_READ"]}>
+                    <Components />
+                  </ProtectedRouteWithRole>
+                }>
                   <Route index element={<ComponentsIndexRedirect />} />
                   <Route path="info" element={
                     <ProtectedRouteWithRole allowedPermissions={["COMP_READ"]}>
@@ -172,7 +194,7 @@ export default function App() {
                     </ProtectedRouteWithRole>
                   } />
                   <Route path="receipts" element={
-                    <ProtectedRouteWithRole allowedPermissions={["PO_RECEIVE"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["PO_READ"]}>
                       <ComponentReceipts />
                     </ProtectedRouteWithRole>
                   } />
@@ -184,16 +206,28 @@ export default function App() {
                     <Supplier />
                   </ProtectedRouteWithRole>
                 }>
-                  <Route index element={<Navigate to="info" replace />} />
-                  <Route path="info" element={<SupplierInformation />} />
-                  <Route path="components" element={<SupplierComponents />} />
+                  <Route index element={<SupplierIndexRedirect />} />
+                  <Route path="info" element={
+                    <ProtectedRouteWithRole allowedPermissions={["SUPPLIER_READ"]}>
+                      <SupplierInformation/>
+                    </ProtectedRouteWithRole>
+                  } />
+                  <Route path="components" element={
+                    <ProtectedRouteWithRole allowedPermissions={["SUPPLIER_READ"]}>
+                      <SupplierComponents/>
+                    </ProtectedRouteWithRole>
+                  } />
                 </Route>
 
                 {/* Warehouse */}
-                <Route path="/warehouse" element={<Warehouse />}>
+                <Route path="/warehouse" element={
+                  <ProtectedRouteWithRole allowedPermissions={["WH_STOCK_READ", "WH_INDUCT", "MR_READ"]}>
+                    <Warehouse />
+                  </ProtectedRouteWithRole>
+                }>
                   <Route index element={<WarehouseIndexRedirect />} />
                   <Route path="info" element={
-                    <ProtectedRouteWithRole allowedPermissions={["WH_STOCK_READ", "WH_MANAGE"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["WH_STOCK_READ"]}>
                       <WarehouseInformation />
                     </ProtectedRouteWithRole>
                   } />
@@ -203,14 +237,21 @@ export default function App() {
                     </ProtectedRouteWithRole>
                   } />
                   <Route path="material-issuing" element={
-                    <ProtectedRouteWithRole allowedPermissions={["MR_APPROVE"]}>
+                    <ProtectedRouteWithRole 
+                      allowedPermissions={["MR_READ", "WH_STOCK_READ"]}
+                      requiresAllPermissions={true}
+                    >
                       <MaterialIssuing />
                     </ProtectedRouteWithRole>
                   } />
                 </Route>
 
                 {/* Production */}
-                <Route path="/production" element={<Production />}>
+                <Route path="/production" element={
+                  <ProtectedRouteWithRole allowedPermissions={["PR_READ", "WO_READ", "MR_READ"]}>
+                    <Production />
+                  </ProtectedRouteWithRole>
+                }>
                   <Route index element={<ProductionIndexRedirect />} />
                   <Route path="requests" element={
                     <ProtectedRouteWithRole allowedPermissions={["PR_READ"]}>
@@ -230,27 +271,51 @@ export default function App() {
                 </Route>
 
                 {/* Finished Products */}
-                <Route path="/finished-products" element={<FinishedProduct />}>
+                <Route path="/finished-products" element={
+                  <ProtectedRouteWithRole allowedPermissions={["PRODUCT_READ", "QC_READ"]}>
+                    <FinishedProduct />
+                  </ProtectedRouteWithRole>
+                }>
                   <Route index element={<FinishedProductIndexRedirect />} />
-                  <Route path="info" element={<FinishedProductInformation />} />
+                  <Route path="info" element={
+                    <ProtectedRouteWithRole allowedPermissions={["PRODUCT_READ"]}>
+                      <FinishedProductInformation />
+                    </ProtectedRouteWithRole>
+                  } />
                   <Route path="quality" element={
-                    <ProtectedRouteWithRole allowedPermissions={["QC_READ", "QC_CREATE"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["QC_READ"]}>
                       <FinishedProductQuality />
                     </ProtectedRouteWithRole>
                   } />
-                  <Route path="checklists" element={<FinishedProductChecklists />} />
+                  <Route path="checklists" element={
+                    <ProtectedRouteWithRole allowedPermissions={["QC_READ"]}>
+                      <FinishedProductChecklists />
+                    </ProtectedRouteWithRole>
+                  } />
                 </Route>
 
                 {/* Reports */}
                 <Route path="/reports" element={
-                  <ProtectedRouteWithRole allowedPermissions={["WO_READ", "WH_STOCK_READ"]}>
+                  <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
                     <Reports />
                   </ProtectedRouteWithRole>
                 }>
                   <Route index element={<ReportsIndexRedirect />} />
-                  <Route path="performance" element={<Performance />} />
-                  <Route path="inventory" element={<InventoryReport />} />
-                  <Route path="costs" element={<CostReport />} />
+                  <Route path="performance" element={
+                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                      <Performance/>
+                    </ProtectedRouteWithRole>
+                  } />
+                  <Route path="inventory" element={
+                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                      <InventoryReport/>
+                    </ProtectedRouteWithRole>
+                  } />
+                  <Route path="costs" element={
+                    <ProtectedRouteWithRole allowedPermissions={["ABC"]}>
+                      <CostReport/>
+                    </ProtectedRouteWithRole>
+                  } />
                 </Route>
 
                 {/* Catch-all */}

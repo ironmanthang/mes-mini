@@ -14,7 +14,7 @@ import { WarehouseServices, type Warehouse, type TYPE } from "../../../services/
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const WarehouseInformation = (): JSX.Element => {
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -24,7 +24,7 @@ export const WarehouseInformation = (): JSX.Element => {
   const [filterType, setFilterType] = useState("All");
   const [selectedWarehouse, setSelectedWarehouse] = useState<any>(null);
 
-  const canEdit = !hasAnyRole(["PROD_MGR"]);
+  const canEdit = hasPermission("WH_MANAGE");
 
   // Notification States
   const [showSuccess, setShowSuccess] = useState(false);
@@ -156,10 +156,10 @@ export const WarehouseInformation = (): JSX.Element => {
             {canEdit && (
                 <div className="flex items-center gap-2">
                     <button 
-                        onClick={handleOpenAdd}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
+                      onClick={handleOpenAdd}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
                     >
-                        <Plus className="w-4 h-4" /> Add Warehouse
+                      <Plus className="w-4 h-4" /> Add Warehouse
                     </button>
                 </div>
             )}
@@ -213,14 +213,14 @@ export const WarehouseInformation = (): JSX.Element => {
                                                         <Edit className="w-4 h-4" />
                                                     </button>
                                                     <button 
-                                                        onClick={() => {
-                                                            setConfirmDelete({
-                                                                isOpen: true,
-                                                                dbId: item.dbId,
-                                                                name: item.name,
-                                                            });
-                                                        }}
-                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Delete Warehouse"
+                                                      onClick={() => {
+                                                          setConfirmDelete({
+                                                              isOpen: true,
+                                                              dbId: item.dbId,
+                                                              name: item.name,
+                                                          });
+                                                      }}
+                                                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" title="Delete Warehouse"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>

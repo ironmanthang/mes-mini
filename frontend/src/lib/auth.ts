@@ -111,7 +111,8 @@ export const hasAnyRole = (allowedRoles: string[]): boolean => {
  */
 export const hasPermission = (permCode: string): boolean => {
   // SYS_ADMIN mặc định có tất cả quyền
-  if (hasAnyRole(["SYS_ADMIN", "PUBLIC"])) return true;
+  if (hasAnyRole(["SYS_ADMIN"])) return true;
+  if (permCode === "PUBLIC") return true;
   
   const permissions = getUserPermissions();
   return permissions.includes(permCode);

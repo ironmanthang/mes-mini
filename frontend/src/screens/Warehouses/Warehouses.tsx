@@ -1,6 +1,6 @@
 import { Warehouse as WarehouseIcon, PackageCheck, QrCode } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyPermission } from "../../lib/auth";
+import { hasAnyPermission, hasAllPermissions } from "../../lib/auth";
 
 export const Warehouse = () => {
   const allTabs = [
@@ -10,7 +10,7 @@ export const Warehouse = () => {
       icon: WarehouseIcon,
       to: "/warehouse/info",
       description: "Manage locations, capacity & status",
-      allowedPermissions: ["WH_STOCK_READ", "WH_STOCK_ADJUST", "WH_MANAGE"],
+      allowedPermissions: ["WH_STOCK_READ"],
     },
     { 
       id: "induction",
@@ -26,12 +26,19 @@ export const Warehouse = () => {
       icon: PackageCheck,
       to: "/warehouse/material-issuing",
       description: "Approve & issue materials to production",
-      allowedPermissions: ["WH_STOCK_READ", "WO_COMPLETED"]
+      allowedPermissions: ["WH_STOCK_READ", "MR_READ"],
+      requiresAllPermissions: true,
     }
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
+  const visibleTabs = allTabs.filter(tab => {
+    if (!tab.allowedPermissions) return true;
+    if (tab.requiresAllPermissions) {
+      return hasAllPermissions(tab.allowedPermissions);
+    }
+    return hasAnyPermission(tab.allowedPermissions);
+  });
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

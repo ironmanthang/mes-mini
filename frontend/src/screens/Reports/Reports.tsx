@@ -1,6 +1,6 @@
 import { BarChart3, Box, TrendingUp } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const Reports = () => {
   const allTabs = [
@@ -10,7 +10,7 @@ export const Reports = () => {
       icon: BarChart3,
       to: "/reports/performance",
       description: "Analyze production line efficiency, yield, and output",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]
+      allowedPermissions: ["ABC"]
     },
     {
       id: "inventory",
@@ -18,7 +18,7 @@ export const Reports = () => {
       icon: Box,
       to: "/reports/inventory",
       description: "View real-time stock levels for components and finished products across warehouses",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR"]
+      allowedPermissions: ["ABC"]
     },
     {
       id: "costs",
@@ -26,12 +26,12 @@ export const Reports = () => {
       icon: TrendingUp,
       to: "/reports/costs",
       description: "Track procurement spend, manufacturing costs, and labor/overhead distribution",
-      allowedRoles: ["SYS_ADMIN", "PROD_MGR", "LINE_LEADER"]
+      allowedPermissions: ["ABC"]
     },
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

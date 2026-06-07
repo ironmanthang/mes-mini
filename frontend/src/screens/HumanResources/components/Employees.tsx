@@ -6,6 +6,7 @@ import { EditEmployeeModal } from "./EditEmployeeModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 
 import { employeeService, type Employee } from "../../../services/employeeServices";
+import { hasPermission } from "../../../lib/auth";
 
 export const Employees = (): JSX.Element => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -63,13 +64,15 @@ export const Employees = (): JSX.Element => {
       <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Employee Management</h1>
-          <button
-            onClick={() => setIsAddOpen(true)}
-            className="flex items-center gap-2 cursor-pointer
-            bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusIcon size={20} /> Add Employee
-          </button>
+          {hasPermission("EMP_CREATE") && (
+            <button
+              onClick={() => setIsAddOpen(true)}
+              className="flex items-center gap-2 cursor-pointer
+              bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusIcon size={20} /> Add Employee
+            </button>
+          )}
         </div>
 
         <div className="relative mb-6">
@@ -127,13 +130,15 @@ export const Employees = (): JSX.Element => {
                       </td>
                       <td className="p-4 text-sm">
                         <div className="flex gap-2">
-                          <button 
-                            onClick={() => handleEdit(emp)}
-                            className="p-1 text-blue-600 cursor-pointer
-                            hover:bg-blue-50 rounded transition-colors"
-                          >
-                            <EditIcon size={18} />
-                          </button>
+                          {hasPermission("EMP_UPDATE") && (
+                            <button 
+                              onClick={() => handleEdit(emp)}
+                              className="p-1 text-blue-600 cursor-pointer
+                              hover:bg-blue-50 rounded transition-colors"
+                            >
+                              <EditIcon size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

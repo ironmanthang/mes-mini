@@ -22,7 +22,7 @@ import { ProductionRequestDetailModal } from "./ProductionRequestDetailModal";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const CreateProductionRequest = (): JSX.Element => {
   const [requests, setRequests] = useState<ProductionRequest[]>([]);
@@ -179,7 +179,7 @@ export const CreateProductionRequest = (): JSX.Element => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">Manage MRP checks, material reservations, and manufacturing queues.</p>
           </div>
-          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && (
+          {hasPermission("PR_CREATE") && hasPermission("SO_READ") && (
             <button 
               onClick={() => setIsNewModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors shadow-sm cursor-pointer"
@@ -210,7 +210,9 @@ export const CreateProductionRequest = (): JSX.Element => {
                 className="bg-transparent text-sm p-1 outline-none text-gray-700 font-medium cursor-pointer"
               >
                 <option value="All">All Status</option>
-                <option value="APPROVED">Approved (Ready)</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
                 <option value="WAITING_MATERIAL">Waiting Material</option>
                 <option value="IN_PROGRESS">In Progress</option>
                 <option value="FULFILLED">Fulfilled</option>
@@ -277,26 +279,30 @@ export const CreateProductionRequest = (): JSX.Element => {
                             <Eye className="w-4 h-4" />
                           </button>
                           
-                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status === 'DRAFT' && (
+                          {req.status === 'DRAFT' && (
                             <>
-                              <button 
+                              {hasPermission("PR_UPDATE") && (
+                                <button 
                                 onClick={() => setSelectedUpdateId(req.productionRequestId)}
                                 className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 
                                 title="Edit Draft"
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
-                              <button 
-                                onClick={() => handleSubmitDraft(req.productionRequestId)}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
-                                title="Submit Request"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
+                              )}
+                              {hasPermission("PR_UPDATE") && (
+                                <button
+                                  onClick={() => handleSubmitDraft(req.productionRequestId)}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
+                                  title="Submit Request"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              )}
                             </>
                           )}
 
-                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status === 'PENDING' && (
+                          {req.status === 'PENDING' && hasPermission("PR_APPROVE") && (
                             <button 
                               onClick={() => handleApprove(req.productionRequestId)}
                               className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer" 
@@ -306,7 +312,7 @@ export const CreateProductionRequest = (): JSX.Element => {
                             </button>
                           )}
 
-                          {hasAnyRole(["SYS_ADMIN", "PROD_MGR"]) && req.status !== 'DRAFT' && (
+                          {req.status !== 'DRAFT' && hasPermission("PR_UPDATE") && (
                             <button 
                               onClick={() => setSelectedUpdateId(req.productionRequestId)}
                               className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer" 

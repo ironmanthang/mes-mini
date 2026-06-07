@@ -9,6 +9,7 @@ import { WarehouseServices, type Warehouse } from "../../../services/warehouseSe
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasPermission } from "../../../lib/auth";
 
 export const MaterialIssuing = (): JSX.Element => {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
@@ -235,12 +236,14 @@ export const MaterialIssuing = (): JSX.Element => {
                           <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 uppercase border border-yellow-200">PENDING</span>
                       </td>
                       <td className="p-4 text-center">
-                        <button 
-                          onClick={() => setSelectedRequest(req)}
-                          className="px-6 py-1.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors text-xs cursor-pointer shadow-sm"
-                        >
-                          Process
-                        </button>
+                        {hasPermission("WH_STOCK_READ") && (
+                          <button 
+                            onClick={() => setSelectedRequest(req)}
+                            className="px-6 py-1.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors text-xs cursor-pointer shadow-sm"
+                          >
+                            Process
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -402,7 +405,7 @@ export const MaterialIssuing = (): JSX.Element => {
             <div className="space-y-3">
                 <button 
                     onClick={handleValidate}
-                    disabled={isValidating || isSubmitting || !selectedWarehouseId}
+                    disabled={isValidating || isSubmitting || !selectedWarehouseId || !hasPermission("MR_APPROVE")}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-lg hover:bg-blue-100 transition-all disabled:opacity-50 cursor-pointer"
                 >
                     {isValidating ? <Loader2 className="w-5 h-5 animate-spin"/> : <ClipboardCheck className="w-5 h-5" />} 
@@ -410,11 +413,11 @@ export const MaterialIssuing = (): JSX.Element => {
                 </button>
 
                 <button 
-                    onClick={handleConfirmIssue}
-                    disabled={!isAllAvailable || isSubmitting || !selectedWarehouseId}
-                    className={`w-full flex items-center justify-center gap-2 py-4 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 cursor-pointer
-                        ${isAllAvailable ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 grayscale cursor-not-allowed opacity-60'}
-                    `}
+                  onClick={handleConfirmIssue}
+                  disabled={!isAllAvailable || isSubmitting || !selectedWarehouseId || !hasPermission("MR_APPROVE")}
+                  className={`w-full flex items-center justify-center gap-2 py-4 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 cursor-pointer
+                      ${isAllAvailable ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 grayscale cursor-not-allowed opacity-60'}
+                  `}
                 >
                     {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5" />} 
                     Step 2: Complete & Issue

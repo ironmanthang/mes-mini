@@ -14,7 +14,7 @@ import { AddSupplierModal } from "./AddSupplierModal";
 import { DeleteSupplierModal } from "./DeleteSupplierModal";
 import { supplierService, type Supplier } from "../../../services/supplierServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
-import { hasAnyRole } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/auth";
 
 export const SupplierInformation = (): JSX.Element => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -27,7 +27,7 @@ export const SupplierInformation = (): JSX.Element => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
 
-  const canEdit = !hasAnyRole(["PROD_MGR"]);
+
 
   const fetchSuppliers = useCallback(async () => {
     setIsLoading(true);
@@ -46,19 +46,19 @@ export const SupplierInformation = (): JSX.Element => {
   }, [fetchSuppliers]);
 
   const handleOpenAdd = () => {
-    if (!canEdit) return;
+    if (!hasPermission("SUPPLIER_CREATE")) return;
     setSelectedSupplier(null);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (sup: Supplier) => {
-    if (!canEdit) return;
+    if (!hasPermission("SUPPLIER_UPDATE")) return;
     setSelectedSupplier(sup);
     setIsModalOpen(true);
   };
 
   const handleDelete = (id: number, name: string) => {
-    if (!canEdit) return;
+    if (!hasPermission("SUPPLIER_UPDATE")) return;
     setSupplierToDelete({ id, name });
   };
 
@@ -119,9 +119,9 @@ export const SupplierInformation = (): JSX.Element => {
                 </div>
             </div>
 
-            {canEdit && (
+            {hasPermission("SUPPLIER_CREATE") && (
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={handleOpenAdd}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm font-medium shadow-sm cursor-pointer"
                     >
@@ -146,7 +146,7 @@ export const SupplierInformation = (): JSX.Element => {
                             <th className="p-4">Email</th>
                             <th className="p-4">Phone</th>
                             <th className="p-4">Address</th>
-                            {canEdit && <th className="p-4 text-center w-24">Actions</th>}
+                            {hasPermission("SUPPLIER_UPDATE") && <th className="p-4 text-center w-24">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="text-sm">
@@ -184,7 +184,7 @@ export const SupplierInformation = (): JSX.Element => {
                                         <span className="text-gray-400 font-italic">No Address</span>
                                     )}
                                 </td>
-                                {canEdit && (
+                                {hasPermission("SUPPLIER_UPDATE") && (
                                     <td className="p-4 flex items-center justify-center gap-1">
                                         <button 
                                             onClick={() => handleOpenEdit(item)}
@@ -206,7 +206,7 @@ export const SupplierInformation = (): JSX.Element => {
                         ))}
                         {filteredSuppliers.length === 0 && !isLoading && (
                             <tr>
-                                <td colSpan={canEdit ? 6 : 5} className="text-center py-12 text-gray-500">
+                                <td colSpan={hasPermission("SUPPLIER_UPDATE") ? 6 : 5} className="text-center py-12 text-gray-500">
                                     <Truck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
                                     No suppliers found.
                                 </td>

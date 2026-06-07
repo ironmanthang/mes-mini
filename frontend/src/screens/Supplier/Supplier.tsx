@@ -1,6 +1,7 @@
 import { Truck, Cpu } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import type { JSX } from "react";
+import { hasAllPermissions } from "../../lib/auth";
 
 export const Supplier = (): JSX.Element => {
   const tabs = [
@@ -9,16 +10,20 @@ export const Supplier = (): JSX.Element => {
       label: "Supplier Directory", 
       icon: Truck,
       to: "/supplier/info",
-      description: "Manage suppliers, address & contact information"
+      description: "Manage suppliers, address & contact information",
+      allowedPermissions: ["SUPPLIER_READ"]
     },
     { 
       id: "components", 
       label: "Supplier-Component Mapping", 
       icon: Cpu,
       to: "/supplier/components",
-      description: "Manage components supplied by each supplier"
+      description: "Manage components supplied by each supplier",
+      allowedPermissions: ["SUPPLIER_READ"]
     },
   ];
+
+  const visibleTabs = tabs.filter((tab) => !tab.allowedPermissions || hasAllPermissions(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">
@@ -30,7 +35,7 @@ export const Supplier = (): JSX.Element => {
       </div>
 
       <div className="flex flex-nowrap items-center gap-1.5 p-1 bg-gray-50 border border-gray-200 rounded-xl mb-8 w-full overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <NavLink
             key={tab.id}
             to={tab.to}

@@ -17,7 +17,7 @@ const menuItems = [
     icon: TrendingUpIcon,
     label: "Reports",
     to: "/reports",
-    allowedPermissions: ["WO_READ", "WH_STOCK_READ"]
+    allowedPermissions: ["ABC"]
   },
   {
     icon: UsersIcon,

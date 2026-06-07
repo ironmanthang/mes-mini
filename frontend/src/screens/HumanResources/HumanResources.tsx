@@ -1,7 +1,7 @@
 import { ShieldCheck, Users } from "lucide-react";
 import { type JSX } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyRole } from "../../lib/auth";
+import { hasAnyPermission } from "../../lib/auth";
 
 export const HumanResources = (): JSX.Element => {
   const allTabs = [
@@ -11,7 +11,7 @@ export const HumanResources = (): JSX.Element => {
       icon: Users,
       to: "/human-resources/employees",
       description: "Manage staff profiles and employment details",
-      allowedRoles: ["SYS_ADMIN"]
+      allowedPermissions: ["EMP_READ"]
     },
     {
       id: "roles",
@@ -19,12 +19,12 @@ export const HumanResources = (): JSX.Element => {
       icon: ShieldCheck,
       to: "/human-resources/roles",
       description: "Configure access roles and permissions",
-      allowedRoles: ["SYS_ADMIN"]
+      allowedPermissions: ["ROLE_MANAGE"]
     },
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có quyền truy cập
-  const visibleTabs = allTabs.filter(tab => !tab.allowedRoles || hasAnyRole(tab.allowedRoles));
+  const visibleTabs = allTabs.filter(tab => !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions));
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

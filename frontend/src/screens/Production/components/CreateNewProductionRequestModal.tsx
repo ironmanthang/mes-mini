@@ -191,7 +191,8 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
             onSuccess();
             onClose();
         } catch (error: any) {
-            alert(error?.response?.data?.message || "Lỗi khi tạo yêu cầu sản xuất. (Sản phẩm này có thể chưa được thiết lập công thức BOM).");
+            setMessageWarning(error?.response?.data?.message || "Lỗi khi tạo yêu cầu sản xuất. (Sản phẩm này có thể chưa được thiết lập công thức BOM).");
+            setShowWarning(true);
         } finally {
             setIsSubmitting(false);
         }

@@ -11,6 +11,7 @@ import { purchaseOrderService } from "../../../services/purchaseOrderServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasPermission } from "../../../lib/auth";
 
 interface OrderRow {
   id: number;
@@ -697,7 +698,8 @@ export const CreateComponentOrder = (): JSX.Element => {
                         ></textarea>
                     </div>
 
-                    <div className="pt-3 border-t border-gray-100 space-y-3">
+                    {hasPermission("ATTACH_UPLOAD") && (
+                      <div className="pt-3 border-t border-gray-100 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                             <div>
                                 <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
@@ -743,8 +745,10 @@ export const CreateComponentOrder = (): JSX.Element => {
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </div>
+                          )}
+                      </div>
+                    )}
+                    
                 </div>
              </div>
           </div>

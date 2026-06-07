@@ -8,6 +8,7 @@ import { purchaseOrderService, type PurchaseOrder } from "../../../services/purc
 import { WarehouseServices, type Warehouse } from "../../../services/warehouseServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
+import { hasPermission } from "../../../lib/auth";
 
 interface ReceiptItem {
   componentId: number;
@@ -485,7 +486,8 @@ export const ComponentReceipts = (): JSX.Element => {
                  </div>
               </div>
 
-              <div className="space-y-3">
+              {hasPermission("ATTACH_UPLOAD") && (
+                <div className="space-y-3">
                  <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                         <Paperclip className="w-4 h-4 text-gray-500" /> Evidence Attachments
@@ -521,9 +523,10 @@ export const ComponentReceipts = (): JSX.Element => {
                                 </div>
                             ))}
                         </div>
-                    )}
-                 </div>
-              </div>
+                      )}
+                  </div>
+                </div>
+              )}
 
               <div className="md:col-span-2 pt-4 border-t border-gray-100 flex justify-end gap-4">
                   <button 
