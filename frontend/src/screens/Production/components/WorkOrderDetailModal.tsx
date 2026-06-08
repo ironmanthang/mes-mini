@@ -1,4 +1,4 @@
-import { type JSX } from "react";
+import { type JSX, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Package, Calendar, User, ClipboardList, Box, AlertCircle, Printer } from "lucide-react";
 import type { WorkOrderDetail } from "../../../services/workOrderServices";
@@ -12,8 +12,43 @@ interface WorkOrderDetailModalProps {
 
 export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDetailModalProps): JSX.Element | null => {
   const navigate = useNavigate();
+  const [selectedSerials, setSelectedSerials] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedSerials([]);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !workOrder) return null;
+
+  const toggleSelect = (serialNumber: string) => {
+    setSelectedSerials(prev => 
+      prev.includes(serialNumber) 
+        ? prev.filter(sn => sn !== serialNumber) 
+        : [...prev, serialNumber]
+    );
+  };
+
+  const handleToggleSelectBatch = (instances: any[]) => {
+    const readyInstances = instances.filter(
+      inst => (inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC') && hasPermission("WH_INDUCT")
+    );
+    const readySerials = readyInstances.map(inst => inst.serialNumber);
+    const allSelected = readySerials.every(sn => selectedSerials.includes(sn));
+
+    if (allSelected) {
+      setSelectedSerials(prev => prev.filter(sn => !readySerials.includes(sn)));
+    } else {
+      setSelectedSerials(prev => Array.from(new Set([...prev, ...readySerials])));
+    }
+  };
+
+  const handleBulkInduct = () => {
+    if (selectedSerials.length === 0) return;
+    onClose();
+    navigate(`/warehouse/induction?search=${encodeURIComponent(selectedSerials.join(","))}`);
+  };
 
   const handleInstanceClick = (serialNumber: string, status: string) => {
     onClose();
@@ -305,15 +340,28 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                         <span className="text-xs text-gray-500">Expiry: {batch.expiryDate || 'N/A'}</span>
                       </div>
                       {batch.productInstances && batch.productInstances.length > 0 && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrintAllInstances(batch.productInstances!);
-                          }}
-                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-                        >
-                          <Printer className="w-3 h-3" /> Print All Labels
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {batch.productInstances.some(inst => (inst.status === 'PASSED_QC' || inst.status === 'FAILED_QC') && hasPermission("WH_INDUCT")) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleSelectBatch(batch.productInstances!);
+                              }}
+                              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-[10px] font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                            >
+                              Select All Ready
+                            </button>
+                          )}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrintAllInstances(batch.productInstances!);
+                            }}
+                            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                          >
+                            <Printer className="w-3 h-3" /> Print All Labels
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -323,21 +371,39 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                         const isClickable = isPendingQC || isReadyForInduction;
                         const hasInductPermission = hasPermission("WH_INDUCT");
                         const canClick = isClickable && hasInductPermission;
+                        const isSelected = selectedSerials.includes(inst.serialNumber);
 
                         return (
                           <div
                             key={inst.productInstanceId} 
-                            onClick={canClick ? () => handleInstanceClick(inst.serialNumber, inst.status) : undefined}
+                            onClick={canClick ? () => {
+                              if (isReadyForInduction) {
+                                toggleSelect(inst.serialNumber);
+                              } else {
+                                handleInstanceClick(inst.serialNumber, inst.status);
+                              }
+                            } : undefined}
                             className={`p-2 border rounded-lg text-[10px] flex flex-col gap-1.5 transition-all ${
                               isPendingQC 
                                 ? `bg-white border-yellow-200 ${canClick ? 'hover:border-yellow-400 hover:shadow-sm cursor-pointer hover:bg-yellow-50/30' : 'opacity-75'}` 
                                 : isReadyForInduction
-                                  ? `bg-white border-blue-200 ${canClick ? 'hover:border-blue-400 hover:shadow-sm cursor-pointer hover:bg-blue-50/30' : 'opacity-75'}`
+                                  ? `${isSelected ? 'bg-blue-50/40 border-blue-400 ring-1 ring-blue-400' : 'bg-white border-blue-200'} ${canClick ? 'hover:border-blue-400 hover:shadow-sm cursor-pointer hover:bg-blue-50/30' : 'opacity-75'}`
                                   : 'bg-white border-gray-200 opacity-75'
                             }`}
                           >
                             <div className="flex justify-between items-center gap-1">
-                              <span className="font-mono font-bold text-gray-700">{inst.serialNumber}</span>
+                              <div className="flex items-center gap-1.5">
+                                {isReadyForInduction && hasInductPermission && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSelect(inst.serialNumber)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                )}
+                                <span className="font-mono font-bold text-gray-700">{inst.serialNumber}</span>
+                              </div>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -356,8 +422,8 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
                               'text-gray-500'
                             }`}>
                               {inst.status === 'PENDING_QC' ? 'PENDING QC (Click to Check)' : 
-                               inst.status === 'PASSED_QC' ? 'PASSED QC (Click to Induct)' :
-                               inst.status === 'FAILED_QC' ? 'FAILED QC (Click to Induct)' :
+                               inst.status === 'PASSED_QC' ? 'PASSED QC (Select to Induct)' :
+                               inst.status === 'FAILED_QC' ? 'FAILED QC (Select to Induct)' :
                                inst.status}
                             </span>
                           </div>
@@ -383,13 +449,30 @@ export const WorkOrderDetailModal = ({ isOpen, onClose, workOrder }: WorkOrderDe
           )}
         </div>
 
-        <div className="p-6 border-t border-gray-100 flex justify-end">
-          <button 
-            onClick={onClose} 
-            className="px-6 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
-          >
-            Close
-          </button>
+        <div className="p-6 border-t border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            {selectedSerials.length > 0 && (
+              <span className="text-sm font-semibold text-blue-600">
+                Selected {selectedSerials.length} item(s) for induction
+              </span>
+            )}
+          </div>
+          <div className="flex gap-3">
+            {selectedSerials.length > 0 && (
+              <button 
+                onClick={handleBulkInduct}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Induct Selected ({selectedSerials.length})
+              </button>
+            )}
+            <button 
+              onClick={onClose} 
+              className="px-6 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

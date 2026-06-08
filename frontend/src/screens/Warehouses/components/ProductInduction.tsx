@@ -151,12 +151,84 @@ export const ProductInduction = (): JSX.Element => {
     }
   };
 
+  const stagingListRef = useRef(stagingList);
+  useEffect(() => {
+    stagingListRef.current = stagingList;
+  }, [stagingList]);
+
   // Automatically submit scan when search query is passed in URL
   useEffect(() => {
     if (serialQuery) {
-      if (!stagingList.some(item => item.serialNumber.toLowerCase() === serialQuery.toLowerCase())) {
-        handleScanSubmit(serialQuery);
-      }
+      const sns = serialQuery.split(",").map(s => s.trim()).filter(Boolean);
+      if (sns.length === 0) return;
+
+      const processMultipleScans = async () => {
+        setIsLoading(true);
+        setScanStatus('IDLE');
+        setFeedbackMessage("");
+
+        const newStaged: StagedProduct[] = [];
+        let successCount = 0;
+        let failCount = 0;
+        let lastError = "";
+
+        for (const sn of sns) {
+          try {
+            if (stagingListRef.current.some(item => item.serialNumber.toLowerCase() === sn.toLowerCase())) {
+              continue;
+            }
+
+            const searchRes = await ProductInstanceServices.getAllProductInstances({ serialNumber: sn });
+            if (!searchRes.data || searchRes.data.length === 0) {
+              throw new Error(`Serial number ${sn} was not found in the system.`);
+            }
+
+            const detail = await ProductInstanceServices.getProductInstanceById(searchRes.data[0].productInstanceId);
+
+            if (detail.status !== 'PASSED_QC' && detail.status !== 'FAILED_QC') {
+              throw new Error(`Product ${sn} is not ready for warehouse induction. Current status: ${detail.status}`);
+            }
+
+            const validatedData: StagedProduct = {
+              productInstanceId: detail.productInstanceId,
+              serialNumber: detail.serialNumber,
+              status: detail.status,
+              productId: detail.product.productId,
+              productName: detail.product.productName,
+              batchCode: detail.productionBatch.batchCode,
+              warehouseName: detail.warehouse?.warehouseName || "Unassigned"
+            };
+            newStaged.push(validatedData);
+            successCount++;
+          } catch (error: any) {
+            failCount++;
+            lastError = error?.response?.data?.message || error.message || `Error staging ${sn}`;
+          }
+        }
+
+        if (newStaged.length > 0) {
+          setStagingList(prev => {
+            const filteredNew = newStaged.filter(item => !prev.some(p => p.serialNumber.toLowerCase() === item.serialNumber.toLowerCase()));
+            return [...filteredNew, ...prev];
+          });
+        }
+
+        if (failCount === 0) {
+          setScanStatus('SUCCESS');
+          setFeedbackMessage(`Successfully staged ${successCount} product(s).`);
+        } else if (successCount > 0) {
+          setScanStatus('SUCCESS');
+          setFeedbackMessage(`Staged ${successCount} product(s) successfully, ${failCount} failed. Last error: ${lastError}`);
+        } else {
+          setScanStatus('ERROR');
+          setFeedbackMessage(lastError || "Failed to stage products.");
+        }
+        setIsLoading(false);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      };
+
+      processMultipleScans();
+
       // Clean up search query parameter
       setSearchParams(
         prev => {
@@ -166,7 +238,7 @@ export const ProductInduction = (): JSX.Element => {
         { replace: true }
       );
     }
-  }, [serialQuery, stagingList, setSearchParams]);
+  }, [serialQuery, setSearchParams]);
 
   const stats = useMemo(() => {
     const passCount = stagingList.filter(i => i.status === 'PASSED_QC').length;
@@ -243,7 +315,9 @@ export const ProductInduction = (): JSX.Element => {
                   onChange={(e) => setCurrentScan(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   disabled={isLoading}
-                  className={inputApiClasses}
+                  className="w-full px-12 py-2 border border-gray-300 rounded-lg text-gray-900
+                  placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500
+                  focus:border-blue-500 transition duration-200 font-mono text-sm"
                 />
             </div>
             

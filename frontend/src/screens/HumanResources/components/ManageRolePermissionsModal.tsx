@@ -1,5 +1,8 @@
-import { 
-  X, Shield, ShieldAlert, Loader2, ChevronDown, ChevronUp, Search, HelpCircle
+import {
+  X, Shield, ShieldAlert, Loader2, Search, HelpCircle,
+  CheckSquare, Square, ChevronRight,
+  TrendingUpIcon, UsersIcon, WrenchIcon, WarehouseIcon, FactoryIcon,
+  PackageIcon, TruckIcon, ShoppingCartIcon, ClipboardListIcon, CheckCircle2Icon,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { roleService, type Role, type Permission } from "../../../services/roleServices";
@@ -13,26 +16,25 @@ interface ManageRolePermissionsModalProps {
   onSuccess: (message?: string) => void;
 }
 
-const MODULE_LABELS: Record<string, string> = {
-  EMP: "Employee Management",
-  ROLE: "Roles & Access Security",
-  PO: "Purchasing & Procurement",
-  SO: "Sales & Fulfillment",
-  PR: "Production Planning (MRP)",
-  WO: "Shop Floor Work Orders",
-  LINE: "Production Line Layouts",
-  QC: "Quality Control Inspections",
-  WH: "Warehouse & Stock Control",
-  MR: "Shop Floor Material Requests",
-  TR: "Warehouse Stock Transfers",
-  ATTACH: "Document File Attachments",
-  NOTIF: "Alerts & Notifications",
-  DASH: "Executive Analytics Dashboard",
-  PRODUCT: "Master Product Data",
-  COMP: "Master Component Data",
-  SUPPLIER: "Supplier Directory",
-  AGENT: "Sales Agent Directory",
+const MODULE_META: Record<string, { label: string; icon: React.ElementType }> = {
+  DASH:     { label: "Dashboard",         icon: TrendingUpIcon      },
+  EMP:      { label: "Human Resources",   icon: UsersIcon           },
+  ROLE:     { label: "Roles & Security",  icon: Shield              },
+  COMP:     { label: "Components",        icon: WrenchIcon          },
+  SUPPLIER: { label: "Suppliers",         icon: TruckIcon           },
+  WH:       { label: "Warehouse",         icon: WarehouseIcon       },
+  MR:       { label: "Material Requests", icon: ClipboardListIcon   },
+  PO:       { label: "Purchase Orders",   icon: ShoppingCartIcon    },
+  PR:       { label: "Production Requests (MRP)",  icon: FactoryIcon         },
+  WO:       { label: "Work Orders",       icon: FactoryIcon         },
+  QC:       { label: "Quality Control",   icon: CheckCircle2Icon    },
+  PRODUCT:  { label: "Products & BOM",    icon: PackageIcon         },
 };
+
+const getFallbackMeta = (code: string) => ({
+  label: `Module: ${code}`,
+  icon: Shield,
+});
 
 export const ManageRolePermissionsModal = ({
   isOpen,
@@ -44,108 +46,94 @@ export const ManageRolePermissionsModal = ({
   const [assignedCodes, setAssignedCodes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedPerms, setExpandedPerms] = useState<Record<string, boolean>>({});
-  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
-  
+  const [selectedModule, setSelectedModule] = useState<string | null>(null);
+
   const [warningMessage, setWarningMessage] = useState("");
   const [showWarning, setShowWarning] = useState(false);
 
-  const isSysAdmin = role?.roleName === "System Admin" || (role as any)?.roleCode === "SYS_ADMIN";
+  const isSysAdmin =
+    role?.roleName === "System Admin" || (role as any)?.roleCode === "SYS_ADMIN";
 
   const visiblePermissions = useMemo(() => {
-    return allPermissions.filter(p => !!PERMISSIONS_META[p.permCode]);
+    return allPermissions.filter((p) => !!PERMISSIONS_META[p.permCode]);
   }, [allPermissions]);
 
-  const allModuleCodes = useMemo(() => {
-    const modules = new Set<string>();
+  const groupedPermissions = useMemo(() => {
+    const groups: Record<string, Permission[]> = {};
     for (const p of visiblePermissions) {
-      modules.add(p.module);
+      if (!groups[p.module]) groups[p.module] = [];
+      groups[p.module].push(p);
     }
-    return Array.from(modules);
+    return groups;
   }, [visiblePermissions]);
 
-  const isAllCollapsed = useMemo(() => {
-    return allModuleCodes.length > 0 && allModuleCodes.every(code => collapsedModules[code]);
-  }, [allModuleCodes, collapsedModules]);
+  const moduleOrder = useMemo(() => Object.keys(groupedPermissions), [groupedPermissions]);
 
-  const toggleAllModules = () => {
-    if (isAllCollapsed) {
-      setCollapsedModules({});
-    } else {
-      const next: Record<string, boolean> = {};
-      for (const code of allModuleCodes) {
-        next[code] = true;
-      }
-      setCollapsedModules(next);
-    }
-  };
+  const activeModulePerms = useMemo(() => {
+    if (!selectedModule) return [];
+    const perms = groupedPermissions[selectedModule] || [];
+    if (!searchQuery.trim()) return perms;
+    const q = searchQuery.toLowerCase().trim();
+    return perms.filter((p) => {
+      const meta = PERMISSIONS_META[p.permCode];
+      return (
+        p.permCode.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (meta &&
+          (meta.title.toLowerCase().includes(q) ||
+            meta.description.toLowerCase().includes(q)))
+      );
+    });
+  }, [selectedModule, groupedPermissions, searchQuery]);
 
-  const toggleModuleCollapse = (moduleCode: string) => {
-    setCollapsedModules(prev => ({
-      ...prev,
-      [moduleCode]: !prev[moduleCode]
-    }));
-  };
-
-  // Load permissions when modal opens and role changes
   useEffect(() => {
     if (isOpen && role) {
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          // 1. Fetch full permission catalog
           const catalog = await roleService.getAllPermissions();
           setAllPermissions(catalog || []);
-          
-          // 2. Fetch assigned permissions for this role
           const rolePerms = await roleService.getRolePermissions(role.roleId);
-          setAssignedCodes((rolePerms || []).map(p => p.permCode));
+          setAssignedCodes((rolePerms || []).map((p) => p.permCode));
         } catch (error: any) {
-          console.error("Failed to load permissions:", error);
-          setWarningMessage(error.response?.data?.message || "Failed to load permissions catalog.");
+          setWarningMessage(
+            error.response?.data?.message || "Failed to load permissions catalog."
+          );
           setShowWarning(true);
         } finally {
           setIsLoading(false);
         }
       };
-      
       fetchData();
       setSearchQuery("");
-      setExpandedPerms({});
-      setCollapsedModules({});
+      setSelectedModule(null);
     }
   }, [isOpen, role]);
 
+  useEffect(() => {
+    if (!isLoading && moduleOrder.length > 0 && !selectedModule) {
+      setSelectedModule(moduleOrder[0]);
+    }
+  }, [isLoading, moduleOrder, selectedModule]);
+
   const togglePermission = (permCode: string) => {
     if (isSysAdmin || isSaving) return;
-    setAssignedCodes(prev => 
-      prev.includes(permCode) 
-        ? prev.filter(code => code !== permCode) 
-        : [...prev, permCode]
+    setAssignedCodes((prev) =>
+      prev.includes(permCode) ? prev.filter((c) => c !== permCode) : [...prev, permCode]
     );
   };
 
-  const toggleExpand = (permCode: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent checking/unchecking the permission row
-    setExpandedPerms(prev => ({
-      ...prev,
-      [permCode]: !prev[permCode]
-    }));
+  const handleSelectAll = (moduleCode: string) => {
+    if (isSysAdmin || isSaving) return;
+    const codes = (groupedPermissions[moduleCode] || []).map((p) => p.permCode);
+    setAssignedCodes((prev) => [...prev.filter((c) => !codes.includes(c)), ...codes]);
   };
 
-  const handleSelectAllInModule = (_module: string, permCodes: string[]) => {
+  const handleClearAll = (moduleCode: string) => {
     if (isSysAdmin || isSaving) return;
-    setAssignedCodes(prev => {
-      const filtered = prev.filter(code => !permCodes.includes(code));
-      return [...filtered, ...permCodes];
-    });
-  };
-
-  const handleDeselectAllInModule = (_module: string, permCodes: string[]) => {
-    if (isSysAdmin || isSaving) return;
-    setAssignedCodes(prev => prev.filter(code => !permCodes.includes(code)));
+    const codes = (groupedPermissions[moduleCode] || []).map((p) => p.permCode);
+    setAssignedCodes((prev) => prev.filter((c) => !codes.includes(c)));
   };
 
   const handleSave = async () => {
@@ -156,7 +144,6 @@ export const ManageRolePermissionsModal = ({
       onSuccess("Role permissions updated successfully!");
       onClose();
     } catch (error: any) {
-      console.error("Failed to save permissions:", error);
       setWarningMessage(error.response?.data?.message || "Failed to save permissions.");
       setShowWarning(true);
     } finally {
@@ -164,323 +151,288 @@ export const ManageRolePermissionsModal = ({
     }
   };
 
-  // Filter permissions based on search query
-  const filteredPermissions = useMemo(() => {
-    if (!searchQuery.trim()) return visiblePermissions;
-    const q = searchQuery.toLowerCase().trim();
-    return visiblePermissions.filter(p => {
-      const meta = PERMISSIONS_META[p.permCode];
-      return (
-        p.permCode.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.module.toLowerCase().includes(q) ||
-        (meta && (
-          meta.title.toLowerCase().includes(q) ||
-          meta.description.toLowerCase().includes(q)
-        ))
-      );
-    });
-  }, [visiblePermissions, searchQuery]);
-
-  // Group filtered permissions by module
-  const groupedPermissions = useMemo(() => {
-    const groups: Record<string, Permission[]> = {};
-    for (const p of filteredPermissions) {
-      if (!groups[p.module]) {
-        groups[p.module] = [];
-      }
-      groups[p.module].push(p);
-    }
-    return groups;
-  }, [filteredPermissions]);
-
   if (!isOpen || !role) return null;
 
+  const totalVisible = visiblePermissions.length;
+  const totalAssigned = assignedCodes.filter((c) => !!PERMISSIONS_META[c]).length;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white w-[900px] max-w-[calc(100vw-2rem)] h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-        
-        {/* Modal Header */}
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gray-50/50">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-md transition-all duration-300 animate-fade-in">
+      <div className="bg-white w-[960px] max-w-[calc(100vw-2rem)] h-[86vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200/80 transform transition-all duration-300 scale-100">
+
+        {/* ── Header ── */}
+        <div className="px-6 py-4 flex items-center justify-between flex-shrink-0 bg-white relative border-b border-slate-100">
+          {/* Top subtle red-blue-emerald gradient line */}
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
-              <Shield className="w-6 h-6" />
+            <div className="p-2 bg-blue-50 rounded-xl">
+              <Shield className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5">
-                <h3 className="text-xl font-bold text-gray-900">Configure Permissions</h3>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800">Configure Permissions</h3>
+                <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/60 rounded-full shadow-sm">
                   {role.roleName}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Select and map role capabilities to system operations</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                Select capabilities to grant access to system operations
+              </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            disabled={isSaving}
-            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all cursor-pointer disabled:opacity-50"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {!isLoading && (
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 
+              border border-blue-200/60 rounded-full text-xs font-mono 
+              font-semibold hidden sm:block shadow-sm">
+                {totalAssigned} / {totalVisible} assigned
+              </span>
+            )}
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-lg transition-all duration-200 cursor-pointer disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* System Admin Safety Banner */}
+        {/* ── System Admin Banner ── */}
         {isSysAdmin && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-4 flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-gradient-to-r from-red-50 to-rose-50/50 border-b border-red-100 px-6 py-3.5 flex items-start gap-3 flex-shrink-0 animate-fade-in">
+            <div className="p-1 bg-red-100 rounded-lg">
+              <ShieldAlert className="w-4 h-4 text-red-600 flex-shrink-0 animate-pulse" />
+            </div>
             <div>
-              <p className="text-sm font-bold text-amber-800">System Safety Guard Active</p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                The <strong>System Admin</strong> role automatically possesses all permissions across the entire platform. 
-                For security reasons, its permission layout is permanently locked and cannot be modified.
+              <p className="text-xs font-bold text-red-800">System Safety Guard Active</p>
+              <p className="text-xs text-red-600/90 font-medium mt-0.5 leading-relaxed">
+                The <strong>System Admin</strong> role has all permissions and cannot be modified.
               </p>
             </div>
           </div>
         )}
 
-        {/* Toolbar (Search & Statistics) */}
-        {!isSysAdmin && !isLoading && (
-          <div className="px-6 py-4 border-b border-gray-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search permission code, name, or description..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+        {/* ── Body ── */}
+        <div className="flex flex-1 overflow-hidden bg-slate-50/50">
 
-            {/* Global Collapse/Expand Toggle */}
-            {allPermissions.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleAllModules}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-xs font-bold text-gray-700 rounded-lg transition-all cursor-pointer select-none"
-              >
-                {isAllCollapsed ? (
-                  <>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Expand All Modules</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Collapse All Modules</span>
-                  </>
-                )}
-              </button>
-            )}
-            
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 flex-shrink-0 text-center sm:text-right">
-              Assigned: <span className="text-indigo-600 font-mono font-extrabold">{assignedCodes.filter(code => !!PERMISSIONS_META[code]).length}</span> / {visiblePermissions.length} Permissions
+          {/* ── Left: Module Tabs ── */}
+          <aside className="w-[220px] flex-shrink-0 border-r border-slate-200/60 flex flex-col overflow-y-auto bg-slate-50/70 backdrop-blur-sm">
+            <div className="px-4 py-3 border-b border-slate-200/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Modules
+              </p>
             </div>
-          </div>
-        )}
+            <nav className="flex-1 py-2 px-2 space-y-1">
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                moduleOrder.map((moduleCode) => {
+                  const meta = MODULE_META[moduleCode] || getFallbackMeta(moduleCode);
+                  const Icon = meta.icon;
+                  const perms = groupedPermissions[moduleCode] || [];
+                  const assignedCount = perms.filter((p) =>
+                    assignedCodes.includes(p.permCode)
+                  ).length;
+                  const isActive = selectedModule === moduleCode;
 
-        {/* Modal Body / Scrollable Permissions Panel */}
-        <div className="flex-1 overflow-y-auto bg-gray-50/50 p-6 space-y-8">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center py-24">
-              <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
-            </div>
-          ) : visiblePermissions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500 bg-white border border-gray-200 rounded-xl">
-              <HelpCircle className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="font-bold text-sm">No permissions found in the database.</p>
-              <p className="text-xs text-gray-400 mt-1">Please ensure the backend seeds have been applied correctly.</p>
-            </div>
-          ) : Object.keys(groupedPermissions).length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center py-20 text-gray-500 bg-white border border-gray-200 rounded-xl">
-              <Search className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="font-bold text-sm">No matching permissions found.</p>
-              <p className="text-xs text-gray-400 mt-1">Try broadening your search term.</p>
-            </div>
-          ) : (
-            Object.entries(groupedPermissions).map(([moduleCode, perms]) => {
-              const moduleLabel = MODULE_LABELS[moduleCode] || `Module: ${moduleCode}`;
-              const modulePermCodes = perms.map(p => p.permCode);
-              const checkedInModule = perms.filter(p => assignedCodes.includes(p.permCode));
-              const isCollapsed = !!collapsedModules[moduleCode];
+                  let badgeStyles = "bg-slate-100 text-slate-400 border border-slate-200/40";
+                  if (assignedCount > 0) {
+                    badgeStyles = "bg-blue-50 text-blue-600 border border-blue-100 font-semibold";
+                  }
 
-              return (
-                <div key={moduleCode} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  
-                  {/* Module Header */}
-                  <div 
-                    onClick={() => toggleModuleCollapse(moduleCode)}
-                    className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-gray-100/70 transition-colors select-none"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {isCollapsed ? (
-                        <ChevronDown className="w-4 h-4 text-gray-400 transition-transform" />
-                      ) : (
-                        <ChevronUp className="w-4 h-4 text-gray-400 transition-transform" />
-                      )}
-                      <h4 className="text-sm font-extrabold text-gray-900 uppercase tracking-wide">
-                        {moduleLabel}
-                      </h4>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold font-mono bg-gray-200 text-gray-700">
-                        {checkedInModule.length}/{perms.length}
+                  return (
+                    <button
+                      key={moduleCode}
+                      type="button"
+                      onClick={() => {
+                        setSelectedModule(moduleCode);
+                        setSearchQuery("");
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-xl transition-all duration-200 border cursor-pointer ${
+                        isActive
+                          ? "bg-white border-slate-200 shadow-sm text-blue-700 font-semibold border-l-4 border-l-blue-600"
+                          : "border-transparent text-slate-600 hover:bg-white hover:text-slate-800"
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
+                      <span className="flex-1 text-xs font-medium truncate">
+                        {meta.label}
                       </span>
-                    </div>
-
-                    {!isSysAdmin && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectAllInModule(moduleCode, modulePermCodes);
-                          }}
-                          className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 border border-transparent rounded cursor-pointer transition-colors"
-                        >
-                          Select All
-                        </button>
-                        <span className="text-gray-300 text-xs">|</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeselectAllInModule(moduleCode, modulePermCodes);
-                          }}
-                          className="px-2.5 py-1 text-xs font-bold text-gray-500 hover:bg-gray-100 border border-transparent rounded cursor-pointer transition-colors"
-                        >
-                          Clear All
-                        </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 
+                          rounded-full ${badgeStyles}`}>
+                          {assignedCount}/{perms.length}
+                        </span>
+                        {isActive && <ChevronRight className="w-3 h-3 text-blue-500" />}
                       </div>
-                    )}
-                  </div>
+                    </button>
+                  );
+                })
+              )}
+            </nav>
+          </aside>
 
-                  {/* Module Permissions Checklist */}
-                  {!isCollapsed && (
-                    <div className="divide-y divide-gray-100">
-                      {perms.map((perm) => {
-                        const isChecked = assignedCodes.includes(perm.permCode);
-                        const meta = PERMISSIONS_META[perm.permCode];
-                        const title = meta?.title || perm.permCode;
-                        const description = meta?.description || perm.description;
-                        const endpoints = meta?.endpoints || [];
-                        const isExpanded = !!expandedPerms[perm.permCode];
+          {/* ── Right: Permission List ── */}
+          <main className="flex-1 flex flex-col overflow-hidden bg-white">
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              </div>
+            ) : !selectedModule ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                <HelpCircle className="w-10 h-10 text-slate-200 mb-2 animate-pulse" />
+                <p className="text-sm font-medium">Select a module from the left</p>
+              </div>
+            ) : (
+              <>
+                {/* Panel Header */}
+                {(() => {
+                  const meta = MODULE_META[selectedModule] || getFallbackMeta(selectedModule);
+                  const Icon = meta.icon;
+                  const perms = groupedPermissions[selectedModule] || [];
+                  const assignedCount = perms.filter((p) =>
+                    assignedCodes.includes(p.permCode)
+                  ).length;
 
-                        return (
-                          <div 
-                            key={perm.permCode}
-                            onClick={() => togglePermission(perm.permCode)}
-                            className={`p-5 transition-colors flex flex-col gap-3 ${
-                              isSysAdmin 
-                                ? "cursor-default opacity-85" 
-                                : "cursor-pointer hover:bg-gray-50/60"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-3.5">
-                                {/* Custom Styled Checkbox */}
-                                <div className="flex items-center h-5 mt-0.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSysAdmin || isChecked}
-                                    onChange={() => {}} // Controlled by row onClick
-                                    disabled={isSysAdmin || isSaving}
-                                    className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer ${
-                                      isSysAdmin ? "opacity-50 cursor-default" : ""
-                                    }`}
-                                  />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-gray-900">{title}</p>
-                                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
-                                </div>
-                              </div>
+                  return (
+                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-white">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-slate-50 rounded-lg">
+                          <Icon className="w-4 h-4 text-slate-600" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-800">{meta.label}</span>
+                        <span className="text-xs text-slate-400 font-mono font-medium">
+                          ({assignedCount}/{perms.length} selected)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 w-3 h-3 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search permissions..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl bg-white outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 w-[170px] transition-all duration-200"
+                          />
+                        </div>
+                        {!isSysAdmin && (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAll(selectedModule)}
+                              className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100/80 active:bg-blue-100 
+                              border border-blue-200/60 rounded-xl cursor-pointer transition-all duration-200 shadow-sm shadow-blue-500/5"
+                            >
+                              Select All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleClearAll(selectedModule)}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100/80 active:bg-red-100 border border-red-200/60 rounded-xl cursor-pointer transition-all duration-200 shadow-sm shadow-red-500/5"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
-                              {/* Collapse Toggle for technical info */}
-                              <button
-                                type="button"
-                                onClick={(e) => toggleExpand(perm.permCode, e)}
-                                className="flex items-center gap-1 text-[11px] font-bold text-gray-400 hover:text-indigo-600 bg-transparent py-1 px-2 border border-transparent hover:border-gray-200 rounded cursor-pointer transition-all"
-                                title="Show Technical Details"
-                              >
-                                <span>Details</span>
-                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                              </button>
-                            </div>
+                {/* Permissions */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                  {activeModulePerms.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                      <div className="p-3 bg-slate-50 rounded-full mb-3">
+                        <Search className="w-6 h-6 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-medium">No matching permissions found</p>
+                      <p className="text-xs text-slate-400 mt-1">Try resetting your search query</p>
+                    </div>
+                  ) : (
+                    activeModulePerms.map((perm) => {
+                      const isChecked = isSysAdmin || assignedCodes.includes(perm.permCode);
+                      const meta = PERMISSIONS_META[perm.permCode];
+                      const title = meta?.title || perm.permCode;
+                      const description = meta?.description || perm.description;
 
-                            {/* Collapsible Advanced Info panel */}
-                            {isExpanded && (
-                              <div className="ml-7 p-3.5 bg-gray-50 rounded-lg border border-gray-100 space-y-2.5 animate-in slide-in-from-top-1 duration-150">
-                                <div>
-                                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">
-                                    Permission Code
-                                  </span>
-                                  <code className="text-xs text-gray-700 bg-white border border-gray-200 px-2 py-1 rounded font-mono font-semibold">
-                                    {perm.permCode}
-                                  </code>
-                                </div>
-
-                                {endpoints.length > 0 && (
-                                  <div>
-                                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">
-                                      Affected API Routes
-                                    </span>
-                                    <div className="flex flex-wrap gap-1.5 mt-1">
-                                      {endpoints.map((route) => {
-                                        const isPost = route.startsWith("POST");
-                                        const isPut = route.startsWith("PUT");
-                                        const isDelete = route.startsWith("DELETE");
-                                        
-                                        let methodColor = "bg-blue-50 text-blue-700 border-blue-100";
-                                        if (isPost) methodColor = "bg-green-50 text-green-700 border-green-100";
-                                        if (isPut) methodColor = "bg-amber-50 text-amber-700 border-amber-100";
-                                        if (isDelete) methodColor = "bg-red-50 text-red-700 border-red-100";
-
-                                        return (
-                                          <span 
-                                            key={route} 
-                                            className={`text-[10px] font-mono px-2 py-0.5 rounded border ${methodColor}`}
-                                          >
-                                            {route}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                      return (
+                        <div
+                          key={perm.permCode}
+                          onClick={() => togglePermission(perm.permCode)}
+                          className={`flex items-start gap-4 px-6 py-4 transition-all duration-200 border-l-4 ${
+                            isSysAdmin
+                              ? "cursor-default opacity-85"
+                              : "cursor-pointer"
+                          } ${
+                            isChecked
+                              ? "bg-blue-50/20 border-l-blue-500 hover:bg-blue-50/30"
+                              : "bg-white border-l-transparent hover:bg-slate-50/60"
+                          }`}
+                        >
+                          {/* Checkbox icon */}
+                          <div className="mt-0.5 flex-shrink-0">
+                            {isChecked ? (
+                              <CheckSquare className="w-5 h-5 text-blue-600 transition-all 
+                              duration-200 transform scale-105" />
+                            ) : (
+                              <Square className="w-5 h-5 text-slate-300 hover:text-slate-400 
+                              hover:scale-105 transition-all duration-200" />
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`text-sm font-bold leading-none 
+                                ${isChecked ? "text-slate-800" : "text-slate-600"}`}>
+                                {title}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-600 font-medium mt-1.5 leading-relaxed">
+                              {description}
+                            </p>
+                            <div className="mt-2.5">
+                              <code className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border font-semibold ${
+                                isChecked
+                                  ? "bg-blue-50 text-blue-700 border-blue-100/50"
+                                  : "bg-slate-50 text-slate-500 border-slate-100"
+                              }`}>
+                                {perm.permCode}
+                              </code>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              );
-            })
-          )}
+              </>
+            )}
+          </main>
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-white">
+        {/* ── Footer ── */}
+        <div className="px-6 py-4.5 border-t border-slate-100 flex items-center justify-end gap-3 bg-white flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer text-sm"
+            className="px-4.5 py-2 border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 active:bg-slate-100 text-sm font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 cursor-pointer shadow-sm shadow-slate-100"
           >
             Cancel
           </button>
-          
           {!isSysAdmin && (
             <button
               type="button"
               onClick={handleSave}
               disabled={isLoading || isSaving}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 cursor-pointer shadow-sm text-sm"
+              className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 active:bg-emerald-800 transition-all duration-200 disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20"
             >
-              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Save Changes
             </button>
           )}
