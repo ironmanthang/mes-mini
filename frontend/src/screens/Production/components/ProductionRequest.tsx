@@ -13,6 +13,9 @@ import {
   PlayCircle,
   Send,
   CheckCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { ProductionRequestServices, type ProductionRequest } from "../../../services/productionRequestServices";
@@ -114,12 +117,46 @@ export const CreateProductionRequest = (): JSX.Element => {
     }
   };
 
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'code' | 'product' | 'quantity' | 'priority' | 'status' | 'dueDate' | null;
+    direction: 'asc' | 'desc' | null;
+  }>({
+    key: null,
+    direction: null,
+  });
+
+  const handleSort = (key: 'code' | 'product' | 'quantity' | 'priority' | 'status' | 'dueDate') => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        if (prev.direction === 'asc') {
+          return { key, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { key: null, direction: null };
+        }
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const getSortIcon = (key: 'code' | 'product' | 'quantity' | 'priority' | 'status' | 'dueDate') => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    }
+    if (sortConfig.direction === 'asc') {
+      return <ArrowUp className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    if (sortConfig.direction === 'desc') {
+      return <ArrowDown className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+  };
+
   useEffect(() => {
     fetchRequests();
   }, []);
 
-  const filteredRequests = useMemo(() => {
-    return requests.filter(req => {
+  const sortedAndFilteredRequests = useMemo(() => {
+    const filtered = requests.filter(req => {
       const searchLower = searchQuery.toLowerCase();
       const matchSearch = 
         req.code?.toLowerCase().includes(searchLower) || 
@@ -130,7 +167,52 @@ export const CreateProductionRequest = (): JSX.Element => {
       
       return matchSearch && matchStatus;
     });
-  }, [requests, searchQuery, filterStatus]);
+
+    if (!sortConfig.key || !sortConfig.direction) {
+      return filtered;
+    }
+
+    const { key, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    return [...filtered].sort((a, b) => {
+      if (key === 'code') {
+        const valA = a.code || "";
+        const valB = b.code || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'product') {
+        const valA = a.product?.productName || "";
+        const valB = b.product?.productName || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'quantity') {
+        const valA = a.quantity || 0;
+        const valB = b.quantity || 0;
+        return isAsc ? valA - valB : valB - valA;
+      }
+      if (key === 'priority') {
+        const priorityWeight: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+        const valA = priorityWeight[a.priority || ""] || 0;
+        const valB = priorityWeight[b.priority || ""] || 0;
+        return isAsc ? valA - valB : valB - valA;
+      }
+      if (key === 'status') {
+        const valA = a.status || "";
+        const valB = b.status || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'dueDate') {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        const valA = new Date(a.dueDate).getTime();
+        const valB = new Date(b.dueDate).getTime();
+        return isAsc ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  }, [requests, searchQuery, filterStatus, sortConfig]);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
@@ -231,19 +313,67 @@ export const CreateProductionRequest = (): JSX.Element => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold sticky top-0">
                 <tr>
-                  <th className="p-4 border-b border-gray-200">Request Code</th>
-                  <th className="p-4 border-b border-gray-200">Product</th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('code')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Request Code
+                      {getSortIcon('code')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('product')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Product
+                      {getSortIcon('product')}
+                    </div>
+                  </th>
                   <th className="p-4 border-b border-gray-200">Type</th>
-                  <th className="p-4 border-b border-gray-200 text-right">Quantity</th>
-                  <th className="p-4 border-b border-gray-200 text-center">Priority</th>
-                  <th className="p-4 border-b border-gray-200 text-center">Status</th>
-                  <th className="p-4 border-b border-gray-200">Due Date</th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-right"
+                    onClick={() => handleSort('quantity')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      {getSortIcon('quantity')}
+                      Quantity
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-center"
+                    onClick={() => handleSort('priority')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Priority
+                      {getSortIcon('priority')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-center"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('dueDate')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Due Date
+                      {getSortIcon('dueDate')}
+                    </div>
+                  </th>
                   <th className="p-4 border-b border-gray-200 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
-                {filteredRequests.length > 0 ? (
-                  filteredRequests.map((req) => (
+                {sortedAndFilteredRequests.length > 0 ? (
+                  sortedAndFilteredRequests.map((req) => (
                     <tr key={req.productionRequestId} className="hover:bg-gray-50 transition-colors">
                       <td className="p-4 font-bold text-blue-600">{req.code}</td>
                       <td className="p-4">

@@ -5,7 +5,10 @@ import {
   Eye, 
   Loader2,
   PackageSearch,
-  Calendar
+  Calendar,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef, type JSX } from "react";
 import { NewMaterialRequestModal } from "./NewMaterialRequestModal";
@@ -33,6 +36,41 @@ export const MaterialRequests = (): JSX.Element => {
 
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'code' | 'workOrder' | 'requestDate' | 'status' | null;
+    direction: 'asc' | 'desc' | null;
+  }>({
+    key: null,
+    direction: null,
+  });
+
+  const handleSort = (key: 'code' | 'workOrder' | 'requestDate' | 'status') => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        if (prev.direction === 'asc') {
+          return { key, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { key: null, direction: null };
+        }
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const getSortIcon = (key: 'code' | 'workOrder' | 'requestDate' | 'status') => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    }
+    if (sortConfig.direction === 'asc') {
+      return <ArrowUp className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    if (sortConfig.direction === 'desc') {
+      return <ArrowDown className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+  };
 
   const showSuccessNotification = (message: string) => {
     if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
@@ -83,9 +121,9 @@ export const MaterialRequests = (): JSX.Element => {
     fetchRequests();
   }, []);
 
-  // LỌC DỮ LIỆU
+  // LỌC & SẮP XẾP DỮ LIỆU
   const filteredRequests = useMemo(() => {
-    return requests.filter(req => {
+    const filtered = requests.filter(req => {
       const searchStr = searchQuery.toLowerCase();
       const matchSearch = 
         req.code?.toLowerCase().includes(searchStr) || 
@@ -94,7 +132,41 @@ export const MaterialRequests = (): JSX.Element => {
       const matchStatus = filterStatus === "ALL" || req.status === filterStatus;
       return matchSearch && matchStatus;
     });
-  }, [requests, searchQuery, filterStatus]);
+
+    if (!sortConfig.key || !sortConfig.direction) {
+      return filtered;
+    }
+
+    const { key, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    return [...filtered].sort((a, b) => {
+      if (key === 'code') {
+        const valA = a.code || "";
+        const valB = b.code || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'workOrder') {
+        const valA = a.workOrder?.code || "";
+        const valB = b.workOrder?.code || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'requestDate') {
+        if (!a.requestDate && !b.requestDate) return 0;
+        if (!a.requestDate) return 1;
+        if (!b.requestDate) return -1;
+        const valA = new Date(a.requestDate).getTime();
+        const valB = new Date(b.requestDate).getTime();
+        return isAsc ? valA - valB : valB - valA;
+      }
+      if (key === 'status') {
+        const valA = a.status || "";
+        const valB = b.status || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return 0;
+    });
+  }, [requests, searchQuery, filterStatus, sortConfig]);
 
   // UI HELPERS
   const formatDate = (dateStr?: string) => {
@@ -183,10 +255,42 @@ export const MaterialRequests = (): JSX.Element => {
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b border-gray-200">
                 <tr>
-                  <th className="p-4 pl-6">Request Code</th>
-                  <th className="p-4">Work Order</th>
-                  <th className="p-4">Request Date</th>
-                  <th className="p-4 text-center">Status</th>
+                  <th 
+                    className="p-4 pl-6 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('code')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Request Code
+                      {getSortIcon('code')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('workOrder')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Work Order
+                      {getSortIcon('workOrder')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('requestDate')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Request Date
+                      {getSortIcon('requestDate')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 text-center cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>

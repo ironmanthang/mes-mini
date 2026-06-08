@@ -1,7 +1,7 @@
 import { 
   Search, Filter, Plus, Eye, Edit, Loader2, 
   Package, Calendar, PlayCircle, PackageCheck, AlertCircle, Clock, Play,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import { useState, useEffect, useMemo, type JSX } from "react";
 import { WorkOrderServices, type WorkOrderListItem, type WorkOrderDetail } from "../../../services/workOrderServices";
@@ -141,12 +141,46 @@ export const WorkOrders = (): JSX.Element => {
     }
   };
 
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'code' | 'product' | 'quantity' | 'startDate' | 'status' | 'materialRequest' | null;
+    direction: 'asc' | 'desc' | null;
+  }>({
+    key: null,
+    direction: null,
+  });
+
+  const handleSort = (key: 'code' | 'product' | 'quantity' | 'startDate' | 'status' | 'materialRequest') => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        if (prev.direction === 'asc') {
+          return { key, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { key: null, direction: null };
+        }
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const getSortIcon = (key: 'code' | 'product' | 'quantity' | 'startDate' | 'status' | 'materialRequest') => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    }
+    if (sortConfig.direction === 'asc') {
+      return <ArrowUp className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    if (sortConfig.direction === 'desc') {
+      return <ArrowDown className="w-3.5 h-3.5 text-blue-600" />;
+    }
+    return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+  };
+
   useEffect(() => {
     fetchWorkOrders();
   }, []);
 
-  const filteredOrders = useMemo(() => {
-    return workOrders.filter(wo => {
+  const sortedAndFilteredOrders = useMemo(() => {
+    const filtered = workOrders.filter(wo => {
       const searchLower = searchQuery.toLowerCase();
       const matchSearch = 
         wo.code?.toLowerCase().includes(searchLower) || 
@@ -157,7 +191,54 @@ export const WorkOrders = (): JSX.Element => {
       
       return matchSearch && matchStatus;
     });
-  }, [workOrders, searchQuery, filterStatus]);
+
+    if (!sortConfig.key || !sortConfig.direction) {
+      return filtered;
+    }
+
+    const { key, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    return [...filtered].sort((a, b) => {
+      if (key === 'code') {
+        const valA = a.code || "";
+        const valB = b.code || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'product') {
+        const valA = a.product?.productName || "";
+        const valB = b.product?.productName || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'quantity') {
+        const valA = a.quantity || 0;
+        const valB = b.quantity || 0;
+        return isAsc ? valA - valB : valB - valA;
+      }
+      if (key === 'startDate') {
+        if (!a.startDate && !b.startDate) return 0;
+        if (!a.startDate) return 1;
+        if (!b.startDate) return -1;
+        const valA = new Date(a.startDate).getTime();
+        const valB = new Date(b.startDate).getTime();
+        return isAsc ? valA - valB : valB - valA;
+      }
+      if (key === 'status') {
+        const valA = a.status || "";
+        const valB = b.status || "";
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (key === 'materialRequest') {
+        const valA = a.materialRequest?.status || "";
+        const valB = b.materialRequest?.status || "";
+        if (!valA && !valB) return 0;
+        if (!valA) return 1;
+        if (!valB) return -1;
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return 0;
+    });
+  }, [workOrders, searchQuery, filterStatus, sortConfig]);
 
   const renderStatusBadge = (status: string) => {
     switch (status) {
@@ -375,18 +456,66 @@ export const WorkOrders = (): JSX.Element => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold sticky top-0">
                 <tr>
-                  <th className="p-4 border-b border-gray-200">WO Code</th>
-                  <th className="p-4 border-b border-gray-200">Product</th>
-                  <th className="p-4 border-b border-gray-200 text-center">Target Qty</th>
-                  <th className="p-4 border-b border-gray-200">Start Date</th>
-                  <th className="p-4 border-b border-gray-200 text-center">Status</th>
-                  <th className="p-4 border-b border-gray-200 text-center">Material Request</th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('code')}
+                  >
+                    <div className="flex items-center gap-1">
+                      WO Code
+                      {getSortIcon('code')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('product')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Product
+                      {getSortIcon('product')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-center"
+                    onClick={() => handleSort('quantity')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Target Qty
+                      {getSortIcon('quantity')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group"
+                    onClick={() => handleSort('startDate')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Start Date
+                      {getSortIcon('startDate')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-center"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 select-none transition-colors group text-center"
+                    onClick={() => handleSort('materialRequest')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Material Request
+                      {getSortIcon('materialRequest')}
+                    </div>
+                  </th>
                   <th className="p-4 border-b border-gray-200 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
-                {filteredOrders.length > 0 ? (
-                  filteredOrders.map((wo) => (
+                {sortedAndFilteredOrders.length > 0 ? (
+                  sortedAndFilteredOrders.map((wo) => (
                     <tr key={wo.workOrderId} className="hover:bg-gray-50 transition-colors">
                       <td className="p-4 font-mono font-bold text-blue-600">{wo.code}</td>
                       <td className="p-4">

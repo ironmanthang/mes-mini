@@ -7,7 +7,8 @@ import {
   Trash2,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  ArrowDownUp
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { AddSupplierModal } from "./AddSupplierModal";
@@ -26,6 +27,23 @@ export const SupplierInformation = (): JSX.Element => {
   const [supplierToDelete, setSupplierToDelete] = useState<{id: number, name: string} | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
+
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Supplier | null;
+    direction: "asc" | "desc" | "none";
+  }>({
+    key: null,
+    direction: "none",
+  });
+
+  const handleSort = (colSelectedToSort: keyof Supplier) => {
+    let nextDirection: "asc" | "desc" | "none" = "asc";
+    if (sortConfig.key === colSelectedToSort) {
+      if (sortConfig.direction === "asc") nextDirection = "desc";
+      else if (sortConfig.direction === "desc") nextDirection = "none";
+    }
+    setSortConfig({ key: colSelectedToSort, direction: nextDirection });
+  };
 
 
 
@@ -81,6 +99,31 @@ export const SupplierInformation = (): JSX.Element => {
       (s.phoneNumber && s.phoneNumber.toLowerCase().includes(term)) ||
       (s.address && s.address.toLowerCase().includes(term))
     );
+  });
+
+  const sortedSuppliers = [...filteredSuppliers].sort((a, b) => {
+    if (!sortConfig.key || sortConfig.direction === "none") return 0;
+
+    const colSelectedToSort = sortConfig.key;
+    const nextDirection = sortConfig.direction;
+
+    let comparison = 0;
+    const aVal = a[colSelectedToSort];
+    const bVal = b[colSelectedToSort];
+
+    const isNumeric = (val: any) => {
+      if (val === null || val === undefined || val === "") return false;
+      return !isNaN(Number(val));
+    };
+
+    if (isNumeric(aVal) && isNumeric(bVal)) {
+      comparison = Number(aVal) - Number(bVal);
+    } else {
+      const aStr = aVal?.toString() || "";
+      const bStr = bVal?.toString() || "";
+      comparison = aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" });
+    }
+    return nextDirection === "asc" ? comparison : -comparison;
   });
 
   return (
@@ -140,17 +183,57 @@ export const SupplierInformation = (): JSX.Element => {
             ) : (
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold sticky top-0">
-                            <th className="p-4 w-32">Supplier Code</th>
-                            <th className="p-4">Supplier Name</th>
-                            <th className="p-4">Email</th>
-                            <th className="p-4">Phone</th>
-                            <th className="p-4">Address</th>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold sticky top-0 select-none">
+                            <th 
+                              className="p-4 w-32 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("code")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Supplier Code
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "code" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("supplierName")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Supplier Name
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "supplierName" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("email")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Email
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "email" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("phoneNumber")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Phone
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "phoneNumber" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("address")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Address
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "address" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
                             {hasPermission("SUPPLIER_UPDATE") && <th className="p-4 text-center w-24">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="text-sm">
-                        {filteredSuppliers.map((item) => (
+                        {sortedSuppliers.map((item) => (
                             <tr key={item.supplierId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                 <td className="p-4 font-mono font-medium text-gray-500">{item.code}</td>
                                 <td className="p-4 font-bold text-gray-900">{item.supplierName}</td>
@@ -204,7 +287,7 @@ export const SupplierInformation = (): JSX.Element => {
                                 )}
                             </tr>
                         ))}
-                        {filteredSuppliers.length === 0 && !isLoading && (
+                        {sortedSuppliers.length === 0 && !isLoading && (
                             <tr>
                                 <td colSpan={hasPermission("SUPPLIER_UPDATE") ? 6 : 5} className="text-center py-12 text-gray-500">
                                     <Truck className="w-12 h-12 mx-auto text-gray-300 mb-3" />

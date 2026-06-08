@@ -10,7 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowDownUp
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, type JSX } from "react";
 import { OrderDetailModal } from "./OrderDetailModel";
@@ -25,8 +26,16 @@ type ConfirmActionType = "SUBMIT" | "APPROVE" | "MARK_ORDERED";
 
 export const ComponentOrders = (): JSX.Element => {
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [originalOrders, setOriginalOrders] = useState<PurchaseOrder[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null;
+    direction: "asc" | "desc" | "none";
+  }>({
+    key: null,
+    direction: "none"
+  });
   
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -72,7 +81,9 @@ export const ComponentOrders = (): JSX.Element => {
       const response = await purchaseOrderService.getAllPOs(params);
       
       setOrders(response.data);
+      setOriginalOrders(response.data);
       setTotal(response.total);
+      setSortConfig({ key: null, direction: "none" });
       
     } catch (error) {
       console.error("Failed to fetch POs:", error);
@@ -80,6 +91,77 @@ export const ComponentOrders = (): JSX.Element => {
       setIsLoading(false);
     }
   }, [page, limit, searchQuery, filterStatus]);
+
+  const handleSort = (key: string) => {
+    let nextDirection: "asc" | "desc" | "none" = "asc";
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === "asc") nextDirection = "desc";
+      else if (sortConfig.direction === "desc") nextDirection = "none";
+    }
+    setSortConfig({ key, direction: nextDirection });
+
+    if (nextDirection === "none") {
+      setOrders(originalOrders);
+      return;
+    }
+
+    const sorted = [...originalOrders].sort((a, b) => {
+      let comparison = 0;
+      let aVal: any;
+      let bVal: any;
+
+      switch (key) {
+        case "code":
+          aVal = a.code;
+          bVal = b.code;
+          break;
+        case "supplierName":
+          aVal = a.supplier?.supplierName;
+          bVal = b.supplier?.supplierName;
+          break;
+        case "orderDate":
+          aVal = a.orderDate;
+          bVal = b.orderDate;
+          break;
+        case "status":
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case "totalAmount":
+          aVal = a.totalAmount;
+          bVal = b.totalAmount;
+          break;
+        case "createdBy":
+          aVal = a.employee?.fullName;
+          bVal = b.employee?.fullName;
+          break;
+        default:
+          aVal = "";
+          bVal = "";
+      }
+
+      const isNumeric = (val: any) => {
+        if (val === null || val === undefined || val === "") return false;
+        return !isNaN(Number(val));
+      };
+
+      if (isNumeric(aVal) && isNumeric(bVal)) {
+        comparison = Number(aVal) - Number(bVal);
+      } else if (key === "orderDate") {
+        const aDate = aVal ? new Date(aVal).getTime() : 0;
+        const bDate = bVal ? new Date(bVal).getTime() : 0;
+        comparison = aDate - bDate;
+      } else {
+        const aStr = aVal?.toString() || "";
+        const bStr = bVal?.toString() || "";
+        comparison = aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" });
+      }
+
+      return nextDirection === "asc" ? comparison : -comparison;
+    });
+
+    setOrders(sorted);
+  };
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -315,14 +397,62 @@ export const ComponentOrders = (): JSX.Element => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse whitespace-nowrap">
-              <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold">
+              <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold select-none">
                 <tr>
-                  <th className="p-4">PO Code</th>
-                  <th className="p-4">Supplier Name</th>
-                  <th className="p-4">Order Date</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Total Amount</th>
-                  <th className="p-4">Created By</th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      PO Code
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "code" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("supplierName")}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      Supplier Name
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "supplierName" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("orderDate")}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      Order Date
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "orderDate" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      Status
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "status" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 text-right cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("totalAmount")}
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      Total Amount
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "totalAmount" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
+                  <th 
+                    className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handleSort("createdBy")}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      Created By
+                      <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "createdBy" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                    </div>
+                  </th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
               </thead>

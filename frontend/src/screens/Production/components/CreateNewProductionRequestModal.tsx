@@ -1,5 +1,5 @@
 import { 
-    X, Play, Loader2, Package, Search, AlertTriangle, ListChecks, CheckCircle
+    X, Loader2, Package, Search, AlertTriangle, ListChecks, CheckCircle
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductServices, type Product } from "../../../services/productServices";
@@ -150,28 +150,6 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
                 if (matchedProduct) setProductId(matchedProduct.productId);
                 setQuantity(selectedLine.qty);
             }
-        }
-    };
-
-
-    const handleInitialSubmit = () => {
-        if (!productId || !quantity || !dueDate) {
-            setShowWarning(true);
-            setMessageWarning("Please fill in the Product Information, Quantity, and Deadline completely.");
-            return;
-        }
-        if (requestType === 'MTO' && !soDetailId) {
-            setShowWarning(true);
-            setMessageWarning("Please select a linked Sales Order for the MTO request.");
-            return;
-        }
-
-        const hasShortage = bomResult.some(item => item.status === 'Shortage');
-        
-        if (hasShortage) {
-            setShowWarningPopup(true);
-        } else {
-            executeCreateAPI(false);
         }
     };
 
@@ -374,21 +352,15 @@ export const CreateNewProductionRequestModal = ({ isOpen, onClose, onSuccess }: 
                     </div>
                 </div>
 
-                <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end gap-3 flex-shrink-0">
+                <div className="p-5 border-t border-gray-100 bg-gray-40 rounded-b-xl flex justify-end gap-3 flex-shrink-0">
                     <button 
                         onClick={handleSaveDraft} 
                         disabled={isSubmitting}
-                        className="px-5 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 cursor-pointer transition-colors"
+                        className="px-5 py-2.5 bg-gray-200 border border-gray-300 
+                        rounded-lg text-gray-900 font-semibold hover:bg-gray-100 
+                        cursor-pointer transition-colors"
                     >
                         Save Draft
-                    </button>
-                    <button 
-                        onClick={handleInitialSubmit} 
-                        disabled={isSubmitting || !productId || !quantity || isCheckingBom} 
-                        className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-60 shadow-md transition-all"
-                    >
-                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Play className="w-5 h-5" />} 
-                        Create Request
                     </button>
                 </div>
             </div>

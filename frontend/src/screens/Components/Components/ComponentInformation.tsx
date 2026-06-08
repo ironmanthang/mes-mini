@@ -8,7 +8,8 @@ import {
   Loader2,
   Trash2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowDownUp,
 } from "lucide-react";
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { AddComponentModal } from "./AddComponentModal";
@@ -19,6 +20,7 @@ import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { hasPermission } from "../../../lib/auth";
 
 export const ComponentInformation = (): JSX.Element => {
+  const [originalComponents, setOriginalComponents] = useState<Component[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -33,6 +35,7 @@ export const ComponentInformation = (): JSX.Element => {
   const [componentToDelete, setComponentToDelete] = useState<{id: number, name: string} | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [message, setMessage] = useState("");
+
 
   useEffect(() => {
     setPage(1);
@@ -61,6 +64,7 @@ export const ComponentInformation = (): JSX.Element => {
       });
 
       setComponents(mergedComponents);
+      setOriginalComponents(mergedComponents);
     } catch (error) {
       console.error("Failed to fetch components:", error);
     } finally {
@@ -108,6 +112,44 @@ export const ComponentInformation = (): JSX.Element => {
   }
 
   const totalPages = Math.ceil(total / limit) || 1;
+
+  const [sortConfig, setSortConfig] = useState<{key: keyof Component | null; direction: "asc" | "desc" | "none"}>({
+    key: null,
+    direction: "none",
+  })
+
+  const handleSort = (colSelectedToSort: keyof Component) => {
+    let nextDirection: "asc" | "desc" | "none" = "asc";
+    if (sortConfig.key === colSelectedToSort) {
+      if (sortConfig.direction === "asc") nextDirection = "desc";
+      else if (sortConfig.direction === "desc") nextDirection = "none";
+    }
+    setSortConfig({ key: colSelectedToSort, direction: nextDirection });
+    if (nextDirection === "none") {
+      setComponents(originalComponents);
+      return;
+    }
+    const sortedComponents = [...originalComponents].sort((a, b) => {
+      let comparison = 0;
+      const aVal = a[colSelectedToSort];
+      const bVal = b[colSelectedToSort];
+
+      const isNumeric = (val: any) => {
+        if (val === null || val === undefined || val === "") return false;
+        return !isNaN(Number(val));
+      };
+
+      if (isNumeric(aVal) && isNumeric(bVal)) {
+        comparison = Number(aVal) - Number(bVal);
+      } else {
+        const aStr = aVal?.toString() || "";
+        const bStr = bVal?.toString() || "";
+        comparison = aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" });
+      }
+      return nextDirection === "asc" ? comparison : -comparison;
+    });
+    setComponents(sortedComponents);
+  };
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-300">
@@ -188,12 +230,44 @@ export const ComponentInformation = (): JSX.Element => {
             ) : (
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold sticky top-0">
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Component Name</th>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold sticky top-0 select-none">
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("code")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Code 
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "code" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("componentName")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                Component Name
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "componentName" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
                             <th className="p-4">Unit</th>
-                            <th className="p-4 text-right">Standard Cost</th>
-                            <th className="p-4 text-center">Available / Min</th>
+                            <th 
+                              className="p-4 text-right cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("standardCost")}
+                            >
+                              <div className="flex items-center justify-end gap-1.5">
+                                Standard Cost
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "standardCost" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
+                            <th 
+                              className="p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort("currentStock")}
+                            >
+                              <div className="flex items-center justify-center gap-1.5">
+                                Available / Min
+                                <ArrowDownUp className={`w-3.5 h-3.5 transition-colors ${sortConfig.key === "currentStock" && sortConfig.direction !== "none" ? "text-blue-600" : "text-gray-400"}`} />
+                              </div>
+                            </th>
                             <th className="p-4 text-center">Status</th>
                             {hasPermission("COMP_UPDATE") && (
                               <th className="p-4 text-center">Actions</th>
