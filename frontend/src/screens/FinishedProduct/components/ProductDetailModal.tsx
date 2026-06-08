@@ -4,6 +4,7 @@ import { ProductServices, type Product, type BOMComponent } from "../../../servi
 import { componentService, type Component } from "../../../services/componentServices";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
+import { hasPermission } from "../../../lib/auth";
 
 interface ProductDetailModalProps {
   isOpen: boolean;
@@ -220,7 +221,7 @@ export const ProductDetailModal = ({ isOpen, onClose, productId }: ProductDetail
                     setIsAddCompleted(true);
                     setShowConfirm(true);
                   }}
-                  disabled={!selectedComponent || quantityToAdd < 1}
+                  disabled={!selectedComponent || quantityToAdd < 1 || !hasPermission("PRODUCT_UPDATE")}
                   className="w-full bg-emerald-200 p-2 rounded-lg text-emerald-800 font-bold
                   cursor-pointer shadow-sm hover:shadow-md hover:bg-emerald-300 transition-all
                   duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -269,7 +270,8 @@ export const ProductDetailModal = ({ isOpen, onClose, productId }: ProductDetail
                             onChange={(e) => {
                               setCompToUpdate(bom.componentId);
                               setQuantityUpdated(Number(e.target.value));
-                            }}/>
+                            }}
+                            disabled={!hasPermission("PRODUCT_UPDATE")}/>
                           <button
                             onClick={() => {
                               setIsUpdate(true);
@@ -282,13 +284,14 @@ export const ProductDetailModal = ({ isOpen, onClose, productId }: ProductDetail
                           </button>
                         </div>
 
-                        <button className="rounded-full hover:bg-red-400 transition-colors duration-200
-                        cursor-pointer"
+                        <button className={`rounded-full hover:bg-red-400 transition-colors duration-200
+                        ${hasPermission("PRODUCT_UPDATE") ? "cursor-pointer" : "cursor-not-allowed"}`}
                           onClick={() => {
                             setCompToRemove(bom.componentId);
                             setIsAddCompleted(false);
                             setShowConfirm(true);
-                          }}>
+                          }}
+                          disabled={!hasPermission("PRODUCT_UPDATE")}>
                           <Trash2 className="w-4 h-4 m-2" />
                         </button>
                       </div>

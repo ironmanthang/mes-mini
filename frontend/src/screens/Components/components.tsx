@@ -1,6 +1,6 @@
 import { Cpu, ShoppingCart, PackagePlus, ClipboardCheck } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { hasAnyPermission } from "../../lib/auth";
+import { hasAnyPermission, hasAllPermissions } from "../../lib/auth";
 
 export const Components = () => {
   const allTabs = [
@@ -10,7 +10,8 @@ export const Components = () => {
       icon: Cpu,
       to: "/components/info",
       description: "Manage items, stock & specs",
-      allowedPermissions: ["COMP_READ"]
+      allowedPermissions: ["COMP_READ", "WH_STOCK_READ"],
+      requiresAllPermissions: true,
     },
     { 
       id: "create-order", 
@@ -39,9 +40,13 @@ export const Components = () => {
   ];
 
   // Lọc tab: chỉ hiển thị những tab người dùng có ít nhất 1 quyền phù hợp
-  const visibleTabs = allTabs.filter(tab =>
-    !tab.allowedPermissions || hasAnyPermission(tab.allowedPermissions)
-  );
+  const visibleTabs = allTabs.filter(tab => {
+      if (!tab.allowedPermissions) return true;
+      if (tab.requiresAllPermissions) {
+        return hasAllPermissions(tab.allowedPermissions);
+      }
+      return hasAnyPermission(tab.allowedPermissions);
+    });
 
   return (
     <div className="p-8 pb-24 bg-white min-h-screen">

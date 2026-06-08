@@ -187,6 +187,7 @@ export const Information = (): JSX.Element => {
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
+                          {hasPermission("PRODUCT_UPDATE") && (
                             <button 
                               onClick={() => handleDelete(product.productId, product.productName)}
                               className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" 
@@ -194,7 +195,7 @@ export const Information = (): JSX.Element => {
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          
+                          )}
                         </div>
                       </td>
                     </tr>

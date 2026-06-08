@@ -70,7 +70,10 @@ const HumanResourcesIndexRedirect = () => {
 
 const ComponentsIndexRedirect = () => {
   const allowed = getFirstAllowedTab([
-    { to: "info", allowedPermissions: ["COMP_READ"] },
+    { to: "info", 
+      allowedPermissions: ["COMP_READ", "WH_STOCK_READ"],
+      requiresAllPermissions: true
+    },
     { to: "create-order", allowedPermissions: ["PO_CREATE"] },
     { to: "orders", allowedPermissions: ["PO_READ"] },
     { to: "receipts", allowedPermissions: ["PO_READ"] }
@@ -190,7 +193,8 @@ export default function App() {
                 }>
                   <Route index element={<ComponentsIndexRedirect />} />
                   <Route path="info" element={
-                    <ProtectedRouteWithRole allowedPermissions={["COMP_READ"]}>
+                    <ProtectedRouteWithRole allowedPermissions={["COMP_READ", "WH_STOCK_READ"]}
+                    requiresAllPermissions={true}>
                       <ComponentInformation />
                     </ProtectedRouteWithRole>
                   } />
