@@ -280,13 +280,7 @@ export const ProductInduction = (): JSX.Element => {
       }
   };
 
-  const inputApiClasses = useMemo(() => {
-    const base = "w-full pl-12 pr-12 py-3 border rounded-xl text-lg font-mono font-bold outline-none transition-all duration-150 shadow-inner";
-    if (isLoading) return `${base} border-blue-300 bg-blue-50 text-blue-800 cursor-wait`;
-    if (scanStatus === 'SUCCESS') return `${base} border-green-500 bg-green-50 text-green-900 focus:border-green-500`;
-    if (scanStatus === 'ERROR') return `${base} border-red-500 bg-red-50 text-red-900 focus:border-red-500`;
-    return `${base} border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500`;
-  }, [scanStatus, isLoading]);
+
 
   return (
     <div className="flex flex-col gap-5 h-[calc(100vh-120px)] animate-in fade-in duration-300">

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, type JSX } from "react";
 import { AddWarehouseModal } from "./AddWarehouseModel";
+import { WarehouseDetailModal } from "./WarehouseComponentDetailModal";
+import { WarehouseSalesDetailModal } from "./WarehouseSalesDetailModal";
 import { WarehouseServices, type Warehouse, type TYPE } from "../../../services/warehouseServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
@@ -23,6 +25,8 @@ export const WarehouseInformation = (): JSX.Element => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState("All");
   const [selectedWarehouse, setSelectedWarehouse] = useState<any>(null);
+  const [detailWarehouseId, setDetailWarehouseId] = useState<number | null>(null);
+  const [detailWarehouseType, setDetailWarehouseType] = useState<TYPE | null>(null);
 
   const canEdit = hasPermission("WH_MANAGE");
 
@@ -99,6 +103,7 @@ export const WarehouseInformation = (): JSX.Element => {
         name: wh.warehouseName || "Unknown",
         location: wh.location || "Not specified",
         type: wh.warehouseType ? wh.warehouseType.charAt(0) + wh.warehouseType.slice(1).toLowerCase() : "Unknown",
+        rawType: wh.warehouseType,
       }));
 
       setWarehouses(mappedData);
@@ -201,7 +206,14 @@ export const WarehouseInformation = (): JSX.Element => {
                                             </span>
                                         </td>
                                         <td className="p-4 flex items-center justify-center gap-2">
-                                            <button className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="View Inventory">
+                                            <button 
+                                                onClick={() => {
+                                                    setDetailWarehouseId(item.dbId);
+                                                    setDetailWarehouseType(item.rawType);
+                                                }}
+                                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" 
+                                                title="View Inventory"
+                                            >
                                                 <Eye className="w-4 h-4" />
                                             </button>
                                             {canEdit && (
@@ -264,6 +276,24 @@ export const WarehouseInformation = (): JSX.Element => {
                 showWarningNotification(error.response?.data?.message || "An error occurred while saving the warehouse");
             }
         }} 
+      />
+
+      <WarehouseDetailModal 
+        isOpen={detailWarehouseId !== null && detailWarehouseType === "COMPONENT"} 
+        onClose={() => {
+          setDetailWarehouseId(null);
+          setDetailWarehouseType(null);
+        }} 
+        warehouseId={detailWarehouseId} 
+      />
+
+      <WarehouseSalesDetailModal 
+        isOpen={detailWarehouseId !== null && detailWarehouseType === "SALES"} 
+        onClose={() => {
+          setDetailWarehouseId(null);
+          setDetailWarehouseType(null);
+        }} 
+        warehouseId={detailWarehouseId} 
       />
 
       <SuccessNotification isVisible={showSuccess} message={successMessage} />
