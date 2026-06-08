@@ -911,3 +911,133 @@ export async function seedDemoProductionRequests(): Promise<void> {
     console.log(`   ✓ ${prSeeds.length} demo production requests created`);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// seedDemoErrorStock
+// Creates ProductInstance records with status = IN_STOCK_ERROR in WH-DEFECT.
+// These are QC-rejected units that have been formally inducted into the error
+// warehouse — exactly what _getErrorStock() queries for.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function seedDemoErrorStock(): Promise<void> {
+    console.log('...Seeding Demo Error Warehouse Stock (IN_STOCK_ERROR)');
+
+    const admin = await prisma.employee.findFirst();
+    if (!admin) return;
+
+    const defectWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-DEFECT' } });
+    const fgWarehouse = await prisma.warehouse.findFirst({ where: { code: 'WH-FG' } });
+    if (!defectWarehouse || !fgWarehouse) {
+        console.warn('   ⚠️ Missing WH-DEFECT or WH-FG — skipping error stock seed');
+        return;
+    }
+
+    const lines = await prisma.productionLine.findMany();
+    if (lines.length === 0) {
+        console.warn('   ⚠️ No production lines found — skipping error stock seed');
+        return;
+    }
+
+    // Defective batches: each entry represents a real QC-failure scenario
+    //   productCode  — which product failed
+    //   prefix       — used for WO / batch / serial codes
+    //   count        — number of IN_STOCK_ERROR instances to create
+    //   productionDate — when the batch was produced
+    //   failureNote  — appears in console only (for clarity)
+    interface ErrorBatchSeed {
+        productCode: string;
+        prefix: string;
+        count: number;
+        daysAgo: number;
+        failureNote: string;
+    }
+
+    const today = new Date();
+    const daysAgo = (n: number) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - n);
+        return d;
+    };
+
+    const batches: ErrorBatchSeed[] = [
+        { productCode: 'PROD-LAPTOP-X1',      prefix: 'ERR-LAPTOP',   count: 5,  daysAgo: 18, failureNote: 'Screen dead-pixel failure batch' },
+        { productCode: 'PROD-GAMING-PC',       prefix: 'ERR-GPC',      count: 3,  daysAgo: 12, failureNote: 'GPU stress-test burn failure' },
+        { productCode: 'PROD-SMARTWATCH',      prefix: 'ERR-SW',       count: 7,  daysAgo: 9,  failureNote: 'Heart-rate sensor calibration failure' },
+        { productCode: 'PROD-TABLET-A1',       prefix: 'ERR-TAB',      count: 4,  daysAgo: 6,  failureNote: 'Touch digitizer delamination' },
+        { productCode: 'PROD-DESKTOP-Z5',      prefix: 'ERR-DSK',      count: 2,  daysAgo: 3,  failureNote: 'Power supply short-circuit on boot' },
+        { productCode: 'PROD-MONITOR-M1',      prefix: 'ERR-MON',      count: 6,  daysAgo: 1,  failureNote: 'Backlight bleed exceeds threshold' },
+    ];
+
+    for (const seed of batches) {
+        const product = await prisma.product.findUnique({ where: { code: seed.productCode } });
+        if (!product) {
+            console.warn(`   ⚠️ Product not found: ${seed.productCode} — skipping`);
+            continue;
+        }
+
+        const randomLine = lines[Math.floor(Math.random() * lines.length)];
+        const productionDate = daysAgo(seed.daysAgo);
+
+        // BOM cost calculation (mirrors the pattern in seedDemoProductInstances)
+        const bom = await prisma.billOfMaterial.findMany({
+            where: { productId: product.productId },
+            include: { component: true }
+        });
+        const unitMatCost = bom.reduce((sum, item) => sum + (item.quantityNeeded * Number(item.component.standardCost)), 0);
+        const totalMatCost = unitMatCost * seed.count;
+        const laborCost = seed.count * 1200;
+        const overheadCost = seed.count * 600;
+
+        // Work Order (COMPLETED — the batch already went through the line)
+        const woCode = `WO-DEMO-${seed.prefix}`;
+        const wo = await prisma.workOrder.upsert({
+            where: { code: woCode },
+            update: {},
+            create: {
+                code: woCode,
+                quantity: seed.count,
+                employeeId: admin.employeeId,
+                productId: product.productId,
+                productionLineId: randomLine.productionLineId,
+                status: 'COMPLETED',
+                targetSalesWarehouseId: fgWarehouse.warehouseId,
+                targetErrorWarehouseId: defectWarehouse.warehouseId,
+                laborCost,
+                overheadCost,
+                totalMaterialCost: totalMatCost,
+                totalProductionCost: totalMatCost + laborCost + overheadCost,
+            }
+        });
+
+        // Production Batch (linked to the WO and the line)
+        const batchCode = `BATCH-DEMO-${seed.prefix}`;
+        let batch = await prisma.productionBatch.findFirst({ where: { batchCode } });
+        if (!batch) {
+            batch = await prisma.productionBatch.create({
+                data: {
+                    batchCode,
+                    productionDate,
+                    workOrderId: wo.workOrderId,
+                    productionLineId: randomLine.productionLineId,
+                }
+            });
+        }
+
+        // Product Instances — status IN_STOCK_ERROR + assigned to WH-DEFECT
+        const instances = [];
+        for (let i = 1; i <= seed.count; i++) {
+            instances.push({
+                productId: product.productId,
+                serialNumber: `SN-DEMO-${seed.prefix}-${i.toString().padStart(4, '0')}`,
+                status: ProductInstanceStatus.IN_STOCK_ERROR,
+                unitProductionCost: unitMatCost + laborCost / seed.count + overheadCost / seed.count,
+                productionBatchId: batch.productionBatchId,
+                warehouseId: defectWarehouse.warehouseId,
+            });
+        }
+
+        await prisma.productInstance.createMany({ data: instances, skipDuplicates: true });
+        console.log(`   ✓ ${seed.count} ${seed.productCode} instances → WH-DEFECT (${seed.failureNote})`);
+    }
+
+    console.log('   ✓ Demo error warehouse stock seeded');
+}
+

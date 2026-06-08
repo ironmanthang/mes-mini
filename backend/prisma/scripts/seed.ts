@@ -3,7 +3,7 @@ import prisma from '../../src/common/lib/prisma.js';
 
 import { seedRoles, seedPermissions, seedRolePermissions, seedEmployees, seedWarehouses, seedProductionLines, seedCodeSequences } from './seeders/system.js';
 import { seedSuppliers, seedAgents, seedComponents, seedQualityChecklists, seedProducts, seedSupplierComponents, seedProductCategories } from './seeders/masterData.js';
-import { seedMaterialRequests, seedProductInstances, seedDemoAgents, seedDemoSuppliers, seedDemoComponents, seedDemoProducts, seedDemoSupplierComponents, seedDemoComponentStock, seedDemoProductInstances, seedDemoPurchaseOrders, seedDemoSalesOrders, seedDemoProductionRequests } from './seeders/demoData.js';
+import { seedMaterialRequests, seedProductInstances, seedDemoAgents, seedDemoSuppliers, seedDemoComponents, seedDemoProducts, seedDemoSupplierComponents, seedDemoComponentStock, seedDemoProductInstances, seedDemoPurchaseOrders, seedDemoSalesOrders, seedDemoProductionRequests, seedDemoErrorStock } from './seeders/demoData.js';
 import { seedProductionScenarios, seedQcTestingScenario } from './seeders/scenarios.js';
 
 // ============================================================================
@@ -71,6 +71,9 @@ async function main(): Promise<void> {
     
     // NEW: Seed Material Requests for all WOs
     if (SEED_CONFIG.MATERIAL_REQUESTS) await seedMaterialRequests();
+
+    // Seed Error Warehouse stock (IN_STOCK_ERROR instances in WH-DEFECT)
+    if (SEED_CONFIG.INSTANCES) await seedDemoErrorStock();
 
     if (SEED_CONFIG.QC_TESTING) await seedQcTestingScenario();
 

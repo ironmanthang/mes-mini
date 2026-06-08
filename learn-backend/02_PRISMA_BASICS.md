@@ -16,6 +16,56 @@ await prisma.<modelName>.<method>({ options });
 
 ---
 
+## The "What, Which, and How" Blueprint (Mental Model)
+
+To write any Prisma query without guessing, divide your options object into three simple categories. Almost all Prisma queries are composed of these:
+
+```typescript
+await prisma.modelName.method({
+    // 1. WHICH records do I want? (Filters)
+    where: { ... },
+    orderBy: { ... },
+    take: 10,
+    skip: 0,
+
+    // 2. WHAT columns/relations do I want back? (Output Selection)
+    // (Use either select OR include, NEVER both at the same level)
+    select: { ... }, 
+    // OR
+    include: { ... },
+
+    // 3. HOW should I create/modify the data? (Mutations only)
+    data: { ... }
+});
+```
+
+### 1. WHICH records (Filters)
+* **`where`**: Filters rows. Think of it as SQL `WHERE`. 
+* **`orderBy`**: Sorts rows. E.g., `{ createdAt: 'desc' }`.
+* **`take`** and **`skip`**: Used for pagination. `take` is the limit, `skip` is the offset.
+
+### 2. WHAT columns/relations (Output Selection)
+* **`select`**: Used to return **only specific columns** (better performance). E.g., `select: { name: true }`.
+* **`include`**: Keeps all columns, but **joins/loads related tables**. E.g., `include: { componentStocks: true }`.
+* **The Rule**: You can use `select` inside `include` (for nested relations), but at the root level, choose one.
+* **For counts**: To count relations without loading them, use `include: { _count: { select: { relationName: true } } }`.
+
+### 3. HOW to write mutations (Data payload)
+* **`data`**: Only used in `create`, `update`, `createMany`, and `updateMany`. It contains the JSON body of fields to insert or modify.
+
+---
+
+## 4. Aggregations: `aggregate` vs `groupBy`
+
+If the reviewer asks you to sum costs or count rows grouped by category:
+
+| Feature | Query | When to use |
+|---|---|---|
+| **`aggregate`** | `prisma.model.aggregate({ _sum: { cost: true } })` | Global totals/averages across the entire table. |
+| **`groupBy`** | `prisma.model.groupBy({ by: ['category'], _sum: { cost: true } })` | Totals/averages **per group** (e.g., total cost per supplier). |
+
+---
+
 ## 1. `findMany` — Get a List of Records
 
 The most used query. Returns an **array** of records.
@@ -380,6 +430,17 @@ const component = await prisma.component.findUnique({
         }
     }
 });
+
+// Count relations (does NOT load relation rows, only fetches count)
+const component = await prisma.component.findUnique({
+    where: { componentId: 5 },
+    include: {
+        _count: {
+            select: { suppliedBy: true } // counts how many suppliers are linked
+        }
+    }
+});
+// Result: { componentId: 5, ..., _count: { suppliedBy: 2 } }
 ```
 
 ---
@@ -399,9 +460,41 @@ const products = await prisma.product.findMany({
         // createdAt, updatedAt, description, etc. are NOT returned
     }
 });
+
+// Nested select for relations (no 'include' needed!)
+const components = await prisma.component.findMany({
+    select: {
+        componentId: true,
+        componentName: true,
+        suppliedBy: {
+            select: {
+                supplierId: true // only get supplierId from the relation table
+            }
+        }
+    }
+});
 ```
 
-> **`include` vs `select`**: You can't use both at the same level. Use `select` when you want only specific own fields. Use `include` when you want to pull in related tables.
+### Combined Approach: `select` inside `include`
+If you want **all** fields of the parent model, but only **specific** fields of the related model, nest a `select` inside the `include`:
+
+```typescript
+const component = await prisma.component.findUnique({
+    where: { componentId: 5 },
+    include: {
+        suppliedBy: {
+            select: {
+                supplierId: true // only fetches supplierId for each related record
+            }
+        }
+    }
+});
+```
+
+> **`include` vs `select` Rules**:
+> 1. You cannot use both `include` and `select` at the same root level.
+> 2. Use **`select`** if you want to limit the parent columns returned.
+> 3. Use **`include`** (with nested `select`) if you want all parent columns plus specific relation columns.
 
 ---
 

@@ -72,7 +72,7 @@ const component = await prisma.component.findUnique({
     where: { componentId },
     include: {
         _count: {
-            select: { SupplierComponent: true }
+            select: { suppliedBy: true }
         }
     }
 });
@@ -86,7 +86,7 @@ const component = await prisma.component.findUnique({
     "componentName": "Steel Sheet 5mm",
     "code": "COM-001",
     "_count": {
-        "SupplierComponent": 2
+        "suppliedBy": 2
     }
 }
 ```
