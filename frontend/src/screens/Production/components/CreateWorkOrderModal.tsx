@@ -1,6 +1,6 @@
 import { 
   Factory, Loader2, Package, 
-  AlertTriangle, ListChecks, Info, Clock, Save, Play
+  AlertTriangle, ListChecks, Info, Clock, Save
 } from "lucide-react";
 import { useState, useEffect, type JSX } from "react";
 import { ProductionRequestServices, type ProductionRequestById } from "../../../services/productionRequestServices";
@@ -366,7 +366,7 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
                           />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-3">
                           <button 
                               onClick={() => handleRelease('PLANNED')}
                               disabled={isSubmitting || !selectedRequestId}
@@ -375,16 +375,6 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
                               hover:bg-gray-50 transition-colors cursor-pointer"
                           >
                               <Save className="w-4 h-4" /> Save Draft
-                          </button>
-                          <button 
-                              onClick={() => handleRelease('RELEASED')}
-                              disabled={isSubmitting || !selectedRequestId || !quantityToProduce || Number(quantityToProduce) <= 0 || isMissingRouting}
-                              className="flex items-center justify-center gap-2 px-4 py-2.5 
-                              bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 
-                              shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                              title={isMissingRouting ? "Please configure QC Routing Warehouses first" : ""}
-                          >
-                              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4" />} Release WO
                           </button>
                       </div>
                   </div>
