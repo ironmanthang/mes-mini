@@ -815,9 +815,20 @@ export async function seedDemoProductionRequests(): Promise<void> {
             totalRequired: b.quantityNeeded * pr.qty
         }));
 
+        const dueDate = (() => {
+            const date = new Date();
+            date.setFullYear(2027);
+            date.setMonth(Math.floor(Math.random() * 12));
+            date.setDate(Math.floor(Math.random() * 28) + 1);
+            date.setHours(12, 0, 0, 0);
+            return date;
+        })();
+
         await prisma.productionRequest.upsert({
             where: { code: pr.code },
-            update: {},
+            update: {
+                dueDate,
+            },
             create: {
                 code: pr.code,
                 productId: product.productId,
@@ -830,6 +841,7 @@ export async function seedDemoProductionRequests(): Promise<void> {
                     date.setDate(date.getDate() - Math.floor(Math.random() * 15) - 1);
                     return date;
                 })(),
+                dueDate,
                 soDetailId: pr.soDetailId,
                 note: pr.note,
                 details: { create: detailsData },

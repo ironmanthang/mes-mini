@@ -220,9 +220,12 @@ export async function seedQcTestingScenario(): Promise<void> {
     }
 
     // 1. Create a dummy PR for traceability
+    const prQcTestDueDate = new Date('2027-08-15T12:00:00Z');
     const pr = await prisma.productionRequest.upsert({
         where: { code: 'PR-QC-TEST' },
-        update: {},
+        update: {
+            dueDate: prQcTestDueDate,
+        },
         create: {
             code: 'PR-QC-TEST',
             productId: product.productId,
@@ -230,6 +233,7 @@ export async function seedQcTestingScenario(): Promise<void> {
             status: ProductionRequestStatus.APPROVED,
             priority: Priority.HIGH,
             employeeId: admin.employeeId,
+            dueDate: prQcTestDueDate,
             note: 'PR for testing QC and Induction'
         }
     });

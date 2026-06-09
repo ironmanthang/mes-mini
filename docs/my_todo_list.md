@@ -52,3 +52,11 @@
   - Implement module-based permission grouping/Organization
 - [ ] **BOM Management**: Add front end ability to manage products BOM.
 - [ ] delete the sales order in the front end
+
+
+
+sửa file seed để ready for all cases demo (với mỗi data thêm, hãy đọc file backend tương ứng để data nó real). đầu tiên add a Work Order that have status In Progress and the material request is in ISSUED
+
+coi lại logic report, chi phí
+
+chỗ Line Performance Analytics cái cột unassign là gì
