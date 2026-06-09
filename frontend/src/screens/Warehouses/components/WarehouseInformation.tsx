@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef, type JSX } from "react";
 import { AddWarehouseModal } from "./AddWarehouseModel";
 import { WarehouseDetailModal } from "./WarehouseComponentDetailModal";
 import { WarehouseSalesDetailModal } from "./WarehouseSalesDetailModal";
+import { WarehouseErrorDetailModal } from "./WarehouseErrorDetailModal";
 import { WarehouseServices, type Warehouse, type TYPE } from "../../../services/warehouseServices";
 import { SuccessNotification } from "../../Notification/SuccessNotification";
 import { WarningNotification } from "../../Notification/WarningNotification";
@@ -289,6 +290,15 @@ export const WarehouseInformation = (): JSX.Element => {
 
       <WarehouseSalesDetailModal 
         isOpen={detailWarehouseId !== null && detailWarehouseType === "SALES"} 
+        onClose={() => {
+          setDetailWarehouseId(null);
+          setDetailWarehouseType(null);
+        }} 
+        warehouseId={detailWarehouseId} 
+      />
+
+      <WarehouseErrorDetailModal 
+        isOpen={detailWarehouseId !== null && detailWarehouseType === "ERROR"} 
         onClose={() => {
           setDetailWarehouseId(null);
           setDetailWarehouseType(null);

@@ -92,7 +92,20 @@ export interface WarehouseErrorDetail {
         totalProducts: number;
         totalDefectiveInstances: number;
     };
-    data: [];
+    data: {
+        productId: number;
+        productCode: string;
+        productName: string;
+        unit: string;
+        defectiveCount: number;
+        batches: {
+            batchCode: string;
+            productionDate: string;
+            instanceCount: number;
+            workOrderCode: string;
+            productionLineName: string;
+        }[];
+    }[];
     pagination: {
         page: number;
         limit: number;
