@@ -158,7 +158,7 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
              <div className="space-y-4">
                 <h3 className="text-sm font-bold text-blue-600 uppercase border-b border-blue-100 pb-1">2. Specifications</h3>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Unit (Đơn vị tính)<span className="text-red-500">*</span></label>
+                    <label className="text-sm font-medium text-gray-700">Unit<span className="text-red-500">*</span></label>
                     <select 
                       name="unit"
                       value={formData.unit}
@@ -189,7 +189,7 @@ export const AddComponentModal = ({ isOpen, onClose, onConfirm, initialData }: A
                   <DollarSign className="w-4 h-4" /> 3. Pricing
                 </h3>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Standard Cost ($)</label>
+                    <label className="text-sm font-medium text-gray-700">Standard Cost (đ)</label>
                     <input 
                       type="number" 
                       name="standardCost"

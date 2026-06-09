@@ -277,9 +277,11 @@ export const OrderDetailModal = ({
     return dateString ? new Date(dateString).toLocaleDateString("vi-VN") : "N/A";
   };
   
-  const parseCurrency = (val: string | number | undefined) => {
-    if (val === undefined || val === null) return 0;
-    return Number(val);
+  const formatCurrency = (val: any): string => {
+    if (val === undefined || val === null) return "0\u00a0\u20ab";
+    const numberVal = Number(val);
+    if (isNaN(numberVal)) return "0\u00a0\u20ab";
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numberVal);
   };
 
   const getStatusColor = (status?: string) => {
@@ -406,7 +408,7 @@ export const OrderDetailModal = ({
                             <div className="flex justify-between pt-2 border-t border-gray-100">
                                 <span className="text-gray-500">Total Amount:</span> 
                                 <span className="font-bold text-blue-700 text-lg">
-                                    ${parseCurrency(order.totalAmount).toLocaleString('vi-VN')}
+                                    {formatCurrency(order.totalAmount)}
                                 </span>
                             </div>
                         </div>
@@ -433,7 +435,7 @@ export const OrderDetailModal = ({
                                     order.details.map((detail, idx) => {
                                       const qtyOrd = detail.quantityOrdered || 0;
                                       const qtyRec = detail.quantityReceived || 0;
-                                      const price = parseCurrency(detail.unitPrice);
+                                      const price = Number(detail.unitPrice) || 0;
                                       const lineTotal = qtyOrd * price;
 
                                       return (
@@ -448,9 +450,9 @@ export const OrderDetailModal = ({
                                                 {qtyRec}
                                               </span>
                                             </td>
-                                            <td className="p-3 text-right">${price.toLocaleString('vi-VN')}</td>
+                                            <td className="p-3 text-right">{formatCurrency(price)}</td>
                                             <td className="p-3 text-right font-medium">
-                                                ${lineTotal.toLocaleString('vi-VN')}
+                                                {formatCurrency(lineTotal)}
                                             </td>
                                         </tr>
                                       );
@@ -475,7 +477,7 @@ export const OrderDetailModal = ({
                     </div>
                     <div className="space-y-2">
                         <p><span className="font-bold text-gray-700">Tax Rate:</span> {order.taxRate ? `${order.taxRate}%` : "0%"}</p>
-                        <p><span className="font-bold text-gray-700">Shipping Cost:</span> ${parseCurrency(order.shippingCost).toLocaleString('vi-VN')}</p>
+                        <p><span className="font-bold text-gray-700">Shipping Cost:</span> {formatCurrency(order.shippingCost)}</p>
                         <p><span className="font-bold text-gray-700">Note:</span> {order.note || "N/A"}</p>
                     </div>
                 </div>
