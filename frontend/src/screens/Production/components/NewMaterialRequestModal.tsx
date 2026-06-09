@@ -92,21 +92,77 @@ export const NewMaterialRequestModal = ({ isOpen, onClose, onSuccess }: NewMater
             if (wo && wo.productId) {
                 setIsFetchingBom(true);
                 
-                // Call API to fetch BOM based on Work Order's productId
-                ProductServices.getBOMById(wo.productId)
-                    .then(bomList => {
-                        // Calculate and map data for display
-                        const tableData: AutoBomRow[] = bomList.map(bomItem => ({
-                            componentId: bomItem.componentId,
-                            componentName: bomItem.component.componentName,
-                            unit: bomItem.component.unit,
-                            bomRatio: bomItem.quantityNeeded,
-                            requestQty: bomItem.quantityNeeded * wo.quantity 
-                        }));
-                        setBomTableData(tableData);
+                WorkOrderServices.getWorkOrderById(Number(selectedWoId))
+                    .then(async (detailedWo) => {
+                        const componentMap = new Map<number, AutoBomRow>();
+
+                        if (detailedWo.workOrderFulfillments && detailedWo.workOrderFulfillments.length > 0) {
+                            for (const fulfillment of detailedWo.workOrderFulfillments) {
+                                const pr = fulfillment.productionRequest;
+                                
+                                if (pr.details && pr.details.length > 0) {
+                                    // Use snapshot BOM details
+                                    for (const detail of pr.details) {
+                                        const needed = fulfillment.quantity * detail.quantityPerUnit;
+                                        const current = componentMap.get(detail.componentId);
+                                        if (current) {
+                                            current.requestQty += needed;
+                                        } else {
+                                            componentMap.set(detail.componentId, {
+                                                componentId: detail.componentId,
+                                                componentName: detail.component.componentName,
+                                                unit: detail.component.unit,
+                                                bomRatio: detail.quantityPerUnit,
+                                                requestQty: needed
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    // Fallback for legacy PR without snapshot: use live BOM
+                                    try {
+                                        const bomList = await ProductServices.getBOMById(pr.productId);
+                                        for (const bomItem of bomList) {
+                                            const needed = fulfillment.quantity * bomItem.quantityNeeded;
+                                            const current = componentMap.get(bomItem.componentId);
+                                            if (current) {
+                                                current.requestQty += needed;
+                                            } else {
+                                                componentMap.set(bomItem.componentId, {
+                                                    componentId: bomItem.componentId,
+                                                    componentName: bomItem.component.componentName,
+                                                    unit: bomItem.component.unit,
+                                                    bomRatio: bomItem.quantityNeeded,
+                                                    requestQty: needed
+                                                });
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error("Failed to fetch BOM for fallback:", err);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Standalone WO (MTS) -> use live BOM
+                            try {
+                                const bomList = await ProductServices.getBOMById(wo.productId);
+                                for (const bomItem of bomList) {
+                                    componentMap.set(bomItem.componentId, {
+                                        componentId: bomItem.componentId,
+                                        componentName: bomItem.component.componentName,
+                                        unit: bomItem.component.unit,
+                                        bomRatio: bomItem.quantityNeeded,
+                                        requestQty: bomItem.quantityNeeded * wo.quantity
+                                    });
+                                }
+                            } catch (err) {
+                                console.error("Failed to fetch live BOM for standalone WO:", err);
+                            }
+                        }
+
+                        setBomTableData(Array.from(componentMap.values()));
                     })
                     .catch(err => {
-                        console.error("Failed to fetch BOM details:", err);
+                        console.error("Failed to fetch Work Order details:", err);
                         setBomTableData([]);
                     })
                     .finally(() => {

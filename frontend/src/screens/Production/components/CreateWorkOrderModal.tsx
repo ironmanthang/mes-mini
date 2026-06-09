@@ -103,17 +103,34 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
       if (selectedPrDetail && quantityToProduce && Number(quantityToProduce) > 0) {
         setIsCheckingBom(true);
         try {
-          const [bomData, invData] = await Promise.all([
-            ProductServices.getBOMById(selectedPrDetail.productId),
-            InventoryServices.getConsolidatedInventory({ limit: 2000 })
-          ]);
-          
+          let componentRequirements: Array<{
+            componentId: number;
+            componentName: string;
+            quantityPerUnit: number;
+          }> = [];
+
+          if (selectedPrDetail.details && selectedPrDetail.details.length > 0) {
+            componentRequirements = selectedPrDetail.details.map((d: any) => ({
+              componentId: d.componentId,
+              componentName: d.component.componentName,
+              quantityPerUnit: d.quantityPerUnit
+            }));
+          } else {
+            const bomData = await ProductServices.getBOMById(selectedPrDetail.productId);
+            componentRequirements = bomData.map((b: any) => ({
+              componentId: b.componentId,
+              componentName: b.component.componentName,
+              quantityPerUnit: b.quantityNeeded
+            }));
+          }
+
+          const invData = await InventoryServices.getConsolidatedInventory({ limit: 2000 });
           const inventory = invData.data || [];
-          const result = bomData.map((b: any) => {
-            const required = b.quantityNeeded * Number(quantityToProduce);
-            const stock = inventory.find((i: any) => i.componentId === b.componentId)?.availableQuantity || 0;
+          const result = componentRequirements.map((c: any) => {
+            const required = c.quantityPerUnit * Number(quantityToProduce);
+            const stock = inventory.find((i: any) => i.componentId === c.componentId)?.availableQuantity || 0;
             return {
-              name: b.component.componentName,
+              name: c.componentName,
               required,
               stock,
               status: stock >= required ? 'Available' : 'Shortage'

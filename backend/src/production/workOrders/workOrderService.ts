@@ -252,7 +252,15 @@ class WorkOrderService {
                 employee: { select: { fullName: true } },
                 productionLine: true, // NEW
                 workOrderFulfillments: {
-                    include: { productionRequest: true }
+                    include: {
+                        productionRequest: {
+                            include: {
+                                details: {
+                                    include: { component: { select: { code: true, componentName: true, unit: true } } }
+                                }
+                            }
+                        }
+                    }
                 },
                 productionBatches: {
                     include: { productInstances: true }

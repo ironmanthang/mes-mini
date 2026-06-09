@@ -87,6 +87,7 @@ export interface ProductionRequestById extends ProductionRequest {
         };
     }[];
     details: {
+        componentId: number;
         component: {
             code: string;
             componentName: string;

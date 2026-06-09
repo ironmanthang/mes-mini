@@ -73,9 +73,16 @@ export interface WorkOrderDetail extends WorkOrderListItem {
             soDetailId: number | null;
             status: string;
             dueDate: string | null;
-            note: string | null;
-            approverId: number | null;
-            approvedAt: string | null;
+            details?: {
+                componentId: number;
+                component: {
+                    code: string;
+                    componentName: string;
+                    unit: string;
+                };
+                quantityPerUnit: number;
+                totalRequired: number;
+            }[];
         };
     }[];
     
