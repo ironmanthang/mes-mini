@@ -24,7 +24,10 @@ export async function seedMaterialRequests(): Promise<void> {
 
     for (const wo of workOrders) {
         // Create MR if not exists
-        const mrStatus = wo.status === 'COMPLETED' ? MaterialRequestStatus.ISSUED : MaterialRequestStatus.PENDING;
+        let mrStatus = MaterialRequestStatus.PENDING;
+        if (wo.status === 'COMPLETED' || wo.code === 'WO-DEMO-PR008') {
+            mrStatus = MaterialRequestStatus.ISSUED;
+        }
         
         const mr = await prisma.materialRequest.upsert({
             where: { workOrderId: wo.workOrderId },
@@ -41,30 +44,80 @@ export async function seedMaterialRequests(): Promise<void> {
         // Create Details
         for (const b of wo.product.bom) {
             const qty = b.quantityNeeded * wo.quantity;
-            await prisma.materialRequestDetail.upsert({
-                where: { detailId: -1 }, // Dummy check
-                update: {},
-                create: {
-                    requestId: mr.requestId,
-                    componentId: b.componentId,
-                    quantity: qty
-                }
+            
+            const existingDetail = await prisma.materialRequestDetail.findFirst({
+                where: { requestId: mr.requestId, componentId: b.componentId }
             });
-
-            // If ISSUED, create audit transaction
-            if (mrStatus === MaterialRequestStatus.ISSUED && whMain && admin) {
-                await prisma.inventoryTransaction.create({
+            if (!existingDetail) {
+                await prisma.materialRequestDetail.create({
                     data: {
-                        transactionDate: new Date(),
-                        quantity: qty,
-                        note: `Issued for ${wo.code}`,
-                        employeeId: admin.employeeId,
-                        warehouseId: whMain.warehouseId,
+                        requestId: mr.requestId,
                         componentId: b.componentId,
-                        transactionType: InventoryTransactionType.EXPORT_PRODUCTION,
-                        materialReqId: mr.requestId
+                        quantity: qty
                     }
                 });
+            }
+
+            // If ISSUED, create audit transaction & deduct inventory
+            if (mrStatus === MaterialRequestStatus.ISSUED && whMain && admin) {
+                // Find a lot for this component in whMain
+                const lot = await prisma.componentLot.findFirst({
+                    where: {
+                        warehouseId: whMain.warehouseId,
+                        componentId: b.componentId,
+                        currentQuantity: { gte: qty }
+                    }
+                });
+
+                if (lot) {
+                    // Decrement lot quantity
+                    await prisma.componentLot.update({
+                        where: { componentLotId: lot.componentLotId },
+                        data: { currentQuantity: { decrement: qty } }
+                    });
+
+                    // Decrement aggregate stock
+                    await prisma.componentStock.update({
+                        where: {
+                            warehouseId_componentId: {
+                                warehouseId: whMain.warehouseId,
+                                componentId: b.componentId
+                            }
+                        },
+                        data: { quantity: { decrement: qty } }
+                    });
+
+                    // Create transaction linked to the lot
+                    await prisma.inventoryTransaction.create({
+                        data: {
+                            transactionDate: new Date(),
+                            quantity: qty,
+                            note: `Issued for ${wo.code} (auto-seeded lot decrement)`,
+                            employeeId: admin.employeeId,
+                            warehouseId: whMain.warehouseId,
+                            componentId: b.componentId,
+                            componentLotId: lot.componentLotId,
+                            transactionType: InventoryTransactionType.EXPORT_PRODUCTION,
+                            materialReqId: mr.requestId
+                        }
+                    });
+                } else {
+                    // Fallback if no lot has enough quantity (shortage scenario)
+                    console.warn(`[Seed Warning] No lot with enough stock for component ${b.componentId} in warehouse ${whMain.warehouseId}. Skipping lot decrement.`);
+                    
+                    await prisma.inventoryTransaction.create({
+                        data: {
+                            transactionDate: new Date(),
+                            quantity: qty,
+                            note: `Issued for ${wo.code} (fallback no-lot)`,
+                            employeeId: admin.employeeId,
+                            warehouseId: whMain.warehouseId,
+                            componentId: b.componentId,
+                            transactionType: InventoryTransactionType.EXPORT_PRODUCTION,
+                            materialReqId: mr.requestId
+                        }
+                    });
+                }
             }
         }
     }
@@ -905,6 +958,84 @@ export async function seedDemoProductionRequests(): Promise<void> {
             where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prNew11.productionRequestId } },
             update: {},
             create: { workOrderId: wo.workOrderId, productionRequestId: prNew11.productionRequestId, quantity: 20 }
+        });
+    }
+ 
+    // Seeding all other demo status cases for Work Orders
+    const prDraft = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0003' } });
+    const prReleased = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0005' } });
+    const prCancelled = await prisma.productionRequest.findUnique({ where: { code: 'PR-20260310-0006' } });
+    const gamingPc = await prod('PROD-GAMING-PC');
+
+    if (prDraft && laptop) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-DRAFT' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-DRAFT',
+                quantity: 15,
+                employeeId: manager.employeeId,
+                productId: laptop.productId,
+                status: 'DRAFT',
+                targetSalesWarehouseId: null,
+                targetErrorWarehouseId: null,
+                laborCost: 15000,
+                overheadCost: 7500
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prDraft.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prDraft.productionRequestId, quantity: 15 }
+        });
+    }
+
+    if (prReleased && desktop && line) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-RELEASED' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-RELEASED',
+                quantity: 5,
+                employeeId: manager.employeeId,
+                productId: desktop.productId,
+                productionLineId: line.productionLineId,
+                status: 'RELEASED',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 20000,
+                overheadCost: 10000
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prReleased.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prReleased.productionRequestId, quantity: 5 }
+        });
+    }
+
+    if (prCancelled && gamingPc && line) {
+        const wo = await prisma.workOrder.upsert({
+            where: { code: 'WO-DEMO-CANCELLED' },
+            update: {},
+            create: {
+                code: 'WO-DEMO-CANCELLED',
+                quantity: 10,
+                employeeId: manager.employeeId,
+                productId: gamingPc.productId,
+                productionLineId: line.productionLineId,
+                status: 'CANCELLED',
+                note: 'Auto-seeded: Cancelled due to revised forecast.',
+                targetSalesWarehouseId: fgWarehouse?.warehouseId,
+                targetErrorWarehouseId: defectWarehouse?.warehouseId,
+                laborCost: 10000,
+                overheadCost: 5000
+            }
+        });
+        await prisma.workOrderFulfillment.upsert({
+            where: { workOrderId_productionRequestId: { workOrderId: wo.workOrderId, productionRequestId: prCancelled.productionRequestId } },
+            update: {},
+            create: { workOrderId: wo.workOrderId, productionRequestId: prCancelled.productionRequestId, quantity: 10 }
         });
     }
 

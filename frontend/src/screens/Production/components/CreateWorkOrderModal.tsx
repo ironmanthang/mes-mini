@@ -288,7 +288,7 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
                           <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-700">End Date</label>
+                          <label className="text-sm font-bold text-gray-700">Target End Date</label>
                           <input 
                               type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)}
                               className={`w-full p-2.5 border rounded-lg text-sm outline-none focus:ring-2 ${isDateDelayed ? 'border-orange-500 focus:ring-orange-500 bg-orange-50' : 'border-gray-300 focus:ring-blue-500'}`} 

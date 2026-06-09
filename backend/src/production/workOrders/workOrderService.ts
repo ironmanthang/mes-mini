@@ -165,8 +165,7 @@ class WorkOrderService {
                             status: WorkOrderStatus.DRAFT,
                             employeeId: userId,
                             productionLineId: productionLineId || null,
-                            // TODO: Use targetDate once Prisma Client is properly regenerated in all environments
-                            endDate: earliestDueDate || undefined // Fallback to endDate for now
+                            targetDate: earliestDueDate || undefined
                         },
                         include: {
                             product: true
@@ -523,7 +522,8 @@ class WorkOrderService {
                 data: {
                     status: WorkOrderStatus.COMPLETED,
                     laborCost: data.laborCost,
-                    overheadCost: data.overheadCost
+                    overheadCost: data.overheadCost,
+                    endDate: new Date()
                 }
             });
 

@@ -24,5 +24,5 @@ export const completeWOSchema = Joi.object({
 });
 
 export const cancelWOSchema = Joi.object({
-    reason: Joi.string().trim().max(500).optional()
+    reason: Joi.string().trim().max(500).allow('', null).optional()
 });
