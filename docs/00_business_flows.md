@@ -294,15 +294,15 @@ This records the flow of moving components from COMPONENT warehouse to productio
 
 ## Quality Control
 
-- **Checklist Templates**: Every finished product is associated with a specific **Quality Checklist** template A checklist consists of multiple **Inspection Points** (discrete steps or criteria)
-- After clicking the complete work order button, all product instances are created directly with status PENDING_QC and await QC inspection
-- The system automatically generates a unique QR code or Barcode identifier for each instance
-- Production employees print and slap these QR labels onto the physical products
-- **Scan Requirement**: Each finished unit is labeled with a unique **Serial Number (SN)**; scanning this during Quality Control initiates the inspection flow
-- **Inspection Execution**: The QA inspector must evaluate every **Inspection Point** defined in the product's associated checklist
+- **Checklist Templates**: Every finished product is associated with a specific **Quality Checklist** template. A checklist consists of multiple **Inspection Points** (discrete steps or criteria), but each criterion only has one type: binary (either Pass or Fail).
+- After clicking the complete work order button, all product instances are created directly with status PENDING_QC and await QC inspection.
+- The system automatically generates a unique QR code or Barcode identifier for each instance.
+- Production employees print and slap these QR labels onto the physical products.
+- **Scan Requirement**: Each finished unit is labeled with a unique **Serial Number (SN)**; scanning this during Quality Control initiates the inspection flow.
+- **Inspection Execution**: The QA inspector must evaluate every **Inspection Point** defined in the product's associated checklist.
 - **Binary Outcome Rule**: Despite having multiple inspection points, the final result for the unit is strictly binary:
-  - **PASSED_QC**: All inspection points passed
-  - **FAILED_QC**: Any single inspection point failed (**One Fail = Total Fail**)
+  - **PASSED_QC**: All inspection points passed.
+  - **FAILED_QC**: Any single inspection point failed (**One Fail = Total Fail**).
 - After QC inspection, the instance status strictly remains as **PASSED_QC** or **FAILED_QC**. The units are physically still at the production staging area and are not yet in the warehouse inventory.
 - **Warehouse Induction (Handover)**: To physically accept the goods into the warehouse, warehouse staff must explicitly induct them (e.g., via a `POST /warehouse-ops/product-induction` API call).
   - The API receives a list of scanned Serial Numbers at the warehouse receiving gate.

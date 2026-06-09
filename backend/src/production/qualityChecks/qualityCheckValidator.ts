@@ -8,7 +8,6 @@ export const createCheckSchema = Joi.object({
         Joi.object({
             inspectionPointId: Joi.number().integer().required(),
             passed: Joi.boolean().required(),
-            measuredValue: Joi.number().optional(),
             notes: Joi.string().allow('', null).optional()
         })
     ).min(1).required()

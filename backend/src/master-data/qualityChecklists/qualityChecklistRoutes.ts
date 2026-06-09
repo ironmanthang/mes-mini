@@ -88,9 +88,6 @@ router.get('/:id', authorize(PERM.QC_READ), getChecklistById);
  *                   properties:
  *                     pointName:
  *                       type: string
- *                     pointType:
- *                       type: string
- *                       enum: [BINARY, MEASUREMENT, SELECTION]
  *     responses:
  *       201:
  *         description: Created checklist
@@ -160,13 +157,10 @@ router.delete('/:id', authorize(PERM.PRODUCT_UPDATE), deleteChecklist);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [pointName, pointType]
+ *             required: [pointName]
  *             properties:
  *               pointName:
  *                 type: string
- *               pointType:
- *                 type: string
- *                 enum: [BINARY, MEASUREMENT, SELECTION]
  *     responses:
  *       201:
  *         description: Added point

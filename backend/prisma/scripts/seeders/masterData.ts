@@ -2,7 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from '../../../src/common/lib/prisma.js';
 import { PERM } from '../../../src/common/constants/permissions.js';
-import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType, ProductInstanceStatus, MaterialRequestStatus, InspectionType } from '../../../src/generated/prisma/index.js';
+import { EmployeeStatus, PurchaseOrderStatus, SalesOrderStatus, ProductionRequestStatus, Priority, WarehouseType, InventoryTransactionType, ProductInstanceStatus, MaterialRequestStatus } from '../../../src/generated/prisma/index.js';
 
 const DEFAULT_PASSWORD = '123456';
 
@@ -108,24 +108,18 @@ export async function seedQualityChecklists(): Promise<void> {
                 checklistId: elecChecklist.checklistId,
                 pointName: 'Power On Test',
                 description: 'Verify device powers on correctly',
-                pointType: InspectionType.BINARY,
                 sortOrder: 1
             },
             {
                 checklistId: elecChecklist.checklistId,
                 pointName: 'Screen Quality',
                 description: 'Check for dead pixels or scratches',
-                pointType: InspectionType.BINARY,
                 sortOrder: 2
             },
             {
                 checklistId: elecChecklist.checklistId,
-                pointName: 'Battery Voltage',
-                description: 'Measure battery voltage',
-                pointType: InspectionType.MEASUREMENT,
-                minValue: 3.7,
-                maxValue: 4.2,
-                unit: 'V',
+                pointName: 'Battery Status',
+                description: 'Verify battery function and status',
                 sortOrder: 3
             }
         ]

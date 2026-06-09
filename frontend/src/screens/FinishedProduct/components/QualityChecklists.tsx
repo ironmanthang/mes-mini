@@ -7,7 +7,6 @@ import {
   QualityChecklistServices,
   type QualityChecklist,
   type InspectionPoint,
-  type InspectionType,
   type PointDataInput
 } from "../../../services/qualityChecklistServices";
 import { ConfirmNotification } from "../../Notification/ConfirmNotification";
@@ -37,10 +36,6 @@ export const QualityChecklists = (): JSX.Element => {
   // Form states - Inspection Point
   const [pointName, setPointName] = useState("");
   const [pointDescription, setPointDescription] = useState("");
-  const [pointType, setPointType] = useState<InspectionType>("BINARY");
-  const [minValue, setMinValue] = useState<number | "">("");
-  const [maxValue, setMaxValue] = useState<number | "">("");
-  const [unit, setUnit] = useState("");
   const [sortOrder, setSortOrder] = useState<number>(0);
 
   // Notification & Confirm States
@@ -198,10 +193,6 @@ export const QualityChecklists = (): JSX.Element => {
   const resetPointForm = () => {
     setPointName("");
     setPointDescription("");
-    setPointType("BINARY");
-    setMinValue("");
-    setMaxValue("");
-    setUnit("");
     setSortOrder(0);
   };
 
@@ -226,15 +217,8 @@ export const QualityChecklists = (): JSX.Element => {
       const payload: PointDataInput = {
         pointName: pointName.trim(),
         description: pointDescription.trim() || undefined,
-        pointType,
         sortOrder: Number(sortOrder) || 0
       };
-
-      if (pointType === "MEASUREMENT") {
-        if (minValue !== "") payload.minValue = Number(minValue);
-        if (maxValue !== "") payload.maxValue = Number(maxValue);
-        if (unit.trim()) payload.unit = unit.trim();
-      }
 
       await QualityChecklistServices.addInspectionPoint(selectedChecklist.checklistId, payload);
       triggerSuccess("Inspection point added successfully!");
@@ -254,10 +238,6 @@ export const QualityChecklists = (): JSX.Element => {
     setSelectedPoint(point);
     setPointName(point.pointName);
     setPointDescription(point.description || "");
-    setPointType(point.pointType as InspectionType);
-    setMinValue(point.minValue !== null ? point.minValue : "");
-    setMaxValue(point.maxValue !== null ? point.maxValue : "");
-    setUnit(point.unit || "");
     setSortOrder(point.sortOrder);
     setShowEditPointModal(true);
   };
@@ -271,12 +251,7 @@ export const QualityChecklists = (): JSX.Element => {
       const payload: Partial<PointDataInput> = {
         pointName: pointName.trim(),
         description: pointDescription.trim() || undefined,
-        pointType,
-        sortOrder: Number(sortOrder) || 0,
-        // Send values if measurement type, send undefined/null to reset if binary/selection
-        minValue: pointType === "MEASUREMENT" && minValue !== "" ? Number(minValue) : undefined,
-        maxValue: pointType === "MEASUREMENT" && maxValue !== "" ? Number(maxValue) : undefined,
-        unit: pointType === "MEASUREMENT" && unit.trim() ? unit.trim() : undefined
+        sortOrder: Number(sortOrder) || 0
       };
 
       await QualityChecklistServices.updateInspectionPoint(selectedPoint.inspectionPointId, payload);
@@ -523,42 +498,10 @@ export const QualityChecklists = (): JSX.Element => {
                           Sort: {point.sortOrder}
                         </span>
                         <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{point.pointName}</h4>
-                        
-                        {/* Type Badge */}
-                        {point.pointType === "BINARY" && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">
-                            BINARY (Pass/Fail)
-                          </span>
-                        )}
-                        {point.pointType === "MEASUREMENT" && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            MEASUREMENT
-                          </span>
-                        )}
-                        {point.pointType === "SELECTION" && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
-                            SELECTION
-                          </span>
-                        )}
                       </div>
 
                       {point.description && (
                         <p className="text-xs text-gray-500 line-clamp-2">{point.description}</p>
-                      )}
-
-                      {/* Display Range Specs for MEASUREMENT points */}
-                      {point.pointType === "MEASUREMENT" && (
-                        <div className="text-xs font-mono bg-gray-50 border border-gray-100 rounded-lg p-2 flex items-center gap-4 text-gray-600 w-fit">
-                          {point.minValue !== null && (
-                            <span>Min: <strong className="text-gray-900">{point.minValue}</strong></span>
-                          )}
-                          {point.maxValue !== null && (
-                            <span>Max: <strong className="text-gray-900">{point.maxValue}</strong></span>
-                          )}
-                          {point.unit && (
-                            <span>Unit: <strong className="text-gray-900">{point.unit}</strong></span>
-                          )}
-                        </div>
                       )}
                     </div>
 
@@ -812,77 +755,16 @@ export const QualityChecklists = (): JSX.Element => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-gray-700">Inspection Type *</label>
-                  <select
-                    value={pointType}
-                    onChange={e => setPointType(e.target.value as InspectionType)}
-                    disabled={isSubmitting}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="BINARY">BINARY (Pass/Fail)</option>
-                    <option value="MEASUREMENT">MEASUREMENT (Numerical Range)</option>
-                    <option value="SELECTION">SELECTION</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-gray-700">Sort Order *</label>
-                  <input
-                    type="number"
-                    value={sortOrder}
-                    onChange={e => setSortOrder(Number(e.target.value))}
-                    disabled={isSubmitting}
-                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-gray-700">Sort Order *</label>
+                <input
+                  type="number"
+                  value={sortOrder}
+                  onChange={e => setSortOrder(Number(e.target.value))}
+                  disabled={isSubmitting}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-
-              {/* Conditional parameters fields for MEASUREMENT type */}
-              {pointType === "MEASUREMENT" && (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-200">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Measurement Rules</p>
-                  
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-600">Min Expected Value</label>
-                      <input
-                        type="number"
-                        placeholder="None"
-                        step="any"
-                        value={minValue}
-                        onChange={e => setMinValue(e.target.value === "" ? "" : Number(e.target.value))}
-                        disabled={isSubmitting}
-                        className="w-full p-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-600">Max Expected Value</label>
-                      <input
-                        type="number"
-                        placeholder="None"
-                        step="any"
-                        value={maxValue}
-                        onChange={e => setMaxValue(e.target.value === "" ? "" : Number(e.target.value))}
-                        disabled={isSubmitting}
-                        className="w-full p-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-600">Unit of Measurement</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. V, mm, Ohm"
-                        value={unit}
-                        onChange={e => setUnit(e.target.value)}
-                        disabled={isSubmitting}
-                        className="w-full p-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="p-5 border-t border-gray-100 bg-gray-50 rounded-b-lg flex justify-end gap-3">

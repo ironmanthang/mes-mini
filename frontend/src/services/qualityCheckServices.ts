@@ -5,7 +5,6 @@ export type QualityCheckResult = 'PASSED' | 'FAILED';
 export interface InspectionResultInput {
     inspectionPointId: number;
     passed: boolean;
-    measuredValue?: number;
     notes?: string;
 }
 
@@ -36,11 +35,9 @@ export interface QualityCheckDetail {
     };
     inspectionResults: {
         passed: boolean;
-        measuredValue: number | null;
         notes: string | null;
         inspectionPoint: { 
             pointName: string; 
-            pointType: string; 
         };
     }[];
 }

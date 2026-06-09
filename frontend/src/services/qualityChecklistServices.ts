@@ -1,16 +1,10 @@
 import api from "./api";
 
-export type InspectionType = 'BINARY' | 'MEASUREMENT' | 'SELECTION';
-
 export interface InspectionPoint {
     inspectionPointId: number;
     checklistId: number;
     pointName: string;
     description: string | null;
-    pointType: InspectionType;
-    minValue: number | null;
-    maxValue: number | null;
-    unit: string | null;
     sortOrder: number;
 }
 
@@ -26,10 +20,6 @@ export interface QualityChecklist {
 export interface PointDataInput {
     pointName: string;
     description?: string;
-    pointType: InspectionType;
-    minValue?: number;
-    maxValue?: number;
-    unit?: string;
     sortOrder?: number;
 }
 

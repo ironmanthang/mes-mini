@@ -9,17 +9,13 @@ const DEFAULT_PASSWORD = '123456';
 export async function seedRoles(): Promise<void> {
     console.log('...Seeding Roles');
 
-    // Consolidated to 8 roles (Warehouse Keeper removed, merged into WH_STAFF)
+    // Consolidated to 4 roles for MVP
     // roleCode is the immutable system identifier — NEVER rename after deployment
     const roles = [
         { code: 'SYS_ADMIN',    name: 'System Admin' },
         { code: 'PROD_MGR',     name: 'Production Manager' },
-        { code: 'WH_STAFF',     name: 'Warehouse Staff' },      // Replaces Warehouse Keeper + Warehouse Manager
+        { code: 'WH_STAFF',     name: 'Warehouse Staff' },
         { code: 'LINE_LEADER',  name: 'Line Leader' },
-        { code: 'PROD_WORKER',  name: 'Production Worker' },
-        { code: 'SALES_STAFF',  name: 'Sales Staff' },
-        { code: 'PURCH_STAFF',  name: 'Purchasing Staff' },
-        { code: 'QC_INSPECTOR', name: 'QC Inspector' },
     ];
 
     for (const role of roles) {
@@ -145,6 +141,11 @@ export async function seedRolePermissions(): Promise<void> {
             PERM.PRODUCT_READ, PERM.PRODUCT_CREATE, PERM.PRODUCT_UPDATE,
             PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
             PERM.SUPPLIER_READ,
+            // Absorbed HR & Role Mgmt
+            PERM.EMP_READ, PERM.EMP_CREATE, PERM.EMP_UPDATE, PERM.EMP_STATUS,
+            PERM.ROLE_MANAGE,
+            PERM.ATTACH_DELETE_ANY,
+            PERM.ATTACH_UPLOAD,
         ],
         WH_STAFF: [
             PERM.WH_STOCK_READ, PERM.WH_STOCK_ADJUST, PERM.WH_MANAGE,
@@ -157,6 +158,12 @@ export async function seedRolePermissions(): Promise<void> {
             PERM.PRODUCT_READ,
             PERM.COMP_READ, PERM.COMP_CREATE, PERM.COMP_UPDATE,
             PERM.SUPPLIER_READ, PERM.SUPPLIER_CREATE, PERM.SUPPLIER_UPDATE,
+            // Absorbed Purchasing
+            PERM.PO_READ, PERM.PO_CREATE, PERM.PO_SUBMIT, PERM.PO_SEND, PERM.PO_CANCEL,
+            PERM.PR_READ, PERM.PR_LINK_PO,
+            // Legacy/Parking
+            PERM.SO_READ, PERM.SO_CREATE, PERM.SO_SUBMIT, PERM.SO_APPROVE, PERM.SO_CANCEL,
+            PERM.AGENT_READ, PERM.AGENT_CREATE, PERM.AGENT_UPDATE,
         ],
         LINE_LEADER: [
             PERM.WO_READ, PERM.WO_UPDATE,
@@ -164,30 +171,8 @@ export async function seedRolePermissions(): Promise<void> {
             PERM.MR_READ, PERM.MR_CREATE,
             PERM.TR_READ,
             PERM.PRODUCT_READ, PERM.COMP_READ,
-        ],
-        PROD_WORKER: [
-            PERM.WO_READ, PERM.QC_READ,
-            PERM.MR_READ,
-            PERM.PRODUCT_READ, PERM.COMP_READ,
-        ],
-        SALES_STAFF: [
-            PERM.SO_READ, PERM.SO_CREATE, PERM.SO_SUBMIT, PERM.SO_APPROVE, PERM.SO_SHIP, PERM.SO_CANCEL,
-            PERM.PR_READ, PERM.PR_CREATE,
-            PERM.DASH_READ,
-            PERM.PRODUCT_READ,
-            PERM.AGENT_READ, PERM.AGENT_CREATE, PERM.AGENT_UPDATE,
-        ],
-        PURCH_STAFF: [
-            PERM.PO_READ, PERM.PO_CREATE, PERM.PO_SUBMIT, PERM.PO_APPROVE, PERM.PO_SEND, PERM.PO_RECEIVE, PERM.PO_CANCEL,
-            PERM.PR_READ, PERM.PR_LINK_PO,
-            PERM.ATTACH_UPLOAD,
-            PERM.PRODUCT_READ, PERM.COMP_READ,
-            PERM.SUPPLIER_READ, PERM.SUPPLIER_CREATE,
-        ],
-        QC_INSPECTOR: [
-            PERM.QC_READ, PERM.QC_CREATE,
-            PERM.WO_READ,
-            PERM.PRODUCT_READ, PERM.COMP_READ,
+            // Absorbed QC
+            PERM.QC_CREATE,
         ],
     };
 
@@ -225,22 +210,18 @@ export async function seedEmployees(minimal: boolean = false): Promise<void> {
     console.log('...Seeding Employees');
     const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
-    // Full list — one employee per role for comprehensive testing
+    // Full list — one employee per role for comprehensive testing (MVP roles only)
     // CHANGED: lookup by roleCode (immutable) instead of roleName (editable)
     const allUsers = [
         { name: 'Super Admin',            username: 'admin',     email: 'admin@mes.com',     roleCode: 'SYS_ADMIN' },
         { name: 'Mr. Production Manager', username: 'manager',   email: 'manager@mes.com',   roleCode: 'PROD_MGR' },
-        { name: 'Ms. Warehouse Staff',    username: 'warehouse', email: 'warehouse@mes.com', roleCode: 'WH_STAFF' },   // CHANGED: was Warehouse Keeper
+        { name: 'Ms. Warehouse Staff',    username: 'warehouse', email: 'warehouse@mes.com', roleCode: 'WH_STAFF' },
         { name: 'Ms. Line Leader',        username: 'lineleader',email: 'lineleader@mes.com',roleCode: 'LINE_LEADER' },
-        { name: 'Mr. Production Worker',  username: 'worker',    email: 'worker@mes.com',    roleCode: 'PROD_WORKER' },
-        { name: 'Ms. Sales Staff',        username: 'sales',     email: 'sales@mes.com',     roleCode: 'SALES_STAFF' },
-        { name: 'Mr. Purchasing Staff',   username: 'purchaser', email: 'purchase@mes.com',  roleCode: 'PURCH_STAFF' },
-        { name: 'Ms. QC Inspector',       username: 'qc',        email: 'qc@mes.com',        roleCode: 'QC_INSPECTOR' },
     ];
 
     const users = minimal
         ? [allUsers[0]]  // Only Super Admin
-        : allUsers;      // All 8 employees (one per role)
+        : allUsers;      // All 4 employees (one per role)
 
     console.log(`   Mode: ${minimal ? 'MINIMAL (1 admin only)' : 'FULL (' + users.length + ' employees, one per role)'}`);
 

@@ -8,7 +8,6 @@ import {
 interface InspectionResultInput {
     inspectionPointId: number;
     passed: boolean;
-    measuredValue?: number;
     notes?: string;
 }
 
@@ -118,7 +117,6 @@ class QualityCheckService {
                             create: data.inspectionResults.map(r => ({
                                 inspectionPointId: r.inspectionPointId,
                                 passed: r.passed,
-                                measuredValue: r.measuredValue,
                                 notes: r.notes
                             }))
                         }
@@ -127,7 +125,7 @@ class QualityCheckService {
                         inspectionResults: {
                             include: {
                                 inspectionPoint: {
-                                    select: { pointName: true, pointType: true }
+                                    select: { pointName: true }
                                 }
                             }
                         },
@@ -319,7 +317,7 @@ class QualityCheckService {
                 inspectionResults: {
                     include: {
                         inspectionPoint: {
-                            select: { pointName: true, pointType: true }
+                            select: { pointName: true }
                         }
                     }
                 }
@@ -344,7 +342,7 @@ class QualityCheckService {
                 inspectionResults: {
                     include: {
                         inspectionPoint: {
-                            select: { pointName: true, pointType: true }
+                            select: { pointName: true }
                         }
                     }
                 }

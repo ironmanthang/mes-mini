@@ -452,9 +452,9 @@ export async function seedDemoProductInstances(): Promise<void> {
 export async function seedDemoPurchaseOrders(): Promise<void> {
     console.log('...Seeding Demo Purchase Orders');
 
-    const purchaser = await prisma.employee.findFirst({ where: { username: 'purchaser' } });
+    const purchaser = await prisma.employee.findFirst({ where: { username: 'warehouse' } });
     const manager = await prisma.employee.findFirst({ where: { username: 'manager' } });
-    if (!purchaser || !manager) { console.warn('   ⚠️ Missing purchaser or manager employee'); return; }
+    if (!purchaser || !manager) { console.warn('   ⚠️ Missing warehouse or manager employee'); return; }
 
     // Helper to find IDs by code
     const sup = async (code: string) => (await prisma.supplier.findUnique({ where: { code } }))!;
@@ -597,9 +597,9 @@ export async function seedDemoPurchaseOrders(): Promise<void> {
 export async function seedDemoSalesOrders(): Promise<void> {
     console.log('...Seeding Demo Sales Orders');
 
-    const sales = await prisma.employee.findFirst({ where: { username: 'sales' } });
+    const sales = await prisma.employee.findFirst({ where: { username: 'warehouse' } });
     const manager = await prisma.employee.findFirst({ where: { username: 'manager' } });
-    if (!sales || !manager) { console.warn('   ⚠️ Missing sales or manager employee'); return; }
+    if (!sales || !manager) { console.warn('   ⚠️ Missing warehouse or manager employee'); return; }
 
     const agt = async (code: string) => (await prisma.agent.findUnique({ where: { code } }))!;
     const prod = async (code: string) => (await prisma.product.findUnique({ where: { code } }))!;

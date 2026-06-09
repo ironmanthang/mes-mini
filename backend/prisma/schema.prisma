@@ -51,11 +51,6 @@ enum QualityCheckResult {
   FAILED
 }
 
-enum InspectionType {
-  BINARY
-  MEASUREMENT
-  SELECTION
-}
 
 enum ProductInstanceStatus {
   PENDING_QC
@@ -620,10 +615,6 @@ model InspectionPoint {
   checklistId       Int               @map("checklist_id")
   pointName         String            @map("point_name")
   description       String?
-  pointType         InspectionType    @default(BINARY) @map("point_type")
-  minValue          Decimal?          @map("min_value") @db.Decimal(10, 4)
-  maxValue          Decimal?          @map("max_value") @db.Decimal(10, 4)
-  unit              String?
   sortOrder         Int               @default(0) @map("sort_order")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
@@ -638,7 +629,6 @@ model InspectionResult {
   qualityCheckId     Int             @map("quality_check_id")
   inspectionPointId  Int             @map("inspection_point_id")
   passed             Boolean
-  measuredValue      Decimal?        @map("measured_value") @db.Decimal(10, 4)
   notes              String?
   qualityCheck       QualityCheck    @relation(fields: [qualityCheckId], references: [qualityCheckId], onDelete: Cascade)
   inspectionPoint    InspectionPoint @relation(fields: [inspectionPointId], references: [inspectionPointId])

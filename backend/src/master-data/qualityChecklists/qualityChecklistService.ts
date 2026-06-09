@@ -1,13 +1,8 @@
 import prisma from '../../common/lib/prisma.js';
-import { InspectionType } from '../../generated/prisma/index.js';
 
 interface PointData {
     pointName: string;
     description?: string;
-    pointType: InspectionType;
-    minValue?: number;
-    maxValue?: number;
-    unit?: string;
     sortOrder?: number;
 }
 
@@ -49,10 +44,6 @@ class QualityChecklistService {
                     create: data.points?.map(p => ({
                         pointName: p.pointName,
                         description: p.description,
-                        pointType: p.pointType,
-                        minValue: p.minValue,
-                        maxValue: p.maxValue,
-                        unit: p.unit,
                         sortOrder: p.sortOrder || 0
                     })) || []
                 }

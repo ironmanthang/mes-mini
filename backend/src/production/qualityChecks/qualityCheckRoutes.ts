@@ -80,9 +80,6 @@ router.get('/work-order/:woId',
  *                     passed:
  *                       type: boolean
  *                       description: Whether this inspection point passed
- *                     measuredValue:
- *                       type: number
- *                       description: Measured value — required for MEASUREMENT type points
  *                     notes:
  *                       type: string
  *                       description: Optional notes for this specific inspection point
@@ -99,8 +96,7 @@ router.get('/work-order/:woId',
  *                 notes: "Screen is flawless"
  *               - inspectionPointId: 3
  *                 passed: true
- *                 measuredValue: 4.0
- *                 notes: "Battery voltage is within range"
+ *                 notes: "Battery status is within range"
  *     responses:
  *       201:
  *         description: QC inspection recorded successfully
@@ -128,7 +124,6 @@ router.get('/work-order/:woId',
  *                       inspectionResultId: { type: integer }
  *                       inspectionPointId: { type: integer }
  *                       passed: { type: boolean }
- *                       measuredValue: { type: number, nullable: true }
  *                       notes: { type: string, nullable: true }
  *       400:
  *         description: Validation error — missing points, duplicate QC, or missing checklist
@@ -180,13 +175,11 @@ router.get('/work-order/:woId',
  *                       type: object
  *                       properties:
  *                         passed: { type: boolean }
- *                         measuredValue: { type: number, nullable: true }
  *                         notes: { type: string, nullable: true }
  *                         inspectionPoint:
  *                           type: object
  *                           properties:
  *                             pointName: { type: string }
- *                             pointType: { type: string }
  */
 
 /**
@@ -232,13 +225,11 @@ router.get('/work-order/:woId',
  *                       type: object
  *                       properties:
  *                         passed: { type: boolean }
- *                         measuredValue: { type: number, nullable: true }
  *                         notes: { type: string, nullable: true }
  *                         inspectionPoint:
  *                           type: object
  *                           properties:
  *                             pointName: { type: string }
- *                             pointType: { type: string }
  */
 
 export default router;
