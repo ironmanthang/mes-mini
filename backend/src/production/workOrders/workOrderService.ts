@@ -95,7 +95,12 @@ class WorkOrderService {
             // A CANCELLED WO must "return" its quantity back to the PR so it can be re-scheduled.
             const previousFulfilled = req.workOrderFulfillments
                 .filter((f: any) => f.workOrder.status !== WorkOrderStatus.CANCELLED)
-                .reduce((sum: number, f: any) => sum + f.quantity, 0);
+                .reduce((sum: number, f: any) => {
+                    if (f.workOrder.status === WorkOrderStatus.COMPLETED) {
+                        return sum + f.fulfilledQuantity;
+                    }
+                    return sum + f.quantity;
+                }, 0);
             const remainingQuantity = req.quantity - previousFulfilled;
 
             // Determine qty for this specific request
