@@ -15,9 +15,51 @@
  *   It is NOT calling docker exec from the outside.
  */
 import { execSync } from 'child_process';
+import pg from 'pg';
 
 export default async function globalSetup(): Promise<void> {
-    console.log('\n🔄 [Global Setup] Resetting database and re-seeding...');
+    console.log('\n🔄 [Global Setup] Ensuring test database exists...');
+
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+        throw new Error('DATABASE_URL is not defined in environment variables');
+    }
+
+    try {
+        const testUrl = new URL(databaseUrl);
+        const testDbName = testUrl.pathname.replace(/^\//, ''); // e.g. "mydatabase_test"
+        
+        // Connect to the development/original database to create the test database
+        const devDbName = testDbName.endsWith('_test') ? testDbName.slice(0, -5) : 'postgres';
+        const adminUrl = new URL(databaseUrl);
+        adminUrl.pathname = '/' + devDbName;
+
+        const client = new pg.Client({ connectionString: adminUrl.toString() });
+        await client.connect();
+        
+        try {
+            const dbCheck = await client.query(
+                'SELECT 1 FROM pg_database WHERE datname = $1',
+                [testDbName]
+            );
+            if (dbCheck.rowCount === 0) {
+                console.log(`🔨 [Global Setup] Database "${testDbName}" does not exist. Creating it...`);
+                // Note: CREATE DATABASE cannot be parameterized, so we interpolate it inside double quotes safely.
+                await client.query(`CREATE DATABASE "${testDbName}"`);
+                console.log(`✅ [Global Setup] Database "${testDbName}" created successfully.`);
+            } else {
+                console.log(`ℹ️ [Global Setup] Database "${testDbName}" already exists.`);
+            }
+        } finally {
+            await client.end();
+        }
+
+    } catch (error) {
+        console.error('❌ [Global Setup] Failed to ensure test database exists:', error);
+        throw error;
+    }
+
+    console.log('🔄 [Global Setup] Resetting database and re-seeding...');
 
     try {
         // Step 1: Wipe all tables and re-run migrations from scratch
