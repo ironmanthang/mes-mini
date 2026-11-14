@@ -25,6 +25,7 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import {
+    assertR2Configured,
     generatePresignedUploadUrl,
     generatePresignedDownloadUrl,
     deleteObject,
@@ -182,6 +183,8 @@ class AttachmentService {
         uploadedBy: number,
         ctx:        EntityContext,
     ) {
+        assertR2Configured();
+
         // Re-check status guard (PO status could have changed between step 1 and 2)
         if (!ctx.canUpload) {
             throw new AppError(

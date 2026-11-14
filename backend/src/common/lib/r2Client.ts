@@ -27,56 +27,55 @@ import {
     GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { AppError } from '../utils/AppError.js';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validate required env vars at startup
-// ─────────────────────────────────────────────────────────────────────────────
-const R2_ENDPOINT     = process.env.R2_ENDPOINT!;
-const R2_ACCESS_KEY   = process.env.R2_ACCESS_KEY_ID!;
-const R2_SECRET_KEY   = process.env.R2_SECRET_ACCESS_KEY!;
-const R2_BUCKET       = process.env.R2_BUCKET_NAME!;
+const R2_ENDPOINT = process.env.R2_ENDPOINT;
+const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET = process.env.R2_BUCKET_NAME;
 
 /** Public endpoint for presigned URLs. Defaults to R2_ENDPOINT if not set. */
 const R2_PUBLIC_ENDPOINT = process.env.R2_PUBLIC_ENDPOINT || R2_ENDPOINT;
 
-if (!R2_ENDPOINT || !R2_ACCESS_KEY || !R2_SECRET_KEY || !R2_BUCKET) {
-    throw new Error(
-        'R2 configuration is incomplete. Ensure R2_ENDPOINT, R2_ACCESS_KEY_ID, ' +
-        'R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME are set in .env'
-    );
+const r2Clients = R2_ENDPOINT && R2_ACCESS_KEY && R2_SECRET_KEY && R2_BUCKET
+    ? (() => {
+        const credentials = {
+            accessKeyId: R2_ACCESS_KEY,
+            secretAccessKey: R2_SECRET_KEY,
+        };
+
+        return {
+            internal: new S3Client({
+                region: 'auto',
+                endpoint: R2_ENDPOINT,
+                credentials,
+                forcePathStyle: true,
+            }),
+            public: new S3Client({
+                region: 'auto',
+                endpoint: R2_PUBLIC_ENDPOINT,
+                credentials,
+                forcePathStyle: true,
+            }),
+        };
+    })()
+    : null;
+
+function getR2Clients() {
+    if (!r2Clients) {
+        throw new AppError(
+            'File attachments are unavailable because R2 is not configured. ' +
+            'Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME on the backend.',
+            503
+        );
+    }
+
+    return r2Clients;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// S3 Clients
-// ─────────────────────────────────────────────────────────────────────────────
-
-const sharedCredentials = {
-    accessKeyId:     R2_ACCESS_KEY,
-    secretAccessKey: R2_SECRET_KEY,
-};
-
-/**
- * Internal client — used for server-side operations (deleteObject).
- * Endpoint: Docker-internal (e.g. http://minio:9000) or production R2.
- */
-const s3Internal = new S3Client({
-    region: 'auto',
-    endpoint: R2_ENDPOINT,
-    credentials: sharedCredentials,
-    forcePathStyle: true,   // Both R2 and MinIO support path-style
-});
-
-/**
- * Public client — used exclusively for generating presigned URLs.
- * Endpoint: Host-reachable (e.g. http://localhost:9000) or production R2.
- * The signature is bound to this endpoint, so the browser MUST use it as-is.
- */
-const s3Public = new S3Client({
-    region: 'auto',
-    endpoint: R2_PUBLIC_ENDPOINT,
-    credentials: sharedCredentials,
-    forcePathStyle: true,
-});
+export function assertR2Configured(): void {
+    getR2Clients();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -104,13 +103,14 @@ export async function generatePresignedUploadUrl(
     mimeType: string,
     fileSize: number,
 ): Promise<string> {
+    const clients = getR2Clients();
     const cmd = new PutObjectCommand({
         Bucket:        R2_BUCKET,
         Key:           fileKey,
         ContentType:   mimeType,
         ContentLength: fileSize,
     });
-    return getSignedUrl(s3Public, cmd, { expiresIn: PRESIGN_UPLOAD_EXPIRES_SEC });
+    return getSignedUrl(clients.public, cmd, { expiresIn: PRESIGN_UPLOAD_EXPIRES_SEC });
 }
 
 /**
@@ -120,11 +120,12 @@ export async function generatePresignedUploadUrl(
  * @param fileKey  R2 object key, e.g. "purchase-orders/47/contract.pdf"
  */
 export async function generatePresignedDownloadUrl(fileKey: string): Promise<string> {
+    const clients = getR2Clients();
     const cmd = new GetObjectCommand({
         Bucket: R2_BUCKET,
         Key:    fileKey,
     });
-    return getSignedUrl(s3Public, cmd, { expiresIn: PRESIGN_DOWNLOAD_EXPIRES_SEC });
+    return getSignedUrl(clients.public, cmd, { expiresIn: PRESIGN_DOWNLOAD_EXPIRES_SEC });
 }
 
 /**
@@ -137,9 +138,10 @@ export async function generatePresignedDownloadUrl(fileKey: string): Promise<str
  * @param fileKey  R2 object key
  */
 export async function deleteObject(fileKey: string): Promise<void> {
+    const clients = getR2Clients();
     const cmd = new DeleteObjectCommand({
         Bucket: R2_BUCKET,
         Key:    fileKey,
     });
-    await s3Internal.send(cmd);
+    await clients.internal.send(cmd);
 }

@@ -10,7 +10,7 @@
   - `CONTAINER_PORT=3000`
   - `DATABASE_URL` — Supabase transaction pooler (port `6543`)
   - `DIRECT_URL` — Supabase session pooler (port `5432`)
-  - R2 storage values (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`)
+  - R2 storage values (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`) — required only for file attachments; without them, the backend starts normally but attachment operations return 503.
 
 ### Database — Supabase
 
