@@ -502,12 +502,19 @@ class ProductionRequestService {
         }
 
         // Calculate remaining quantity to schedule
-        const fulfilledQuantity = req.workOrderFulfillments.reduce((sum, f) => sum + f.quantity, 0);
-        const remainingQtyToSchedule = req.quantity - fulfilledQuantity;
+        const scheduledQuantity = req.workOrderFulfillments
+            .filter((f: any) => f.workOrder.status !== WorkOrderStatus.CANCELLED)
+            .reduce((sum: number, f: any) => {
+                if (f.workOrder.status === WorkOrderStatus.COMPLETED) {
+                    return sum + f.fulfilledQuantity;
+                }
+                return sum + f.quantity;
+            }, 0);
+        const remainingQtyToSchedule = Math.max(0, req.quantity - scheduledQuantity);
 
         return {
             ...req,
-            fulfilledQuantity,
+            fulfilledQuantity: scheduledQuantity,
             remainingQtyToSchedule
         };
     }

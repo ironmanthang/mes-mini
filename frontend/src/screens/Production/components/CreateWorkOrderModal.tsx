@@ -86,7 +86,13 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
       ProductionRequestServices.getProductionRequestById(Number(selectedRequestId))
         .then(details => {
           setSelectedPrDetail(details);
-          const scheduledQty = details.workOrderFulfillments?.reduce((sum, f) => sum + (f.workOrder?.quantity || 0), 0) || 0;
+          const scheduledQty = details.workOrderFulfillments?.reduce((sum, f) => {
+            if (f.workOrder?.status === 'CANCELLED') return sum;
+            if (f.workOrder?.status === 'COMPLETED') {
+              return sum + (f.fulfilledQuantity || 0);
+            }
+            return sum + (f.workOrder?.quantity || 0);
+          }, 0) || 0;
           const remaining = Math.max(0, details.quantity - scheduledQty);
           
           setQuantityToProduce(remaining);
@@ -152,8 +158,14 @@ export const CreateWorkOrderModal = ({ isOpen, onClose, onSuccess }: CreateWorkO
     return () => clearTimeout(timer);
   }, [showWarning]);
 
-  const scheduledQty = selectedPrDetail?.workOrderFulfillments?.reduce((sum, f) => sum + (f.workOrder?.quantity || 0), 0) || 0;
-  const remainingQtyToSchedule = selectedPrDetail ? selectedPrDetail.quantity - scheduledQty : 0;
+  const scheduledQty = selectedPrDetail?.workOrderFulfillments?.reduce((sum, f) => {
+    if (f.workOrder?.status === 'CANCELLED') return sum;
+    if (f.workOrder?.status === 'COMPLETED') {
+      return sum + (f.fulfilledQuantity || 0);
+    }
+    return sum + (f.workOrder?.quantity || 0);
+  }, 0) || 0;
+  const remainingQtyToSchedule = selectedPrDetail ? Math.max(0, selectedPrDetail.quantity - scheduledQty) : 0;
   
   const isDateDelayed = endDate && selectedPrDetail?.dueDate && new Date(endDate) > new Date(selectedPrDetail.dueDate);
   const isQtyExceeded = Number(quantityToProduce) > remainingQtyToSchedule;
