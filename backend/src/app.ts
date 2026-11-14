@@ -36,7 +36,8 @@ app.use(cors({
         'https://mes-mini.pages.dev',      // Cloudflare Pages production
         /\.pages\.dev$/,                   // Cloudflare preview deploys
         'null',                            // Allow local file:/// execution
-        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/ // Allow local network (Phones/Tablets)
+        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Allow local network (Phones/Tablets
+        'https://mes-mini-fe-two.vercel.app/'
     ],
     credentials: true
 }));
