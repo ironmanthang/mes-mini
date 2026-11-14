@@ -12,16 +12,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             user
         });
     } catch (error) {
-        const err = error as Error;
-        if (err.message === 'Username and password are required') {
-            res.status(400).json({ message: err.message });
+        if (error instanceof Error && error.message === 'Username and password are required') {
+            res.status(400).json({ message: error.message });
             return;
         }
-        if (err.message === 'Invalid credentials' || err.message.includes('Account is inactive')) {
-            res.status(401).json({ message: err.message });
+        if (error instanceof Error &&
+            (error.message === 'Invalid credentials' || error.message.includes('Account is inactive'))) {
+            res.status(401).json({ message: error.message });
             return;
         }
-        res.status(500).json({ message: 'Server error', error: err.message });
+        console.error('[AuthController] Login failed:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
